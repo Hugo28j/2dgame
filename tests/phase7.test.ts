@@ -4,6 +4,7 @@ import {
   ENEMY_CONFIGS, getBossName, getEnemyKindForRoom, getEnemyStatsForRoom,
 } from '../src/enemies/enemyConfig';
 import { bossPhase, rangedVelocity, withinRadius } from '../src/enemies/enemyMovement';
+import { shotAngles } from '../src/enemies/projectilePatterns';
 import { CHAPTER_ROOM_COUNT, getRoomDefinition } from '../src/rooms/roomConfig';
 
 describe('phase 7 room enemy rosters', () => {
@@ -74,5 +75,15 @@ describe('phase 7 tactical movement', () => {
   it('uses a circular explosion hit test with exact boundary handling', () => {
     expect(withinRadius(0, 0, 30, 40, 50)).toBe(true);
     expect(withinRadius(0, 0, 30, 41, 50)).toBe(false);
+  });
+});
+
+describe('phase 7 projectile patterns', () => {
+  it('fires equally spaced 360-degree radial shots instead of an aimed fan', () => {
+    const angles = shotAngles('radial', 2);
+    expect(angles).toHaveLength(8);
+    angles.forEach((angle, index) => expect(angle).toBeCloseTo(index * Math.PI / 4));
+    expect(shotAngles('fan', 0)).toEqual([-0.28, 0, 0.28]);
+    expect(shotAngles('single', 0.5)).toEqual([0.5]);
   });
 });
