@@ -23,5 +23,5 @@
 
 ## Huidige status
 
-- Actieve ontwikkelfase: **fase 7 – Vijanden en bossgevechten**.
-- Volgende fase na afzonderlijke goedkeuring: **fase 8 – Roguelike progressie en economie**.
+- Actieve ontwikkelfase: **fase 8 – Progressie en economie**.
+- Volgende fase na afzonderlijke goedkeuring: **fase 9 – Visuele afwerking**.
