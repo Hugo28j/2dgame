@@ -169,10 +169,11 @@ export class AdvancedEnemy extends Slime {
       { x: this.x + this.dashX * reach - normalX, y: this.y + this.dashY * reach - normalY },
       { x: this.x - normalX, y: this.y - normalY },
     ];
+    const corners = points.map(point => new Phaser.Math.Vector2(point.x, point.y));
     this.warning.fillStyle(color, 0.18);
-    this.warning.fillPoints(points, true);
+    this.warning.fillPoints(corners, true);
     this.warning.lineStyle(3, color, 0.9);
-    this.warning.strokePoints(points, true);
+    this.warning.strokePoints(corners, true);
   }
   private clearWarning(): void {
     this.windupEndsAt = 0;
