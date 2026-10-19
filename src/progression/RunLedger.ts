@@ -1,7 +1,9 @@
+import type { WorldId } from '../worlds/worldConfig';
 import type { EnemyKind } from '../enemies/enemyConfig';
 import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
 
 export interface RunReport {
+  worldId: WorldId;
   runId: string;
   reachedRoom: number;
   roomsCleared: number;
@@ -22,7 +24,8 @@ export class RunLedger {
   private damage = 0;
   private gold = 0;
 
-  public constructor(id = 'run-' + Date.now() + '-' + Math.random().toString(36).slice(2)) {
+  public constructor(id = 'run-' + Date.now() + '-' + Math.random().toString(36).slice(2),
+    public readonly worldId: WorldId = 1) {
     this.runId = id;
   }
   public enterRoom(room: number): void {
@@ -51,7 +54,7 @@ export class RunLedger {
   public get runGold(): number { return this.gold; }
   public report(victory: boolean): RunReport {
     return {
-      runId: this.runId, reachedRoom: this.reached, roomsCleared: this.rooms.size,
+      runId: this.runId, worldId: this.worldId, reachedRoom: this.reached, roomsCleared: this.rooms.size,
       enemiesDefeated: this.enemyIds.size, bossesDefeated: this.bosses,
       totalDamage: Math.round(this.damage), earnedGold: this.gold, victory,
     };
