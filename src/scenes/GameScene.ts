@@ -9,6 +9,7 @@ import { getBossName } from '../enemies/enemyConfig';
 import { AdvancedEnemy, type BulletPattern } from '../enemies/AdvancedEnemy';
 import { EnemyProjectile } from '../enemies/EnemyProjectile';
 import { withinRadius } from '../enemies/enemyMovement';
+import { shotAngles } from '../enemies/projectilePatterns';
 import {
   ENEMY_DEFEATED_EVENT,
   ENEMY_SPAWNED_EVENT,
@@ -481,7 +482,8 @@ export class GameScene extends Phaser.Scene {
     projectileObject: ArcadeCollisionObject,
     targetObject: ArcadeCollisionObject,
   ): void => {
-    if (!(projectileObject instanceof Projectile) || !(targetObject instanceof Slime)) {
+    if (!(projectileObject instanceof Projectile) || !(targetObject instanceof Slime) ||
+      targetObject.aiState === 'defeated') {
       return;
     }
     if (!projectileObject.registerHit(targetObject.enemyId)) {
@@ -530,14 +532,10 @@ export class GameScene extends Phaser.Scene {
   private readonly fireEnemyProjectiles = (enemy: AdvancedEnemy, pattern: BulletPattern): void => {
     if (!this.player || !this.enemyProjectiles || this.gameOver || this.transitioning) return;
     const angle = Math.atan2(this.player.y - enemy.y, this.player.x - enemy.x);
-    const offsets = pattern === 'single' ? [0] :
-      pattern === 'double' ? [-0.14, 0.14] :
-      pattern === 'fan' ? [-0.28, 0, 0.28] :
-      [-0.7, -0.35, 0, 0.35, 0.7];
+    const angles = shotAngles(pattern, angle);
     const speed = enemy.kind === 'boss' ? 260 : enemy.kind === 'mage' ? 220 : 320;
     const color = enemy.kind === 'mage' ? 0xa78bfa : enemy.kind === 'boss' ? 0xf59e0b : 0xfb7185;
-    for (const offset of offsets) {
-      const direction = angle + offset;
+    for (const direction of angles) {
       const bullet = new EnemyProjectile(
         this, enemy.x + Math.cos(direction) * 30,
         enemy.y + Math.sin(direction) * 30,
@@ -631,6 +629,8 @@ export class GameScene extends Phaser.Scene {
     this.aliveEnemies = Math.max(0, this.aliveEnemies - 1);
     this.updateEnemyCount();
     if (this.roomProgress.registerEnemyDefeated() && !this.gameOver) {
+      // Prevent lingering projectiles from damaging the player after victory.
+      this.enemyProjectiles?.clear(true, true);
       this.openDoor();
       // One payment per cleared room. Full run rewards follow in phase 8.
       progressStore.dispatch({ type: 'awardGold', amount: 20 + this.roomProgress.roomNumber * 3 });
