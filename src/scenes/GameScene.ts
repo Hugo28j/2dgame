@@ -65,6 +65,7 @@ export class GameScene extends Phaser.Scene {
   private roomNumberText?: Phaser.GameObjects.Text;
   private roomTypeText?: Phaser.GameObjects.Text;
   private doorStatusText?: Phaser.GameObjects.Text;
+  private doorHintText?: Phaser.GameObjects.Text;
   private aliveEnemies = 0;
   private gameOver = false;
   private transitioning = false;
@@ -247,6 +248,10 @@ export class GameScene extends Phaser.Scene {
       fontSize: '12px', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(10).setScrollFactor(0);
     this.updateGoldHud();
+    this.doorHintText = this.add.text(195, 100, 'DEUR OPEN ↑  ·  GA NAAR HET NOORDEN', {
+      color: '#86efac', fontFamily: 'system-ui, sans-serif',
+      fontSize: '11px', fontStyle: 'bold', stroke: '#020617', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(43).setScrollFactor(0).setVisible(false);
     this.bossHealthBar = this.add.graphics().setDepth(41).setScrollFactor(0).setVisible(false);
     this.bossNameText = this.add.text(195, 137, '', {
       color: '#fde68a', fontFamily: 'system-ui, sans-serif',
@@ -437,6 +442,7 @@ export class GameScene extends Phaser.Scene {
 
     this.door.setFillStyle(0x7f1d1d).setStrokeStyle(3, 0xfca5a5);
     this.doorStatusText?.setText('VERSLA ALLE VIJANDEN').setColor('#fca5a5');
+    this.doorHintText?.setVisible(false);
     const body = this.door.body;
     if (body instanceof Phaser.Physics.Arcade.StaticBody) {
       body.enable = true;
@@ -451,6 +457,7 @@ export class GameScene extends Phaser.Scene {
 
     this.door.setFillStyle(0x166534).setStrokeStyle(3, 0x86efac);
     this.doorStatusText?.setText('DEUR OPEN ↑').setColor('#86efac');
+    this.doorHintText?.setVisible(true);
     const body = this.door.body;
     if (body instanceof Phaser.Physics.Arcade.StaticBody) {
       body.enable = false;
@@ -925,6 +932,7 @@ export class GameScene extends Phaser.Scene {
     this.roomNumberText = undefined;
     this.roomTypeText = undefined;
     this.doorStatusText = undefined;
+    this.doorHintText = undefined;
     this.player = undefined;
   }
 }
