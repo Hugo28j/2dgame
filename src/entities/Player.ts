@@ -6,14 +6,14 @@ import { HEROES, getHeroStats, type HeroId } from '../heroes/heroConfig';
 import type { Vector2Value } from '../input/vectorMath';
 
 export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
-  public readonly maxHp: number;
-  public readonly defense: number;
-  public readonly damage: number;
-  public readonly attackSpeed: number;
-  public readonly movementSpeed: number;
-  public readonly criticalChance: number;
+  public maxHp: number;
+  public defense: number;
+  public damage: number;
+  public attackSpeed: number;
+  public movementSpeed: number;
+  public criticalChance: number;
   public readonly criticalMultiplier: number;
-  public readonly abilityCooldownModifier: number;
+  public abilityCooldownModifier: number;
   public readonly abilityDamageMultiplier: number;
   public currentHp: number;
   private readonly invulnerability = new InvulnerabilityWindow();
@@ -21,13 +21,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   public constructor(
     scene: Phaser.Scene, x: number, y: number,
     public readonly heroId: HeroId = 'ranger', level = 1,
+    permanent: Readonly<{ hp: number; damage: number; defense: number }> = { hp: 0, damage: 0, defense: 0 },
   ) {
     super(scene, x, y, HEROES[heroId].textureKey);
     const stats = getHeroStats(heroId, level);
-    this.maxHp = stats.maxHp;
-    this.currentHp = stats.maxHp;
-    this.defense = stats.defense;
-    this.damage = stats.damage;
+    this.maxHp = stats.maxHp + permanent.hp;
+    this.currentHp = this.maxHp;
+    this.defense = stats.defense + permanent.defense;
+    this.damage = stats.damage + permanent.damage;
     this.attackSpeed = stats.attackSpeed;
     this.movementSpeed = stats.movementSpeed;
     this.criticalChance = stats.criticalChance;
@@ -41,6 +42,21 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
     if (body instanceof Phaser.Physics.Arcade.Body) {
       body.setCircle(16, 8, 8);
       body.setCollideWorldBounds(true);
+    }
+  }
+
+  /** Bonuses are ephemeral and deliberately never written to the save. */
+  public applyRunBonus(id: 'damage' | 'attackSpeed' | 'movement' | 'maxHp' | 'healing'
+    | 'crit' | 'defense' | 'cooldown'): void {
+    switch (id) {
+      case 'damage': this.damage *= 1.15; break;
+      case 'attackSpeed': this.attackSpeed *= 1.1; break;
+      case 'movement': this.movementSpeed *= 1.12; break;
+      case 'maxHp': this.maxHp += 20; this.currentHp += 20; break;
+      case 'healing': this.currentHp = Math.min(this.maxHp, this.currentHp + 35); break;
+      case 'crit': this.criticalChance = Math.min(1, this.criticalChance + 0.06); break;
+      case 'defense': this.defense *= 1.15; break;
+      case 'cooldown': this.abilityCooldownModifier *= 0.9; break;
     }
   }
 
