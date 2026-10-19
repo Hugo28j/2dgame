@@ -56,6 +56,20 @@ const TEMPLATES: readonly LayoutTemplate[] = [
   { id: 'zigzag-gallery', accent: 0xfb7185, pieces: [[0.31, 0.34, 0.2, 0.08], [0.68, 0.55, 0.2, 0.08], [0.31, 0.72, 0.2, 0.08]] },
   { id: 'crystal-maze', accent: 0x67e8f9, pieces: [[0.22, 0.27, 0.1, 0.11], [0.79, 0.46, 0.1, 0.11], [0.45, 0.59, 0.11, 0.10], [0.75, 0.76, 0.10, 0.08]] },
   { id: 'staggered-court', accent: 0xc084fc, pieces: [[0.19, 0.50, 0.13, 0.18], [0.55, 0.35, 0.12, 0.1], [0.79, 0.63, 0.13, 0.13]] },
+  // Each piece is an isolated island rather than a full wall across the arena.
+  // This leaves paths for the player, chargers and boss projectile avoidance.
+  { id: 'moonlit-courtyard', accent: 0x93c5fd, pieces: [[0.19, 0.30, 0.11, 0.12], [0.37, 0.46, 0.10, 0.11], [0.63, 0.46, 0.10, 0.11], [0.81, 0.30, 0.11, 0.12]] },
+  { id: 'serpent-pass', accent: 0x4ade80, pieces: [[0.28, 0.25, 0.14, 0.10], [0.70, 0.41, 0.15, 0.11], [0.29, 0.56, 0.14, 0.11], [0.70, 0.70, 0.14, 0.10]] },
+  { id: 'ruined-library', accent: 0xfda4af, pieces: [[0.20, 0.31, 0.10, 0.19], [0.45, 0.29, 0.10, 0.16], [0.72, 0.42, 0.10, 0.20], [0.30, 0.67, 0.10, 0.13]] },
+  { id: 'echo-chambers', accent: 0xc4b5fd, pieces: [[0.27, 0.35, 0.12, 0.12], [0.73, 0.35, 0.12, 0.12], [0.27, 0.67, 0.12, 0.12], [0.73, 0.67, 0.12, 0.12], [0.50, 0.50, 0.12, 0.09]] },
+  { id: 'fallen-gateway', accent: 0xfcd34d, pieces: [[0.18, 0.22, 0.11, 0.16], [0.82, 0.22, 0.11, 0.16], [0.30, 0.54, 0.13, 0.09], [0.70, 0.54, 0.13, 0.09]] },
+  { id: 'sunken-temple', accent: 0x2dd4bf, pieces: [[0.26, 0.29, 0.10, 0.12], [0.74, 0.29, 0.10, 0.12], [0.50, 0.50, 0.16, 0.12], [0.26, 0.72, 0.10, 0.11], [0.74, 0.72, 0.10, 0.11]] },
+  { id: 'scattered-monoliths', accent: 0xa3e635, pieces: [[0.16, 0.32, 0.10, 0.09], [0.41, 0.41, 0.10, 0.14], [0.77, 0.32, 0.10, 0.11], [0.24, 0.68, 0.11, 0.11], [0.70, 0.67, 0.10, 0.13]] },
+  { id: 'forge-works', accent: 0xfb923c, pieces: [[0.28, 0.30, 0.16, 0.11], [0.73, 0.33, 0.11, 0.17], [0.52, 0.57, 0.11, 0.11], [0.23, 0.72, 0.12, 0.11]] },
+  { id: 'whispering-crypt', accent: 0xd8b4fe, pieces: [[0.22, 0.40, 0.10, 0.17], [0.50, 0.27, 0.10, 0.09], [0.78, 0.40, 0.10, 0.17], [0.40, 0.68, 0.11, 0.10]] },
+  { id: 'thorn-labyrinth', accent: 0x86efac, pieces: [[0.23, 0.28, 0.13, 0.10], [0.68, 0.27, 0.12, 0.11], [0.48, 0.44, 0.13, 0.09], [0.23, 0.67, 0.13, 0.10], [0.74, 0.68, 0.12, 0.10]] },
+  { id: 'storm-hall', accent: 0x7dd3fc, pieces: [[0.38, 0.26, 0.13, 0.10], [0.72, 0.46, 0.11, 0.16], [0.29, 0.55, 0.12, 0.12], [0.56, 0.73, 0.15, 0.10]] },
+  { id: 'obsidian-crossroads', accent: 0xf9a8d4, pieces: [[0.17, 0.34, 0.09, 0.11], [0.83, 0.34, 0.09, 0.11], [0.50, 0.49, 0.13, 0.12], [0.21, 0.70, 0.11, 0.09], [0.79, 0.70, 0.11, 0.09]] },
 ] as const;
 
 const clamped = (n: number, min: number, max: number): number =>
@@ -134,7 +148,10 @@ export const getEnemyCountForRoom = (roomNumber: number): number => {
 export const getRoomDefinition = (roomNumber: number): RoomDefinition => {
   const room = Math.min(CHAPTER_ROOM_COUNT, Math.max(1, Math.floor(roomNumber)));
   const isBossRoom = room % BOSS_ROOM_INTERVAL === 0;
-  const index = isBossRoom ? (Math.floor(room / 5) + 3) % TEMPLATES.length : (room - 1) % TEMPLATES.length;
+  // Count only normal rooms to cycle through *every* layout, not skip a
+  // pattern whenever its previous index happens to land on a boss chamber.
+  const regularIndex = (room - 1) - Math.floor((room - 1) / BOSS_ROOM_INTERVAL);
+  const index = regularIndex % TEMPLATES.length;
   const layout = makeLayout(room, index);
   const enemyCount = isBossRoom ? 1 : getEnemyCountForRoom(room);
   // Bosses receive an open arena: mobility and projectile patterns remain fair.
