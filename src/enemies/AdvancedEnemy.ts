@@ -3,16 +3,22 @@ import { getEnemyStatsForRoom, type EnemyKind, type SlimeRuntimeStats } from './
 import { bossPhase, rangedVelocity } from './enemyMovement';
 import { Slime } from './Slime';
 import { getObstacleAvoidanceVelocity } from './slimeMovement';
+import { getBossPlan, getBossProfile } from './bossProfiles';
+import type { BulletPattern } from './projectilePatterns';
+export type { BulletPattern } from './projectilePatterns';
 
-export type BulletPattern = 'single' | 'double' | 'fan' | 'radial';
-export type EnemyFire = (enemy: AdvancedEnemy, pattern: BulletPattern) => void;
+export type EnemyFire = (enemy: AdvancedEnemy, pattern: BulletPattern, volley?: number, speed?: number) => void;
 export type EnemyExplosion = (enemy: AdvancedEnemy, radius: number) => void;
+export type EnemyBomb = (enemy: AdvancedEnemy, targetX: number, targetY: number,
+  count: number, radius: number, windupMs: number) => void;
 
 /** Reuses the phase-3 shared HP, damage, slow and death events for all enemy types. */
 export class AdvancedEnemy extends Slime {
   public readonly kind: Exclude<EnemyKind, 'slime'>;
   public readonly stats: Readonly<SlimeRuntimeStats>;
   private nextShotAt = 0;
+  private bossVolleys = 0;
+  private readonly roomNumber: number;
   private nextSpecialAt = 0;
   private windupEndsAt = 0;
   private dashEndsAt = 0;
@@ -26,11 +32,13 @@ export class AdvancedEnemy extends Slime {
     const stats = getEnemyStatsForRoom(kind, roomNumber);
     super(scene, id, x, y, stats);
     this.kind = kind;
+    this.roomNumber = roomNumber;
     this.stats = stats;
     this.orbitSign = id.length % 2 === 0 ? 1 : -1;
     this.setTexture('enemy-' + kind);
     if (kind === 'boss') {
       this.setScale(1.75);
+      this.setTint(getBossProfile(roomNumber).color);
       const body = this.body;
       if (body instanceof Phaser.Physics.Arcade.Body) body.setCircle(21, 3, 3);
     }
@@ -41,7 +49,7 @@ export class AdvancedEnemy extends Slime {
   public get isBoss(): boolean { return this.kind === 'boss'; }
 
   public updateAI(targetX: number, targetY: number, now: number,
-    fire: EnemyFire, explode: EnemyExplosion): void {
+    fire: EnemyFire, explode: EnemyExplosion, dropBombs?: EnemyBomb): void {
     if (this.aiState === 'defeated') return;
     super.chase(targetX, targetY);
     const distance = Phaser.Math.Distance.Between(this.x, this.y, targetX, targetY);
@@ -91,8 +99,10 @@ export class AdvancedEnemy extends Slime {
         break;
       case 'boss': {
         const phase = bossPhase(this.healthRatio);
+        const profile = getBossProfile(this.roomNumber);
+        const mode = getBossPlan(this.roomNumber, phase, this.bossVolleys);
         const move = rangedVelocity(this.x, this.y, targetX, targetY, speed,
-          phase === 1 ? 185 : 135, this.orbitSign);
+          profile.preferredRange, this.orbitSign);
         if (this.windupEndsAt === 0 && this.dashEndsAt === 0) {
           const body = this.body;
           const blockedX = body instanceof Phaser.Physics.Arcade.Body &&
@@ -101,18 +111,39 @@ export class AdvancedEnemy extends Slime {
             (body.blocked.up || body.blocked.down || body.touching.up || body.touching.down);
           const velocity = blockedX || blockedY
             ? getObstacleAvoidanceVelocity(blockedX, targetX - this.x,
-                targetY - this.y, speed, this.orbitSign)
-            : move;
+                targetY - this.y, speed, this.orbitSign) : move;
           this.setVelocity(velocity.x, velocity.y);
         }
         if (now >= this.nextShotAt && this.windupEndsAt === 0 && this.dashEndsAt === 0) {
-          fire(this, phase === 1 ? 'fan' : 'radial');
-          this.nextShotAt = now + this.stats.attackIntervalMs * (phase === 2 ? 0.7 : 1);
+          fire(this, mode.pattern, this.bossVolleys, mode.speed);
+          if (mode.bombs > 0 && dropBombs) {
+            dropBombs(this, targetX, targetY, mode.bombs, mode.radius, mode.windupMs);
+          }
+          this.bossVolleys++;
+          const scaledInterval = this.stats.attackIntervalMs * mode.tempo;
+          this.nextShotAt = now + Math.max(150, scaledInterval);
         }
-        this.chargeLogic(targetX, targetY, now, distance,
-          phase === 2 ? 3200 : 4900);
+        // Only explicitly charging bosses use dash logic; other nine archetypes
+        // are NOT automatically assigned the old common charge attack.
+        if ((mode.dashEvery > 0 && this.bossVolleys > 0 &&
+            this.bossVolleys % mode.dashEvery === 0) ||
+          this.windupEndsAt > 0 || this.dashEndsAt > 0) {
+          this.chargeLogic(targetX, targetY, now, distance,
+            phase === 2 ? 2900 : 4400);
+        }
         break;
       }
+    }
+  }
+
+  public override showHit(): void {
+    super.showHit();
+    if (this.isBoss) {
+      this.scene.time.delayedCall(85, () => {
+        if (this.active && this.aiState !== 'defeated') {
+          this.setTint(getBossProfile(this.roomNumber).color);
+        }
+      });
     }
   }
 

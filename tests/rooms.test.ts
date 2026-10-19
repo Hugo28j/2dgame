@@ -24,7 +24,7 @@ describe('phase 4 room progression', () => {
     expect(progress.advance()).toBe(2);
   });
 
-  it('stops after room 20 is cleared', () => {
+  it('stops after room 50 is cleared', () => {
     const progress = new RoomProgress(CHAPTER_ROOM_COUNT);
 
     for (let room = 1; room <= CHAPTER_ROOM_COUNT; room += 1) {

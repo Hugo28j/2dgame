@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import { GAME_SCENE_KEY, MENU_SCENE_KEY } from '../config/constants';
+import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
 import {
   HERO_IDS, HEROES, getHeroStats, heroUpgradeCost, MAX_HERO_LEVEL,
 } from '../heroes/heroConfig';
 import { progressStore, type ProfileAction } from '../progression/ProgressStore';
 import {
-  CONTROL_ACTIONS, CONTROL_LABELS, formatBinding, normalizeBindKey, rebindKey,
+  CONTROL_ACTIONS, CONTROL_LABELS, formatBinding, mouseButtonKey, normalizeBindKey, rebindKey,
   type ControlAction,
 } from '../input/keyBindings';
 import {
@@ -31,6 +32,7 @@ export class MainMenuScene extends Phaser.Scene {
   private resetRequested = false;
   private awaitingKey?: ControlAction;
   private notice = '';
+  private suppressNextContextMenu = false;
 
   public constructor() { super(MENU_SCENE_KEY); }
 
@@ -47,11 +49,17 @@ export class MainMenuScene extends Phaser.Scene {
     else this.drawSettings();
 
     this.button(195, 763, 340, 61, '▶   SPELEN', () => this.scene.start(GAME_SCENE_KEY), 'primary', false, 22);
-    this.text(195, 807, '20 KAMERS  ·  4 BOSSEN  ·  ELKE RUN IS ANDERS', 10, COLOR.faint, true);
+    this.text(195, 807, '50 KAMERS  ·  10 BOSSEN  ·  ELKE RUN IS ANDERS', 10, COLOR.faint, true);
 
     this.input.keyboard?.on('keydown', this.captureBinding);
+    // Capture before Phaser delivers game-object clicks; the click that opens
+    // the remap modal is not captured because awaitingKey is still undefined.
+    window.addEventListener('pointerdown', this.captureMouseButton, true);
+    window.addEventListener('contextmenu', this.preventCaptureContextMenu, true);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.input.keyboard?.off('keydown', this.captureBinding);
+      window.removeEventListener('pointerdown', this.captureMouseButton, true);
+      window.removeEventListener('contextmenu', this.preventCaptureContextMenu, true);
     });
   }
 
@@ -88,7 +96,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.text(260, 135, 'GOUD', 10, COLOR.faint);
     this.text(260, 151, profile.gold.toLocaleString('nl-BE') + '  G', 17, '#fde68a', false, true);
     this.text(23, 189, 'KIES JE LOADOUT', 10, COLOR.faint);
-    this.text(367, 189, 'BESTE KAMER ' + profile.highestRoom + '/20', 10, COLOR.secondary, true);
+    this.text(367, 189, 'BESTE KAMER ' + profile.highestRoom + '/' + CHAPTER_ROOM_COUNT, 10, COLOR.secondary, true);
   }
 
   private drawNavigation(): void {
@@ -221,7 +229,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.plate(195, 348, 328, 76, COLOR.card, COLOR.border, 11);
     this.text(46, 322, 'AVONTURENPROFIEL', 10, COLOR.faint);
     this.text(46, 344, 'Hoogste kamer bereikt', 12, COLOR.secondary);
-    this.text(337, 344, profile.highestRoom + ' / 20', 16, '#7dd3fc', true, true);
+    this.text(337, 344, profile.highestRoom + ' / ' + CHAPTER_ROOM_COUNT, 16, '#7dd3fc', true, true);
     this.text(46, 365, 'Voortgang wordt lokaal opgeslagen', 10, COLOR.faint);
 
     this.button(195, 435, 328, 49,
@@ -265,17 +273,17 @@ export class MainMenuScene extends Phaser.Scene {
       this.settingsView = 'general';
       this.scene.restart();
     }, 'quiet', false, 10);
-    this.text(194, 265, 'TOETSENBORD', 15, COLOR.white, true, true);
+    this.text(199, 265, 'BESTURING', 15, COLOR.white, true, true);
     this.text(195, 294,
-      this.awaitingKey ? 'DRUK OP EEN TOETS  ·  ESC ANNULEERT' :
-        'Tik op een toets om deze te wijzigen', 11, this.awaitingKey ? '#fcd34d' : COLOR.secondary, true);
+      this.awaitingKey ? 'DRUK TOETS OF MUISKNOP  ·  ESC ANNULEERT' :
+        'Klik een actie en druk een toets of muisknop', 11, this.awaitingKey ? '#fcd34d' : COLOR.secondary, true);
 
     const bindings = progressStore.current.settings.keyBindings;
     CONTROL_ACTIONS.forEach((action, index) => {
-      const y = 328 + index * 47;
+      const y = 322 + index * 43;
       const awaiting = action === this.awaitingKey;
-      const skill = index >= 4;
-      this.plate(195, y, 328, 42, awaiting ? 0x173f50 : COLOR.card,
+      const skill = index >= 5;
+      this.plate(195, y, 328, 39, awaiting ? 0x173f50 : COLOR.card,
         awaiting ? 0x67e8f9 : COLOR.border, 9);
       this.text(43, y - 12, CONTROL_LABELS[action].toUpperCase(),
         12, COLOR.white, false, true);
@@ -289,7 +297,7 @@ export class MainMenuScene extends Phaser.Scene {
         }, awaiting ? 'selected' : 'normal', false, 11);
     });
 
-    if (this.notice) this.text(195, 660, this.notice, 10, '#fcd34d', true);
+    if (this.notice) this.text(195, 657, this.notice, 10, '#fcd34d', true);
     this.button(195, 689, 324, 33, 'STANDAARDTOETSEN HERSTELLEN', () => {
       this.awaitingKey = undefined;
       this.notice = 'Standaardbesturing hersteld';
@@ -297,9 +305,24 @@ export class MainMenuScene extends Phaser.Scene {
     }, 'quiet', false, 10);
   }
 
+  private readonly preventCaptureContextMenu = (event: MouseEvent): void => {
+    if (this.awaitingKey || this.suppressNextContextMenu) event.preventDefault();
+    this.suppressNextContextMenu = false;
+  };
+
+  private readonly captureMouseButton = (event: PointerEvent): void => {
+    if (!this.awaitingKey || event.pointerType !== 'mouse' ||
+      !(event.target instanceof Node) || !this.game.canvas.contains(event.target)) return;
+    const key = mouseButtonKey(event.button);
+    if (!key) return;
+    if (event.button === 2) this.suppressNextContextMenu = true;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    this.applyCapturedInput(key);
+  };
+
   private readonly captureBinding = (event: KeyboardEvent): void => {
-    const action = this.awaitingKey;
-    if (!action) return;
+    if (!this.awaitingKey) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     if (event.repeat) return;
@@ -316,10 +339,16 @@ export class MainMenuScene extends Phaser.Scene {
     }
     const key = normalizeBindKey(event.key);
     if (!key) {
-      this.notice = 'Gebruik een letter, cijfer, pijl of spatie';
+      this.notice = 'Gebruik letters, cijfers, pijlen, spatie of muisknop';
       this.scene.restart();
       return;
     }
+    this.applyCapturedInput(key);
+  };
+
+  private applyCapturedInput(key: string): void {
+    const action = this.awaitingKey;
+    if (!action) return;
     const result = rebindKey(progressStore.current.settings.keyBindings, action, key);
     if (!result.ok) {
       this.notice = result.reason === 'conflict' && result.action
@@ -329,7 +358,7 @@ export class MainMenuScene extends Phaser.Scene {
       return;
     }
     this.awaitingKey = undefined;
-    this.notice = CONTROL_LABELS[action] + ' ingesteld op ' + key;
+    this.notice = CONTROL_LABELS[action] + ' ingesteld op ' + formatBinding([key]);
     progressStore.dispatch({ type: 'rebindKey', action, key });
     this.scene.restart();
   };

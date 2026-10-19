@@ -5,6 +5,7 @@ import {
   permanentUpgradeCost, type PermanentLevels, type PermanentUpgradeId,
 } from './economy';
 import type { RunReport } from './RunLedger';
+import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
 import {
   defaultKeyBindings, rebindKey, validateKeyBindings,
   type ControlAction, type KeyBindings,
@@ -70,7 +71,7 @@ export function validateProfile(raw: unknown): Profile {
       ? validLevel(input.gold, 0, MAX_GOLD) : 0,
     selectedHero, selectedWeapon, unlockedHeroes: heroes, unlockedWeapons: weapons,
     heroLevels, weaponLevels, permanentLevels,
-    highestRoom: validLevel(input.highestRoom, 1, 20),
+    highestRoom: validLevel(input.highestRoom, 1, CHAPTER_ROOM_COUNT),
     settledRunIds: Array.isArray(input.settledRunIds)
       ? [...new Set(input.settledRunIds.filter(
           (id): id is string => typeof id === 'string' && id.length > 0 && id.length <= 100,
@@ -155,7 +156,7 @@ export function applyProfileAction(profile: Profile, action: ProfileAction): Pro
       if (!report.runId || report.runId.length > 100 || p.settledRunIds.includes(report.runId)) return p;
       const reward = Number.isFinite(report.earnedGold)
         ? Math.max(0, Math.min(MAX_GOLD, Math.floor(report.earnedGold))) : 0;
-      const reached = validLevel(report.reachedRoom, 1, 20);
+      const reached = validLevel(report.reachedRoom, 1, CHAPTER_ROOM_COUNT);
       return {
         ...p, gold: Math.min(MAX_GOLD, p.gold + reward),
         highestRoom: Math.max(p.highestRoom, reached),
