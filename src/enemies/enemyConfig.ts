@@ -57,7 +57,8 @@ export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number): Ene
   const debut: Partial<Record<number, EnemyKind>> = {
     2: 'archer', 3: 'charger', 4: 'tank', 6: 'mage', 7: 'bomber',
   };
-  if (index === 0 && debut[roomNumber]) return debut[roomNumber];
+  const introduced = debut[roomNumber];
+  if (index === 0 && introduced) return introduced;
   return pool[(index + roomNumber - 1) % pool.length] ?? 'slime';
 };
 export const getBossName = (roomNumber: number): string =>

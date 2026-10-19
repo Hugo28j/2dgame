@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { getEnemyStatsForRoom, type EnemyKind, type SlimeRuntimeStats } from './enemyConfig';
 import { bossPhase, rangedVelocity } from './enemyMovement';
 import { Slime } from './Slime';
+import { getObstacleAvoidanceVelocity } from './slimeMovement';
 
 export type BulletPattern = 'single' | 'double' | 'fan' | 'radial';
 export type EnemyFire = (enemy: AdvancedEnemy, pattern: BulletPattern) => void;
@@ -51,7 +52,16 @@ export class AdvancedEnemy extends Slime {
       case 'mage': {
         const move = rangedVelocity(this.x, this.y, targetX, targetY, speed,
           this.kind === 'archer' ? 210 : 155, this.orbitSign);
-        this.setVelocity(move.x, move.y);
+        const body = this.body;
+        const horizontalBlock = body instanceof Phaser.Physics.Arcade.Body &&
+          (body.blocked.left || body.blocked.right || body.touching.left || body.touching.right);
+        const verticalBlock = body instanceof Phaser.Physics.Arcade.Body &&
+          (body.blocked.up || body.blocked.down || body.touching.up || body.touching.down);
+        const velocity = horizontalBlock || verticalBlock
+          ? getObstacleAvoidanceVelocity(horizontalBlock, targetX - this.x,
+              targetY - this.y, speed, this.orbitSign)
+          : move;
+        this.setVelocity(velocity.x, velocity.y);
         if (now >= this.nextShotAt) {
           fire(this, this.kind === 'archer' ? 'single' : 'double');
           this.nextShotAt = now + this.stats.attackIntervalMs;
@@ -83,7 +93,18 @@ export class AdvancedEnemy extends Slime {
         const phase = bossPhase(this.healthRatio);
         const move = rangedVelocity(this.x, this.y, targetX, targetY, speed,
           phase === 1 ? 185 : 135, this.orbitSign);
-        if (this.windupEndsAt === 0 && this.dashEndsAt === 0) this.setVelocity(move.x, move.y);
+        if (this.windupEndsAt === 0 && this.dashEndsAt === 0) {
+          const body = this.body;
+          const blockedX = body instanceof Phaser.Physics.Arcade.Body &&
+            (body.blocked.left || body.blocked.right || body.touching.left || body.touching.right);
+          const blockedY = body instanceof Phaser.Physics.Arcade.Body &&
+            (body.blocked.up || body.blocked.down || body.touching.up || body.touching.down);
+          const velocity = blockedX || blockedY
+            ? getObstacleAvoidanceVelocity(blockedX, targetX - this.x,
+                targetY - this.y, speed, this.orbitSign)
+            : move;
+          this.setVelocity(velocity.x, velocity.y);
+        }
         if (now >= this.nextShotAt && this.windupEndsAt === 0 && this.dashEndsAt === 0) {
           fire(this, phase === 1 ? 'fan' : 'radial');
           this.nextShotAt = now + this.stats.attackIntervalMs * (phase === 2 ? 0.7 : 1);

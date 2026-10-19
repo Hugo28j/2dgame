@@ -259,7 +259,7 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(10);
     this.updateGoldHud();
     this.bossHealthBar = this.add.graphics().setDepth(41).setVisible(false);
-    this.bossNameText = this.add.text(195, 91, '', {
+    this.bossNameText = this.add.text(195, 137, '', {
       color: '#fde68a', fontFamily: 'system-ui, sans-serif',
       fontSize: '13px', fontStyle: 'bold', stroke: '#020617', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(42).setVisible(false);
@@ -617,9 +617,9 @@ export class GameScene extends Phaser.Scene {
     this.bossNameText.setText(getBossName(this.roomProgress.roomNumber) +
       (boss.healthRatio <= 0.5 ? ' · FASE 2' : ' · FASE 1'));
     this.bossHealthBar.fillStyle(0x020617, 0.95);
-    this.bossHealthBar.fillRoundedRect(60, 108, 270, 14, 4);
+    this.bossHealthBar.fillRoundedRect(60, 154, 270, 14, 4);
     this.bossHealthBar.fillStyle(boss.healthRatio <= 0.5 ? 0xef4444 : 0xf59e0b);
-    this.bossHealthBar.fillRoundedRect(62, 110, 266 * boss.healthRatio, 10, 3);
+    this.bossHealthBar.fillRoundedRect(62, 156, 266 * boss.healthRatio, 10, 3);
   }
 
   private readonly handleEnemySpawned = (): void => {
