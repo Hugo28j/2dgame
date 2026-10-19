@@ -43,17 +43,16 @@ describe('late-room spawn counts and starting distance', () => {
   });
 });
 
-describe('dynamic spawn waves', () => {
-  it('keeps early waves unchanged but uses a growing active-enemy cap later', () => {
-    expect(spawnWaveSettings(1, 3).initial).toBe(3);
-    const early = spawnWaveSettings(8, 7);
-    expect(early.initial).toBe(7);
-    const late = spawnWaveSettings(49, 31);
-    expect(late.initial).toBeLessThan(31);
-    expect(late.batchSize).toBeGreaterThan(0);
-    expect(late.maxActive).toBeLessThan(31);
-    expect(late.maxActive).toBeGreaterThan(spawnWaveSettings(11, 9).maxActive);
-    expect(late.intervalMs).toBeGreaterThanOrEqual(1500);
+describe('room start spawn policy', () => {
+  it('spawns every planned enemy immediately for all 50 rooms', () => {
+    for (let room = 1; room <= CHAPTER_ROOM_COUNT; room++) {
+      const enemyCount = getRoomDefinition(room).enemyCount;
+      const settings = spawnWaveSettings(room, enemyCount);
+      expect(settings.initial).toBe(enemyCount);
+      expect(settings.batchSize).toBe(enemyCount);
+      expect(settings.maxActive).toBe(enemyCount);
+      expect(settings.intervalMs).toBe(0);
+    }
   });
 
   it('chooses opposite farthest locations if the player moves during a fight', () => {
