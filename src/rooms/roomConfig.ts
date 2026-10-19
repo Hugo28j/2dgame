@@ -1,7 +1,7 @@
 import { ARENA_BOUNDS } from '../config/gameplay';
 import type { SpawnPoint } from '../enemies/EnemySpawner';
 
-export const CHAPTER_ROOM_COUNT = 20;
+export const CHAPTER_ROOM_COUNT = 50;
 export const BOSS_ROOM_INTERVAL = 5;
 export const SAFE_SPAWN_DISTANCE = 120;
 
