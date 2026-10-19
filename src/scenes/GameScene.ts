@@ -5,7 +5,6 @@ import { DamageSystem, type DamageResult } from '../combat/damage';
 import { addAndLaunch } from '../combat/launchProjectile';
 import { GAME_SCENE_KEY, GAME_TITLE, GAME_OVER_SCENE_KEY } from '../config/constants';
 import { EnemySpawner } from '../enemies/EnemySpawner';
-import { getBossName } from '../enemies/enemyConfig';
 import { getBossProfile, getBossTier } from '../enemies/bossProfiles';
 import { AdvancedEnemy, type BulletPattern } from '../enemies/AdvancedEnemy';
 import { EnemyProjectile } from '../enemies/EnemyProjectile';
@@ -996,58 +995,88 @@ export class GameScene extends Phaser.Scene {
     this.goldHudText?.setText(`DEZE RUN: +${this.run.runGold} G  ·  MUNTEN ${this.coins.size}`);
   }
 
-  /** Offers three exclusive run-only improvements after selected cleared rooms. */
+  /** A brief magic pulse reveals the upgrade cards in sequence.
+   * Combat stays frozen until the offer is chosen. */
   private showUpgradeOffer(): void {
     if (!this.player || this.choosingUpgrade) return;
     const cards = this.upgrades.offer(this.player.currentHp < this.player.maxHp);
     if (cards.length < 3) return;
     this.choosingUpgrade = true;
+    this.upgradeReady = false;
     this.player.setVelocity(0, 0);
     this.controls?.cancelTouches();
     this.physics.world.pause();
+
     const overlay = this.add.container(0, 0).setDepth(170).setScrollFactor(0);
     this.upgradeOverlay = overlay;
-    const shade = this.add.rectangle(195, 422, 390, 844, 0x020617, 0.93)
+    const shade = this.add.rectangle(195, 422, 390, 844, 0x020617, 0.94)
       .setInteractive();
     overlay.add(shade);
-    overlay.add(this.add.text(195, 171, 'KIES EEN RUN-UPGRADE', {
-      fontFamily: 'system-ui, sans-serif', fontSize: '23px',
-      fontStyle: 'bold', color: '#fde68a',
-    }).setOrigin(0.5));
-    overlay.add(this.add.text(195, 212, 'Geldig tot het einde van deze run', {
+    overlay.setAlpha(0);
+    this.tweens.add({ targets: overlay, alpha: 1, duration: 210, ease: 'Sine.easeOut' });
+
+    const pulse = this.add.circle(195, 180, 20, 0xfde68a, 0.12)
+      .setStrokeStyle(4, 0xfbbf24, 0.92);
+    overlay.add(pulse);
+    this.tweens.add({
+      targets: pulse, scale: 4.8, alpha: 0, duration: 640,
+      ease: 'Cubic.easeOut', onComplete: () => pulse.destroy(),
+    });
+
+    const title = this.add.text(195, 174, '✦  POWER-UP!  ✦', {
+      fontFamily: 'system-ui, sans-serif', fontSize: '28px',
+      fontStyle: 'bold', color: '#fde68a', stroke: '#78350f', strokeThickness: 3,
+    }).setOrigin(0.5).setScale(0.35).setAlpha(0);
+    overlay.add(title);
+    this.tweens.add({
+      targets: title, scaleX: 1, scaleY: 1, alpha: 1,
+      duration: 440, ease: 'Back.easeOut',
+    });
+    const subtitle = this.add.text(195, 219, 'KIES ÉÉN VERSTERKING', {
       fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#cbd5e1',
-    }).setOrigin(0.5));
+    }).setOrigin(0.5).setAlpha(0);
+    overlay.add(subtitle);
+    this.tweens.add({ targets: subtitle, alpha: 1, duration: 240, delay: 310 });
 
     cards.forEach((card, index) => {
-      const y = 299 + index * 112;
+      const y = 302 + index * 112;
       const border = card.rarity === 'epic' ? 0xc084fc :
         card.rarity === 'rare' ? 0x38bdf8 : 0x94a3b8;
-      const plate = this.add.rectangle(195, y, 330, 99, 0x172338)
+      const cardContainer = this.add.container(195, y).setScale(0.65).setAlpha(0);
+      const plate = this.add.rectangle(0, 0, 330, 99, 0x172338)
         .setStrokeStyle(2, border).setInteractive({ useHandCursor: true });
       plate.on('pointerdown', () => this.chooseUpgrade(card.id));
-      overlay.add(plate);
-      overlay.add(this.add.text(46, y - 32, card.name.toUpperCase(), {
+      cardContainer.add(plate);
+      cardContainer.add(this.add.text(-149, -32, card.name.toUpperCase(), {
         fontFamily: 'system-ui, sans-serif', fontSize: '17px',
         fontStyle: 'bold', color: '#f8fafc',
       }));
-      overlay.add(this.add.text(46, y - 5, card.description, {
+      cardContainer.add(this.add.text(-149, -5, card.description, {
         fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#cbd5e1',
       }));
-      overlay.add(this.add.text(46, y + 19,
+      cardContainer.add(this.add.text(-149, 19,
         card.rarity.toUpperCase() + '   ·   ' + (this.upgrades.count(card.id) + 1) + '/' + card.maxStacks, {
         fontFamily: 'system-ui, sans-serif', fontSize: '11px', color: '#94a3b8',
       }));
+      overlay.add(cardContainer);
+      this.tweens.add({
+        targets: cardContainer, scaleX: 1, scaleY: 1, alpha: 1,
+        delay: 480 + index * 135, duration: 360, ease: 'Back.easeOut',
+        onComplete: () => { if (index === cards.length - 1) this.upgradeReady = true; },
+      });
     });
   }
 
   private chooseUpgrade(id: RunUpgradeId): void {
-    if (!this.choosingUpgrade || !this.player || !this.weapon || !this.upgrades.choose(id)) return;
+    if (!this.choosingUpgrade || !this.upgradeReady || !this.player || !this.weapon ||
+      !this.upgrades.choose(id)) return;
     if (id === 'projectile') this.weapon.extraProjectiles += 1;
     else if (id === 'piercing') this.weapon.extraPiercing += 1;
     else this.player.applyRunBonus(id);
     this.upgradeOverlay?.destroy(true);
     this.upgradeOverlay = undefined;
     this.choosingUpgrade = false;
+    this.upgradeReady = false;
     this.physics.world.resume();
     this.drawPlayerHealth();
   }
@@ -1081,6 +1110,7 @@ export class GameScene extends Phaser.Scene {
     this.clearBossBombs();
     this.upgradeOverlay?.destroy(true);
     this.upgradeOverlay = undefined;
+    this.upgradeReady = false;
     this.abilities?.destroy();
     this.abilities = undefined;
     this.controls?.destroy();
