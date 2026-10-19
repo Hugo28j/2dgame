@@ -4,20 +4,16 @@ Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de br
 
 ## Huidige fase
 
-Fase 6 – Active abilities:
+Fase 7 – Vijanden en bossgevechten:
 
-- **Dash (1)**: korte, gerichte versnelling in de beweegrichting (of laatste aim), met 140 ms contactbescherming. Botsingen met muren en obstakels blijven actief.
-- **Fire Nova (2)**: directe cirkelvormige aanval rond de speler, met schade via het centrale damage-systeem.
-- **Ice Blast (3)**: cirkelvormige aanval die Slimes schade geeft en de overlevenden tijdelijk vertraagt.
-- Drie touchknoppen boven de rechter joystick, tegelijk te gebruiken met beide joysticks (Phaser multitouch).
-- Desktopbediening met toetsen 1, 2, 3; de bestaande WASD/muisbesturing blijft behouden.
-- Per ability een eigen cooldown, aangepast aan de geselecteerde hero; blokkering tijdens cooldown of bij game over.
-- Zichtbare countdowns en gekleurde cooldown-ringen, bijbehorende visuele effecten.
-- Cooldowns lopen op Phaser-speltijd door tussen kamers en worden niet gepasseerd bij een nieuw vertrek uit een kamer.
-- Unit tests voor cooldowns, dash-vectoren en area-of-effect targeting.
+- Moss Slime, Thorn Archer, Rush Beetle (Charger), Rune Wisp (Mage), Stone Brute (Tank) en Blast Shroom (Bomber) met verschillende AI en eigen stats;
+- afstandsschoten, ontwijken/straffen, charges met visuele waarschuwing, en ontploffingen met een zichtbaar gevarengebied;
+- één echte boss in kamer 5, 10, 15 en 20 (vier unieke namen), met een boss-HP-balk en snellere, zwaardere aanvallen vanaf 50% HP;
+- vijandelijke projectielen botsen met speler en muren en gebruiken het centrale damage-systeem;
+- bestaande wapens, Dash, Fire Nova, Ice Blast, invulnerability frames en kamerprogressie blijven behouden;
+- tests voor vijandselectie, stats, bosskamers en bewegingshelpers.
 
-**Dit is fase 6;** extra vijandtypes en de echte boss volgen in fase 7.
-De volledige goud/run-economie en uitgebreide savevoorzieningen volgen in fase 8.
+De volledige beloningseconomie volgt in fase 8; de visuele en audio-afwerking in fase 9.
 
 ## Lokaal starten
 

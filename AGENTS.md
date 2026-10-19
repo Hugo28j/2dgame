@@ -23,5 +23,5 @@
 
 ## Huidige status
 
-- Actieve ontwikkelfase: **fase 6 – Active abilities**.
-- Volgende fase na afzonderlijke goedkeuring: **fase 7 – Geavanceerde vijanden en boss**.
+- Actieve ontwikkelfase: **fase 7 – Vijanden en bossgevechten**.
+- Volgende fase na afzonderlijke goedkeuring: **fase 8 – Roguelike progressie en economie**.
