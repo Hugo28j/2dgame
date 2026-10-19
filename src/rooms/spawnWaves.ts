@@ -8,21 +8,11 @@ export interface SpawnWaveSettings {
   preferredDistance: number;
 }
 
-/** Keep the first ten rooms familiar; late rooms spawn larger groups in waves
- * instead of creating 30+ moving sprites and bullets in the same frame. */
-export function spawnWaveSettings(room: number, enemyCount: number): SpawnWaveSettings {
-  const depth = Math.max(1, Math.floor(room));
-  if (depth <= 10) return {
+/** No mid-fight reinforcements: every scheduled enemy exists from the start. */
+export function spawnWaveSettings(_room: number, enemyCount: number): SpawnWaveSettings {
+  return {
     initial: enemyCount, batchSize: enemyCount, intervalMs: 0,
     maxActive: enemyCount, preferredDistance: 140,
-  };
-  const tier = Math.floor((depth - 1) / 10);
-  return {
-    initial: Math.min(enemyCount, 7 + tier),
-    batchSize: Math.min(8, 4 + tier),
-    intervalMs: Math.max(1500, 2400 - tier * 190),
-    maxActive: 12 + tier * 2,
-    preferredDistance: Math.min(390, 205 + tier * 50),
   };
 }
 
