@@ -11,7 +11,7 @@ import { RunLedger } from '../src/progression/RunLedger';
 describe('mouse and keyboard bindings', () => {
   it('accepts primary, secondary, middle and extra buttons; ignores invalid mouse buttons', () => {
     expect([0, 1, 2, 3, 4].map(mouseButtonKey)).toEqual([
-      'MOUSE1', 'MOUSE2', 'MOUSE3', 'MOUSE4', 'MOUSE5',
+      'MOUSE1', 'MOUSE3', 'MOUSE2', 'MOUSE4', 'MOUSE5',
     ]);
     expect(mouseButtonKey(-1)).toBeNull();
     expect(mouseButtonKey(8)).toBeNull();
