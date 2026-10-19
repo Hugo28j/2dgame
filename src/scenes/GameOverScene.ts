@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_OVER_SCENE_KEY, GAME_SCENE_KEY, MENU_SCENE_KEY } from '../config/constants';
+import { GAME_OVER_SCENE_KEY, GAME_SCENE_KEY, GAME_WIDTH, MENU_SCENE_KEY } from '../config/constants';
 import type { RunReport } from '../progression/RunLedger';
 import { progressStore } from '../progression/ProgressStore';
 import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
@@ -30,6 +30,7 @@ export class GameOverScene extends Phaser.Scene {
     const profile = progressStore.current;
     const world = getWorld(report.worldId);
     const fontFamily = 'system-ui, sans-serif';
+    this.cameras.main.setScroll((390 - GAME_WIDTH) / 2, 0);
     this.cameras.main.setBackgroundColor('#081525');
     this.add.rectangle(195, 422, 364, 760, 0x101d30)
       .setStrokeStyle(3, report.victory ? 0x38bdf8 : 0xef4444);
