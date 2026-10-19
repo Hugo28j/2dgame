@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { AttackData } from '../combat/damage';
+import { addAndLaunch } from '../combat/launchProjectile';
 import { Projectile } from '../entities/Projectile';
 import type { Player } from '../entities/Player';
 import type { Vector2Value } from '../input/vectorMath';
@@ -47,7 +48,7 @@ export class WeaponController {
         vector, config.projectileSpeed, attack, config.piercing + this.extraPiercing,
         { textureKey: config.textureKey, range: config.projectileRange, effect: config.effect },
       );
-      this.projectiles.add(projectile);
+      addAndLaunch(this.projectiles, projectile, vector, config.projectileSpeed);
     }
   }
 }
