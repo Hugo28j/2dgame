@@ -103,7 +103,7 @@ export class ProgressStore {
   private profile: Profile;
   public constructor() {
     let loaded: unknown;
-    try { loaded = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? 'null'); }
+    try { loaded = typeof window === 'undefined' ? null : JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? 'null'); }
     catch { loaded = null; }
     this.profile = validateProfile(loaded);
   }
@@ -114,7 +114,7 @@ export class ProgressStore {
     // Denied purchases return a normalized but unchanged profile.
     if (JSON.stringify(next) === JSON.stringify(this.profile)) return false;
     this.profile = next;
-    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(this.profile)); }
+    try { if (typeof window !== 'undefined') window.localStorage.setItem(STORAGE_KEY, JSON.stringify(this.profile)); }
     catch { /* Storage can be unavailable in private mode. Keep session state. */ }
     return true;
   }
