@@ -1,39 +1,56 @@
 import Phaser from 'phaser';
 
 import { JOYSTICK_CONFIG } from '../config/gameplay';
-import { VirtualJoystick } from './VirtualJoystick';
-import { keyboardMovement, type MovementKeys } from './keyboardMovement';
+import { progressStore } from '../progression/ProgressStore';
 import {
-  normalizeVector,
-  type Vector2Value,
-} from './vectorMath';
+  CONTROL_ACTIONS, keyboardVector, normalizeBindKey,
+  type ControlAction, type KeyBindings,
+} from './keyBindings';
+import { VirtualJoystick } from './VirtualJoystick';
+import { normalizeVector, type Vector2Value } from './vectorMath';
 
 export class InputController {
   private readonly movementJoystick: VirtualJoystick;
   private readonly aimJoystick: VirtualJoystick;
-  private readonly keys: Record<keyof MovementKeys, Phaser.Input.Keyboard.Key>;
+  private readonly bindings: Readonly<KeyBindings>;
+  private readonly heldKeys = new Set<string>();
+  private readonly pressedAbilities = new Set<ControlAction>();
+  private readonly keyboard: Phaser.Input.Keyboard.KeyboardPlugin;
   private lastAim: Vector2Value = { x: 1, y: 0 };
 
   private readonly reset = (): void => {
     this.movementJoystick.reset();
     this.aimJoystick.reset();
+    this.heldKeys.clear();
+    this.pressedAbilities.clear();
+  };
+
+  private readonly onKeyDown = (event: KeyboardEvent): void => {
+    if (event.ctrlKey || event.altKey || event.metaKey) return;
+    const key = normalizeBindKey(event.key);
+    if (!key) return;
+    const action = CONTROL_ACTIONS.find(id => this.bindings[id].includes(key));
+    if (!action) return;
+    if (['SPACE', 'ARROWUP', 'ARROWDOWN', 'ARROWLEFT', 'ARROWRIGHT'].includes(key)) {
+      event.preventDefault();
+    }
+    if (this.heldKeys.has(key)) return;
+    this.heldKeys.add(key);
+    if (action === 'dash' || action === 'fireNova' || action === 'iceBlast') {
+      this.pressedAbilities.add(action);
+    }
+  };
+
+  private readonly onKeyUp = (event: KeyboardEvent): void => {
+    const key = normalizeBindKey(event.key);
+    if (key) this.heldKeys.delete(key);
   };
 
   public constructor(private readonly scene: Phaser.Scene) {
     const keyboard = scene.input.keyboard;
-
-    if (!keyboard) {
-      throw new Error('Keyboard input is unavailable.');
-    }
-
-    this.keys = {
-      w: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-      z: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z),
-      a: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-      q: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q),
-      s: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-      d: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
-    };
+    if (!keyboard) throw new Error('Keyboard input is unavailable.');
+    this.keyboard = keyboard;
+    this.bindings = progressStore.current.settings.keyBindings;
 
     this.movementJoystick = new VirtualJoystick(scene, {
       x: JOYSTICK_CONFIG.movementX,
@@ -55,45 +72,51 @@ export class InputController {
       accentColor: 0xf59e0b,
     });
 
+    this.keyboard.on('keydown', this.onKeyDown);
+    this.keyboard.on('keyup', this.onKeyUp);
     scene.game.events.on(Phaser.Core.Events.BLUR, this.reset);
     window.addEventListener('blur', this.reset);
     window.addEventListener('pointercancel', this.reset);
     document.addEventListener('visibilitychange', this.handleVisibilityChange);
   }
 
-  public cancelTouches(): void { this.reset(); }
+  public cancelTouches(): void {
+    this.movementJoystick.reset();
+    this.aimJoystick.reset();
+    this.pressedAbilities.clear();
+  }
 
   public getMovement(): Vector2Value {
-    if (this.movementJoystick.isActive) {
-      return { ...this.movementJoystick.vector };
-    }
+    if (this.movementJoystick.isActive) return { ...this.movementJoystick.vector };
+    return keyboardVector(this.heldKeys, this.bindings);
+  }
 
-    return keyboardMovement({
-      w: this.keys.w.isDown, z: this.keys.z.isDown,
-      a: this.keys.a.isDown, q: this.keys.q.isDown,
-      s: this.keys.s.isDown, d: this.keys.d.isDown,
-    });
+  /** Consumes one key press; holding the key never repeats a skill. */
+  public consumeAbilityPressed(action: 'dash' | 'fireNova' | 'iceBlast'): boolean {
+    const pressed = this.pressedAbilities.has(action);
+    this.pressedAbilities.delete(action);
+    return pressed;
+  }
+
+  public getAbilityLabel(action: 'dash' | 'fireNova' | 'iceBlast'): string {
+    return this.bindings[action].join(' / ');
   }
 
   public getAim(playerX: number, playerY: number): Vector2Value {
     const joystickAim = this.aimJoystick.vector;
-
     if (Math.hypot(joystickAim.x, joystickAim.y) > 0) {
       this.lastAim = normalizeVector(joystickAim.x, joystickAim.y);
       return { ...this.lastAim };
     }
 
     const mousePointer = this.scene.input.manager.mousePointer;
-
     if (!this.aimJoystick.isActive && mousePointer?.active) {
       const deltaX = mousePointer.worldX - playerX;
       const deltaY = mousePointer.worldY - playerY;
-
       if (Math.hypot(deltaX, deltaY) > 8) {
         this.lastAim = normalizeVector(deltaX, deltaY);
       }
     }
-
     return { ...this.lastAim };
   }
 
@@ -102,22 +125,23 @@ export class InputController {
       const aim = this.aimJoystick.vector;
       return Math.hypot(aim.x, aim.y) > 0;
     }
-
     return this.scene.input.manager.mousePointer?.primaryDown ?? false;
   }
 
   public destroy(): void {
+    this.keyboard.off('keydown', this.onKeyDown);
+    this.keyboard.off('keyup', this.onKeyUp);
     this.scene.game.events.off(Phaser.Core.Events.BLUR, this.reset);
     window.removeEventListener('blur', this.reset);
     window.removeEventListener('pointercancel', this.reset);
     document.removeEventListener('visibilitychange', this.handleVisibilityChange);
     this.movementJoystick.destroy();
     this.aimJoystick.destroy();
+    this.heldKeys.clear();
+    this.pressedAbilities.clear();
   }
 
   private readonly handleVisibilityChange = (): void => {
-    if (document.hidden) {
-      this.reset();
-    }
+    if (document.hidden) this.reset();
   };
 }
