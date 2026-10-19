@@ -1,3 +1,4 @@
+import type { WorldId } from '../worlds/worldConfig';
 import Phaser from 'phaser';
 
 import type { SlimeRuntimeStats } from './enemyConfig';
@@ -20,7 +21,8 @@ export class EnemySpawner {
     private readonly enemyGroup: Phaser.Physics.Arcade.Group,
   ) {}
 
-  public spawnRoom(room: Readonly<RoomDefinition>, indices?: readonly number[]): readonly Slime[] {
+  public spawnRoom(room: Readonly<RoomDefinition>, indices?: readonly number[],
+    worldId: WorldId = 1): readonly Slime[] {
     const toSpawn = indices ?? room.enemySpawns.map((_, index) => index);
     return toSpawn.map(index => {
       const point = room.enemySpawns[index];
@@ -28,9 +30,9 @@ export class EnemySpawner {
       const kind = getEnemyKindForRoom(room.number, index);
       const enemy = kind === 'slime'
         ? new Slime(this.scene, `slime-${this.nextEnemyNumber++}`, point.x, point.y,
-            { ...getSlimeStatsForRoom(room.number) })
+            { ...getSlimeStatsForRoom(room.number, worldId) })
         : new AdvancedEnemy(this.scene, `${kind}-${this.nextEnemyNumber++}`,
-            point.x, point.y, kind, room.number);
+            point.x, point.y, kind, room.number, worldId);
       addBoundedEnemy(enemy, () => this.enemyGroup.add(enemy));
       return enemy;
     });
