@@ -12,7 +12,7 @@ export interface RunReport {
   victory: boolean;
 }
 
-/** Run gold is provisional until settlement at death or chapter completion. */
+/** Only physically collected coin gold is settled at death or victory. */
 export class RunLedger {
   private readonly enemyIds = new Set<string>();
   private readonly rooms = new Set<number>();
@@ -31,14 +31,18 @@ export class RunLedger {
   public defeatEnemy(enemyId: string, kind: EnemyKind): boolean {
     if (!enemyId || this.enemyIds.has(enemyId)) return false;
     this.enemyIds.add(enemyId);
-    this.gold += kind === 'boss' ? 90 : kind === 'tank' ? 9 : 5;
     if (kind === 'boss') this.bosses += 1;
     return true;
   }
   public clearRoom(room: number): boolean {
     if (!Number.isSafeInteger(room) || room < 1 || room > CHAPTER_ROOM_COUNT || this.rooms.has(room)) return false;
     this.rooms.add(room);
-    this.gold += 20 + room * 3 + (room % 5 === 0 ? 70 : 0);
+    return true;
+  }
+  /** Invoked only when the player touches/magnetically collects a coin. */
+  public collectGold(amount: number): boolean {
+    if (!Number.isSafeInteger(amount) || amount <= 0) return false;
+    this.gold = Math.min(1_000_000_000, this.gold + amount);
     return true;
   }
   public recordDamage(amount: number): void {
