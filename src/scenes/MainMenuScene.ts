@@ -32,6 +32,7 @@ export class MainMenuScene extends Phaser.Scene {
   private resetRequested = false;
   private awaitingKey?: ControlAction;
   private notice = '';
+  private suppressNextContextMenu = false;
 
   public constructor() { super(MENU_SCENE_KEY); }
 
@@ -305,7 +306,8 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   private readonly preventCaptureContextMenu = (event: MouseEvent): void => {
-    if (this.awaitingKey) event.preventDefault();
+    if (this.awaitingKey || this.suppressNextContextMenu) event.preventDefault();
+    this.suppressNextContextMenu = false;
   };
 
   private readonly captureMouseButton = (event: PointerEvent): void => {
@@ -313,6 +315,7 @@ export class MainMenuScene extends Phaser.Scene {
       !(event.target instanceof Node) || !this.game.canvas.contains(event.target)) return;
     const key = mouseButtonKey(event.button);
     if (!key) return;
+    if (event.button === 2) this.suppressNextContextMenu = true;
     event.preventDefault();
     event.stopImmediatePropagation();
     this.applyCapturedInput(key);
