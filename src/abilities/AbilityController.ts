@@ -4,7 +4,6 @@ import { DamageSystem, type DamageResult } from '../combat/damage';
 import { Slime } from '../enemies/Slime';
 import type { Player } from '../entities/Player';
 import type { InputController } from '../input/InputController';
-import type { Vector2Value } from '../input/vectorMath';
 import { AbilityCooldowns } from './AbilityCooldowns';
 import {
   ABILITIES, ABILITY_SLOTS, DASH_IFRAME_MS, DASH_SPEED, ICE_SLOW_FACTOR,
