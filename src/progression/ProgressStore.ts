@@ -80,7 +80,10 @@ export function validateProfile(raw: unknown): Profile {
       1, CHAPTER_ROOM_COUNT));
   // Existing v2 profiles tracked one chapter. Preserve that record in world 1
   // even if no world-specific fields exist yet.
-  worldBestRooms[0] = Math.max(worldBestRooms[0]!, validLevel(input.highestRoom, 1, CHAPTER_ROOM_COUNT));
+  if (!Array.isArray(input.worldBestRooms)) {
+    worldBestRooms[0] = Math.max(worldBestRooms[0]!,
+      validLevel(input.highestRoom, 1, CHAPTER_ROOM_COUNT));
+  }
   return {
     version: 2,
     gold: typeof input.gold === 'number' && Number.isFinite(input.gold)
