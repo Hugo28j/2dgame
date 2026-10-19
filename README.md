@@ -2,6 +2,13 @@
 
 Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de browser. Het project gebruikt Phaser, TypeScript en Vite en wordt in afzonderlijk geteste ontwikkelfases opgebouwd.
 
+## Hotfixes na fase 8
+
+- Desktop: WASD en ZQSD werken allebei, ook diagonaal. Muis + linkermuisknop blijft richten en schieten.
+- Phaser Arcade Physics Groups overschrijven de initiële velocity van een nieuw projectiel. Zowel speler- als vijandschoten krijgen hun snelheid daarom opnieuw **nadat** ze aan de groep zijn toegevoegd.
+- Reguliere schoten verdwijnen bij een treffer op een muur of vijand; bestaande piercing-wapens/upgrades blijven doelbewust meerdere vijanden kunnen doorboren tot hun hitlimiet. Vijandelijke schoten verdwijnen bij een botsing met muur of speler.
+- Vijanden krijgen na toevoegen aan de Physics Group expliciet botsing met kamergrenzen, ook tijdens boss charges.
+
 ## Huidige fase
 
 Fase 8 – Progressie en economie:
