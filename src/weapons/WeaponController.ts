@@ -48,7 +48,7 @@ export class WeaponController {
         vector, config.projectileSpeed, attack, config.piercing + this.extraPiercing,
         { textureKey: config.textureKey, range: config.projectileRange, effect: config.effect },
       );
-      addAndLaunch(this.projectiles, projectile, vector, config.projectileSpeed);
+      addAndLaunch(projectile, () => this.projectiles.add(projectile), vector, config.projectileSpeed);
     }
   }
 }
