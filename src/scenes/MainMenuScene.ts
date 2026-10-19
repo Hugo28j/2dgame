@@ -156,6 +156,6 @@ export class MainMenuScene extends Phaser.Scene {
       fontStyle: 'bold', color: disabled ? '#64748b' : '#f8fafc',
     }).setOrigin(0.5);
     if (!disabled) rect.setInteractive({ useHandCursor: true })
-      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, action);
+      .on('pointerdown', action);
   }
 }
