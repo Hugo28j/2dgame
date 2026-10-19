@@ -5,6 +5,10 @@ import {
   permanentUpgradeCost, type PermanentLevels, type PermanentUpgradeId,
 } from './economy';
 import type { RunReport } from './RunLedger';
+import {
+  defaultKeyBindings, rebindKey, validateKeyBindings,
+  type ControlAction, type KeyBindings,
+} from '../input/keyBindings';
 
 const STORAGE_KEY = 'dungeon-ascent:profile:v2';
 const LEGACY_KEY = 'dungeon-ascent:profile:v1';
@@ -23,7 +27,7 @@ export interface Profile {
   permanentLevels: PermanentLevels;
   highestRoom: number;
   settledRunIds: string[];
-  settings: { musicEnabled: boolean; sfxEnabled: boolean };
+  settings: { musicEnabled: boolean; sfxEnabled: boolean; keyBindings: KeyBindings };
 }
 export function defaultProfile(): Profile {
   return {
@@ -32,7 +36,7 @@ export function defaultProfile(): Profile {
     heroLevels: { ranger: 1, mage: 1, guardian: 1 },
     weaponLevels: { bow: 1, crossbow: 1, staff: 1, daggers: 1, lightning: 1 },
     permanentLevels: defaultPermanentLevels(), highestRoom: 1,
-    settledRunIds: [], settings: { musicEnabled: true, sfxEnabled: true },
+    settledRunIds: [], settings: { musicEnabled: true, sfxEnabled: true, keyBindings: defaultKeyBindings() },
   };
 }
 const validLevel = (n: unknown, min: number, max: number): number =>
@@ -74,6 +78,7 @@ export function validateProfile(raw: unknown): Profile {
     settings: {
       musicEnabled: typeof settings?.musicEnabled === 'boolean' ? settings.musicEnabled : true,
       sfxEnabled: typeof settings?.sfxEnabled === 'boolean' ? settings.sfxEnabled : true,
+      keyBindings: validateKeyBindings(settings?.keyBindings),
     },
   };
 }
@@ -87,6 +92,8 @@ export type ProfileAction =
   | { type: 'upgradeWeapon'; id: WeaponId }
   | { type: 'upgradePermanent'; id: PermanentUpgradeId }
   | { type: 'setSetting'; key: 'musicEnabled' | 'sfxEnabled'; value: boolean }
+  | { type: 'rebindKey'; action: ControlAction; key: string }
+  | { type: 'resetKeyBindings' }
   | { type: 'settleRun'; report: RunReport }
   // Retained for compatibility with phase-5 tests; gameplay uses settleRun only.
   | { type: 'awardGold'; amount: number };
@@ -132,6 +139,12 @@ export function applyProfileAction(profile: Profile, action: ProfileAction): Pro
       };
     }
     case 'setSetting': return { ...p, settings: { ...p.settings, [action.key]: action.value } };
+    case 'rebindKey': {
+      const result = rebindKey(p.settings.keyBindings, action.action, action.key);
+      return result.ok ? { ...p, settings: { ...p.settings, keyBindings: result.bindings } } : p;
+    }
+    case 'resetKeyBindings':
+      return { ...p, settings: { ...p.settings, keyBindings: defaultKeyBindings() } };
     case 'awardGold':
       return {
         ...p, gold: Math.min(MAX_GOLD,
