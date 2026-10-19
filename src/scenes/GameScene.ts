@@ -199,7 +199,7 @@ export class GameScene extends Phaser.Scene {
       .setDepth(10);
 
     this.roomNumberText = this.add
-      .text(372, 14, 'KAMER 1/20', {
+      .text(372, 14, 'KAMER 1/' + CHAPTER_ROOM_COUNT, {
         color: '#7dd3fc',
         fontFamily: 'system-ui, sans-serif',
         fontSize: '14px',
