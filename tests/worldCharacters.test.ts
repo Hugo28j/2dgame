@@ -66,7 +66,7 @@ describe('four world-specific playable heroes', () => {
   });
 
   it('prevents paying for heroes from future locked worlds', () => {
-    let profile = applyProfileAction(defaultProfile(), { type: 'awardGold', amount: 1000 });
+    let profile = applyProfileAction(defaultProfile(), { type: 'awardGold', amount: 2000 });
     for (const id of ['frostblade', 'pyromancer', 'stormstrider', 'voidwalker'] as const) {
       expect(applyProfileAction(profile, { type: 'unlockHero', id })).toEqual(profile);
     }
