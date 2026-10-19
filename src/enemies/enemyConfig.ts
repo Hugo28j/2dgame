@@ -1,3 +1,5 @@
+import { BOSSES, getBossProfile, getBossTier } from './bossProfiles';
+
 export type EnemyKind = 'slime' | 'archer' | 'charger' | 'mage' | 'tank' | 'bomber' | 'boss';
 
 export interface EnemyConfig {
@@ -26,7 +28,7 @@ export const ENEMY_CONFIGS: Readonly<Record<EnemyKind, EnemyConfig>> = {
   bomber: { id: 'bomber', name: 'Blast Shroom', maxHp: 75, damage: 27, defense: 3, movementSpeed: 82, attackRange: 105, attackIntervalMs: 1200 },
   boss: { id: 'boss', name: 'Dungeon Guardian', maxHp: 880, damage: 23, defense: 12, movementSpeed: 66, attackRange: 280, attackIntervalMs: 1550 },
 };
-export const BOSS_NAMES = ['Stone Warden', 'Ember Colossus', 'Frost Tyrant', 'Void Sentinel'] as const;
+export const BOSS_NAMES = BOSSES.map(boss => boss.name);
 
 export const SLIME_DIFFICULTY = Object.freeze({ hpPerRoom: 0.08, damagePerRoom: 0.05 });
 
@@ -36,8 +38,10 @@ export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number): Slime
   const completed = number - 1;
   return {
     ...base, roomNumber: number,
-    maxHp: Math.round(base.maxHp * (1 + completed * SLIME_DIFFICULTY.hpPerRoom)),
-    damage: Math.round(base.damage * (1 + completed * SLIME_DIFFICULTY.damagePerRoom)),
+    maxHp: Math.round(base.maxHp * (1 + completed * SLIME_DIFFICULTY.hpPerRoom) *
+      (kind === 'boss' ? 1 + (getBossTier(number) - 1) * 0.09 : 1)),
+    damage: Math.round(base.damage * (1 + completed * SLIME_DIFFICULTY.damagePerRoom) *
+      (kind === 'boss' ? 1 + (getBossTier(number) - 1) * 0.05 : 1)),
   };
 };
 export const getSlimeStatsForRoom = (roomNumber: number): SlimeRuntimeStats =>
@@ -61,5 +65,4 @@ export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number): Ene
   if (index === 0 && introduced) return introduced;
   return pool[(index + roomNumber - 1) % pool.length] ?? 'slime';
 };
-export const getBossName = (roomNumber: number): string =>
-  BOSS_NAMES[Math.max(0, Math.min(3, Math.floor(roomNumber / 5) - 1))] ?? BOSS_NAMES[0];
+export const getBossName = (roomNumber: number): string => getBossProfile(roomNumber).name;
