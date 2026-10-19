@@ -25,6 +25,7 @@ import {
   type RoomDefinition,
 } from '../rooms/roomConfig';
 import { RoomProgress } from '../rooms/RoomProgress';
+import { chooseDistantSpawnIndices, spawnWaveSettings, type SpawnWaveSettings } from '../rooms/spawnWaves';
 import { targetArenaScroll } from '../rooms/cameraFollow';
 import { WeaponController } from '../weapons/WeaponController';
 import { WEAPONS } from '../weapons/weaponConfig';
@@ -68,6 +69,9 @@ export class GameScene extends Phaser.Scene {
   private doorStatusText?: Phaser.GameObjects.Text;
   private doorHintText?: Phaser.GameObjects.Text;
   private aliveEnemies = 0;
+  private pendingSpawnIndices: number[] = [];
+  private nextEnemyWaveAt = 0;
+  private waveSettings?: SpawnWaveSettings;
   private gameOver = false;
   private transitioning = false;
   private chapterComplete = false;
@@ -148,6 +152,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.player.move(this.controls.getMovement());
+    this.updateEnemyWaves();
     this.updateCamera();
     const aim = this.controls.getAim(this.player.x, this.player.y);
     this.player.face(aim);
@@ -376,6 +381,8 @@ export class GameScene extends Phaser.Scene {
     this.projectiles.clear(true, true);
     this.obstacles.clear(true, true);
     this.aliveEnemies = 0;
+    this.pendingSpawnIndices = [];
+    this.waveSettings = undefined;
     this.currentRoom = room;
     const bounds = room.layout.bounds;
     this.physics.world.setBounds(bounds.x, bounds.y, bounds.width, bounds.height,
@@ -402,7 +409,9 @@ export class GameScene extends Phaser.Scene {
     const initial = targetArenaScroll(this.player.x, this.player.y, bounds);
     this.cameras.main.setScroll(initial.x, initial.y);
 
-    const spawned = this.enemySpawner.spawnRoom(room);
+    this.waveSettings = spawnWaveSettings(room.number, room.enemyCount);
+    this.pendingSpawnIndices = room.enemySpawns.map((_, index) => index);
+    const spawned = this.spawnEnemyWave(this.waveSettings.initial);
     this.activeBoss = spawned.find(
       (enemy): enemy is AdvancedEnemy => enemy instanceof AdvancedEnemy && enemy.isBoss,
     );
@@ -413,6 +422,44 @@ export class GameScene extends Phaser.Scene {
     if (showBanner) {
       this.showRoomBanner(room);
     }
+  }
+
+  /** New enemies arrive over time, far from the current player position. */
+  private updateEnemyWaves(): void {
+    if (!this.waveSettings || this.pendingSpawnIndices.length === 0) return;
+    const capacity = this.waveSettings.maxActive - this.aliveEnemies;
+    if (capacity <= 0) return;
+    if (this.aliveEnemies > 0 && this.time.now < this.nextEnemyWaveAt &&
+        this.aliveEnemies > Math.max(2, Math.floor(this.waveSettings.maxActive / 3))) return;
+    this.spawnEnemyWave(Math.min(capacity, this.waveSettings.batchSize));
+  }
+
+  private spawnEnemyWave(count: number): readonly Slime[] {
+    if (!this.currentRoom || !this.player || !this.enemies || !this.enemySpawner ||
+        count <= 0 || this.pendingSpawnIndices.length === 0) return [];
+    const live = this.enemies.getChildren()
+      .filter((child): child is Slime => child instanceof Slime &&
+        child.active && child.aiState !== 'defeated');
+    const settings = this.waveSettings!;
+    const occupied = live.map(enemy => ({ x: enemy.x, y: enemy.y }));
+    // Try not to spawn directly onto another enemy, but never deadlock room
+    // completion if the player is standing near the last open spawn positions.
+    let chosen = chooseDistantSpawnIndices(
+      this.currentRoom.enemySpawns, this.pendingSpawnIndices,
+      { x: this.player.x, y: this.player.y }, count,
+      settings.preferredDistance, occupied,
+    );
+    if (!chosen.length) chosen = chooseDistantSpawnIndices(
+      this.currentRoom.enemySpawns, this.pendingSpawnIndices,
+      { x: this.player.x, y: this.player.y }, count,
+      settings.preferredDistance,
+    );
+    if (!chosen.length) return [];
+    const selected = new Set(chosen);
+    this.pendingSpawnIndices = this.pendingSpawnIndices.filter(i => !selected.has(i));
+    const spawned = this.enemySpawner.spawnRoom(this.currentRoom, chosen);
+    this.nextEnemyWaveAt = this.time.now + settings.intervalMs;
+    return spawned;
   }
 
   private createObstacles(room: RoomDefinition): void {
@@ -906,19 +953,19 @@ export class GameScene extends Phaser.Scene {
     if (this.gameOver || this.chapterComplete) return;
     if (victory) this.chapterComplete = true;
     else this.gameOver = true;
-    this.abilities?.cancelMotion();
-    this.enemyProjectiles?.clear(true, true);
-    this.clearBossBombs();
+    // Render Game Over before deleting a large room's sprites and collisions.
+    // Scene.start() here forces synchronous SHUTDOWN/cleanup in the death frame,
+    // which causes the apparent freeze in crowded later chambers.
     this.player?.setVelocity(0, 0);
-    this.upgradeOverlay?.destroy(true);
-    this.upgradeOverlay = undefined;
-    this.choosingUpgrade = false;
-    this.physics.world.resume();
+    this.controls?.cancelTouches();
+    this.physics.world.pause();
+    this.pendingSpawnIndices = [];
     const report = this.run.report(victory);
     progressStore.dispatch({ type: 'settleRun', report });
-    this.scene.start(GAME_OVER_SCENE_KEY, {
+    this.scene.launch(GAME_OVER_SCENE_KEY, {
       report, chosenUpgrades: this.upgrades.chosen(),
     });
+    this.scene.sleep();
   }
 
   private finishChapterRooms(): void { this.completeRun(true); }
@@ -943,6 +990,8 @@ export class GameScene extends Phaser.Scene {
     this.events.off(ENEMY_SPAWNED_EVENT, this.handleEnemySpawned);
     this.events.off(ENEMY_DEFEATED_EVENT, this.handleEnemyDefeated);
     this.controls = undefined;
+    this.pendingSpawnIndices = [];
+    this.waveSettings = undefined;
     this.weapon = undefined;
     this.projectiles = undefined;
     this.enemies = undefined;
