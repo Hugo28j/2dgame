@@ -23,5 +23,5 @@
 
 ## Huidige status
 
-- Actieve ontwikkelfase: **fase 1 – Speler en bediening**.
-- Volgende fase na afzonderlijke goedkeuring: **fase 2 – Schieten en basiscombat**.
+- Actieve ontwikkelfase: **fase 2 – Schieten en basiscombat**.
+- Volgende fase na afzonderlijke goedkeuring: **fase 3 – Eerste vijand en kamervooruitgang**.

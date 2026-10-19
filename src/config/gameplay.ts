@@ -6,6 +6,7 @@ export const ARENA_BOUNDS = {
 } as const;
 
 export const PLAYER_SPEED = 210;
+export const PLAYER_BASE_CRITICAL_CHANCE = 0.1;
 
 export const JOYSTICK_CONFIG = {
   radius: 52,
@@ -15,3 +16,9 @@ export const JOYSTICK_CONFIG = {
   movementX: 92,
   aimX: 298,
 } as const;
+
+export const TRAINING_TARGETS = [
+  { id: 'target-north-west', x: 92, y: 174 },
+  { id: 'target-north-east', x: 298, y: 174 },
+  { id: 'target-south', x: 195, y: 542 },
+] as const;

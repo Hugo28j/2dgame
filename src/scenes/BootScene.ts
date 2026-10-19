@@ -1,9 +1,11 @@
 import Phaser from 'phaser';
 
 import {
+  ARROW_TEXTURE_KEY,
   BOOT_SCENE_KEY,
   GAME_SCENE_KEY,
   PLAYER_TEXTURE_KEY,
+  TARGET_TEXTURE_KEY,
 } from '../config/constants';
 
 export class BootScene extends Phaser.Scene {
@@ -13,6 +15,8 @@ export class BootScene extends Phaser.Scene {
 
   public create(): void {
     this.createPlayerTexture();
+    this.createArrowTexture();
+    this.createTargetTexture();
     this.scene.start(GAME_SCENE_KEY);
   }
 
@@ -29,6 +33,36 @@ export class BootScene extends Phaser.Scene {
     graphics.lineStyle(3, 0x0e7490, 1);
     graphics.strokeCircle(24, 24, 16);
     graphics.generateTexture(PLAYER_TEXTURE_KEY, 48, 48);
+    graphics.destroy();
+  }
+
+  private createArrowTexture(): void {
+    if (this.textures.exists(ARROW_TEXTURE_KEY)) {
+      return;
+    }
+
+    const graphics = this.make.graphics({ x: 0, y: 0 }, false);
+    graphics.fillStyle(0xf8fafc, 1);
+    graphics.fillRect(1, 3, 16, 3);
+    graphics.fillStyle(0xf59e0b, 1);
+    graphics.fillTriangle(14, 0, 23, 4, 14, 8);
+    graphics.generateTexture(ARROW_TEXTURE_KEY, 24, 9);
+    graphics.destroy();
+  }
+
+  private createTargetTexture(): void {
+    if (this.textures.exists(TARGET_TEXTURE_KEY)) {
+      return;
+    }
+
+    const graphics = this.make.graphics({ x: 0, y: 0 }, false);
+    graphics.fillStyle(0x7f1d1d, 1);
+    graphics.fillCircle(20, 20, 19);
+    graphics.fillStyle(0xf8fafc, 1);
+    graphics.fillCircle(20, 20, 13);
+    graphics.fillStyle(0xdc2626, 1);
+    graphics.fillCircle(20, 20, 7);
+    graphics.generateTexture(TARGET_TEXTURE_KEY, 40, 40);
     graphics.destroy();
   }
 }

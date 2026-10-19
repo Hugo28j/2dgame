@@ -49,7 +49,7 @@ export class InputController {
       radius: JOYSTICK_CONFIG.radius,
       interactionSize: JOYSTICK_CONFIG.interactionSize,
       deadZone: JOYSTICK_CONFIG.deadZone,
-      label: 'RICHTEN',
+      label: 'RICHT + VUUR',
       accentColor: 0xf59e0b,
     });
 
@@ -89,6 +89,15 @@ export class InputController {
     }
 
     return { ...this.lastAim };
+  }
+
+  public isShooting(): boolean {
+    if (this.aimJoystick.isActive) {
+      const aim = this.aimJoystick.vector;
+      return Math.hypot(aim.x, aim.y) > 0;
+    }
+
+    return this.scene.input.manager.mousePointer?.primaryDown ?? false;
   }
 
   public destroy(): void {
