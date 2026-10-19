@@ -13,7 +13,8 @@ describe('custom keyboard controls', () => {
     expect(defaultMap.dash).toEqual(['1']);
     expect(defaultMap.fireNova).toEqual(['2']);
     expect(defaultMap.iceBlast).toEqual(['3']);
-    expect(CONTROL_ACTIONS).toHaveLength(7);
+    expect(CONTROL_ACTIONS).toHaveLength(8);
+    expect(defaultMap.shoot).toEqual(['MOUSE1']);
     expect(keyboardVector(new Set(['Z', 'D']), defaultMap).x).toBeCloseTo(Math.SQRT1_2);
     expect(keyboardVector(new Set(['W', 'Z']), defaultMap)).toEqual({ x: 0, y: -1 });
     expect(keyboardVector(new Set(['W', 'S']), defaultMap)).toEqual({ x: 0, y: 0 });
