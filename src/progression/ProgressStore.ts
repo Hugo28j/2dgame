@@ -39,7 +39,7 @@ export function defaultProfile(): Profile {
   return {
     version: 2, gold: 150, selectedHero: 'ranger', selectedWeapon: 'bow',
     unlockedHeroes: ['ranger'], unlockedWeapons: ['bow'],
-    heroLevels: { ranger: 1, mage: 1, guardian: 1 },
+    heroLevels: Object.fromEntries(HERO_IDS.map(id => [id, 1])) as Record<HeroId, number>,
     weaponLevels: { bow: 1, crossbow: 1, staff: 1, daggers: 1, lightning: 1 },
     permanentLevels: defaultPermanentLevels(), highestRoom: 1,
     selectedWorld: 1, completedWorlds: 0, worldBestRooms: [1, 1, 1, 1, 1],
@@ -132,7 +132,8 @@ export function applyProfileAction(profile: Profile, action: ProfileAction): Pro
       return p.unlockedWeapons.includes(action.id) ? { ...p, selectedWeapon: action.id } : p;
     case 'unlockHero': {
       const cost = HEROES[action.id].unlockCost;
-      if (p.unlockedHeroes.includes(action.id) || p.gold < cost) return p;
+      if (p.unlockedHeroes.includes(action.id) || p.gold < cost ||
+        !isWorldUnlocked(HEROES[action.id].requiredWorld, p.completedWorlds)) return p;
       return { ...p, gold: p.gold - cost, unlockedHeroes: [...p.unlockedHeroes, action.id], selectedHero: action.id };
     }
     case 'unlockWeapon': {
