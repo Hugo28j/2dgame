@@ -1,3 +1,4 @@
+import { getWorld, type WorldId } from '../worlds/worldConfig';
 import { BOSSES, getBossProfile, getBossTier } from './bossProfiles';
 
 export type EnemyKind = 'slime' | 'archer' | 'charger' | 'mage' | 'tank' | 'bomber' | 'boss';
@@ -32,20 +33,24 @@ export const BOSS_NAMES = BOSSES.map(boss => boss.name);
 
 export const SLIME_DIFFICULTY = Object.freeze({ hpPerRoom: 0.08, damagePerRoom: 0.05 });
 
-export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number): SlimeRuntimeStats => {
+export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number,
+  worldId: WorldId = 1): SlimeRuntimeStats => {
   const base = ENEMY_CONFIGS[kind];
   const number = Math.max(1, Math.floor(roomNumber));
   const completed = number - 1;
+  const world = getWorld(worldId);
   return {
     ...base, roomNumber: number,
     maxHp: Math.round(base.maxHp * (1 + completed * SLIME_DIFFICULTY.hpPerRoom) *
-      (kind === 'boss' ? 1 + (getBossTier(number) - 1) * 0.09 : 1)),
+      (kind === 'boss' ? 1 + (getBossTier(number) - 1) * 0.09 : 1) * world.hpMultiplier),
     damage: Math.round(base.damage * (1 + completed * SLIME_DIFFICULTY.damagePerRoom) *
-      (kind === 'boss' ? 1 + (getBossTier(number) - 1) * 0.05 : 1)),
+      (kind === 'boss' ? 1 + (getBossTier(number) - 1) * 0.05 : 1) * world.damageMultiplier),
+    movementSpeed: Math.round(base.movementSpeed * world.speedMultiplier),
+    attackIntervalMs: Math.round(base.attackIntervalMs / world.attackSpeedMultiplier),
   };
 };
-export const getSlimeStatsForRoom = (roomNumber: number): SlimeRuntimeStats =>
-  getEnemyStatsForRoom('slime', roomNumber);
+export const getSlimeStatsForRoom = (roomNumber: number, worldId: WorldId = 1): SlimeRuntimeStats =>
+  getEnemyStatsForRoom('slime', roomNumber, worldId);
 
 /** First rooms contain only slimes. New enemies unlock gradually, then become
  * more frequent as the dungeon gets deeper. Deterministic for reproducible runs. */
