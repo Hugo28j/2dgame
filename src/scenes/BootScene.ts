@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { EnemyKind } from '../enemies/enemyConfig';
+import { createWorldCharacterTextures } from '../enemies/worldCharacterArt';
 import { HERO_IDS, HEROES } from '../heroes/heroConfig';
 
 import {
@@ -22,6 +23,7 @@ export class BootScene extends Phaser.Scene {
     this.createTargetTexture();
     this.createSlimeTexture();
     this.createEnemyTextures();
+    createWorldCharacterTextures(this);
     this.createHeroTextures();
     this.createWeaponTextures();
     this.scene.start(MENU_SCENE_KEY);
