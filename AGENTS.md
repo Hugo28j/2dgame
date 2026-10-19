@@ -23,5 +23,5 @@
 
 ## Huidige status
 
-- Actieve ontwikkelfase: **fase 2 – Schieten en basiscombat**.
-- Volgende fase na afzonderlijke goedkeuring: **fase 3 – Eerste vijand en kamervooruitgang**.
+- Actieve ontwikkelfase: **fase 3 – Eerste vijand**.
+- Volgende fase na afzonderlijke goedkeuring: **fase 4 – Kamersysteem en deuren**.

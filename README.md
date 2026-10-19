@@ -4,18 +4,19 @@ Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de br
 
 ## Huidige fase
 
-Fase 2 – Schieten en basiscombat:
+Fase 3 – Eerste vijand:
 
-- alle speler- en bedieningsfuncties uit fase 1;
-- continu boogschieten via de rechter joystick;
-- richten met de muis en schieten met de linkermuisknop;
-- configureerbaar wapen met fire rate, damage, snelheid, crit en piercing;
-- projectielen die verdwijnen bij een muur of niet-piercende treffer;
-- centraal damage-systeem met defense en critical hits;
-- statische oefendoelen met HP-balk, hitflash, damage numbers en death-feedback;
-- unit tests voor damage, fire rate en bescherming tegen dubbele treffers.
+- alle speler-, bedienings- en basiscombatfuncties uit eerdere fasen;
+- de eerste echte vijand: **Moss Slime**;
+- directe chase-AI met genormaliseerde beweging;
+- contactschade via het centrale damage-systeem;
+- speler-HP, defense en invulnerability frames;
+- vijand-HP, defense, health bar, hit- en death-feedback;
+- configureerbaar, eenvoudig spawnsysteem;
+- expliciete spawn- en death-events;
+- game-over en herstart van de oefenarena.
 
-Volledige vijand-AI, abilities, kamerprogressie en permanente upgrades horen bij latere fasen.
+Kamers, deuren, obstakels, extra vijandtypes, abilities en permanente upgrades horen bij latere fasen.
 
 ## Lokaal starten
 
@@ -51,6 +52,7 @@ De productiebuild gebruikt het basispad `/2dgame/`, passend bij:
 src/
 ├── config/     # spelconfiguratie en constanten
 ├── combat/     # centrale schaderekening
+├── enemies/    # vijandconfiguratie, spawning en AI-modules
 ├── entities/   # Phaser-gameobjecten zoals de speler
 ├── input/      # joysticks, pointer ownership en invoerlogica
 ├── scenes/     # Phaser-scenes

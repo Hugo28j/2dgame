@@ -5,6 +5,7 @@ import {
   BOOT_SCENE_KEY,
   GAME_SCENE_KEY,
   PLAYER_TEXTURE_KEY,
+  SLIME_TEXTURE_KEY,
   TARGET_TEXTURE_KEY,
 } from '../config/constants';
 
@@ -17,6 +18,7 @@ export class BootScene extends Phaser.Scene {
     this.createPlayerTexture();
     this.createArrowTexture();
     this.createTargetTexture();
+    this.createSlimeTexture();
     this.scene.start(GAME_SCENE_KEY);
   }
 
@@ -63,6 +65,26 @@ export class BootScene extends Phaser.Scene {
     graphics.fillStyle(0xdc2626, 1);
     graphics.fillCircle(20, 20, 7);
     graphics.generateTexture(TARGET_TEXTURE_KEY, 40, 40);
+    graphics.destroy();
+  }
+
+  private createSlimeTexture(): void {
+    if (this.textures.exists(SLIME_TEXTURE_KEY)) {
+      return;
+    }
+
+    const graphics = this.make.graphics({ x: 0, y: 0 }, false);
+    graphics.fillStyle(0x65a30d, 1);
+    graphics.fillRoundedRect(2, 7, 36, 30, 13);
+    graphics.fillStyle(0xa3e635, 1);
+    graphics.fillCircle(12, 17, 6);
+    graphics.fillCircle(28, 17, 6);
+    graphics.fillStyle(0x132a13, 1);
+    graphics.fillCircle(13, 18, 2);
+    graphics.fillCircle(27, 18, 2);
+    graphics.lineStyle(2, 0x3f6212, 1);
+    graphics.lineBetween(15, 28, 25, 28);
+    graphics.generateTexture(SLIME_TEXTURE_KEY, 40, 40);
     graphics.destroy();
   }
 }
