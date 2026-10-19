@@ -60,6 +60,19 @@ Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de br
 - Niet-opgeraapte munten worden bij het verlaten van de kamer weggehaald en tellen niet mee. De run-HUD toont hoeveel munten nog in de huidige kamer liggen.
 - Goudwaarden zijn bewust lager dan de vorige 5/9/90 goud per kill, en de extra beloning van 20 + 3 × kamernummer (+ bossbonus) per kamer is verwijderd. Bestaande profielen/goudsaldo blijven ongewijzigd.
 
+## Vijf werelden, ontgrendeling en power-upanimatie
+
+- Kies je wereld via het nieuwe tabblad **Werelden** in het hoofdmenu. Iedere wereld heeft 50 kamers en 10 bosses (elke vijfde kamer), dus 250 kamers en 50 wereldspecifieke bossnamen in totaal.
+- **Wereld 1 – Verdant Ruins:** groene bosruïnes, mos en wortels (normale moeilijkheid).
+- **Wereld 2 – Frozen Hollow:** blauwe ijsgrotten met kristalpatronen en 35% meer HP / 20% meer schade van vijanden dan dezelfde kamer in wereld 1.
+- **Wereld 3 – Ember Wastes:** vulkanisch landschap met lava en as (75% extra HP / 43% extra schade ten opzichte van wereld 1).
+- **Wereld 4 – Storm Citadel:** elektrische vesting, bliksemmotieven en metalen blokkades (130% extra HP / 72% extra schade).
+- **Wereld 5 – Void Realm:** paarse kosmische dimensie met runen (200% extra HP / 105% extra schade).
+- Iedere volgende wereld heeft ook iets snellere vijanden en kortere aanvalscooldowns. De bestaande boss-archetypen en hun twee fases worden in iedere wereld behouden; hun namen passen bij het thema.
+- De volgende wereld komt pas beschikbaar nadat **kamer 50 daadwerkelijk gewonnen** is in de vorige wereld. Alleen kamer 50 bereiken is niet genoeg. Ontgrendeling, selectie en wereldrecords worden lokaal opgeslagen; bestaande saves migreren naar wereld 1.
+- Tijdens een run zie je **DEZE RUN: +... G** bij de coin-teller. Op het Game Over / overwinning-scherm staan het goud van deze run, het **totale ooit verdiende** goud en het actuele saldo naast elkaar. Het levenslange totaal telt vanaf de installatie van deze update, want oudere aankopen maken dat historisch totaal niet betrouwbaar reconstrueerbaar.
+- Voor de power-upkeuze komt een korte **glow/pulse-animatie**; daarna verschijnen de drie upgrade-kaarten één voor één. De game blijft gepauzeerd tijdens de keuze.
+
 ## Huidige fase
 
 Fase 8 – Progressie en economie:

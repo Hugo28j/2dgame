@@ -1,3 +1,4 @@
+import { getWorld, type WorldId } from '../worlds/worldConfig';
 import Phaser from 'phaser';
 import { getEnemyStatsForRoom, type EnemyKind, type SlimeRuntimeStats } from './enemyConfig';
 import { bossPhase, rangedVelocity } from './enemyMovement';
@@ -11,6 +12,13 @@ export type EnemyFire = (enemy: AdvancedEnemy, pattern: BulletPattern, volley?: 
 export type EnemyExplosion = (enemy: AdvancedEnemy, radius: number) => void;
 export type EnemyBomb = (enemy: AdvancedEnemy, targetX: number, targetY: number,
   count: number, radius: number, windupMs: number) => void;
+
+/** Retain each boss's distinct color while shifting it toward its world's palette. */
+function blendColors(a: number, b: number): number {
+  const channel = (shift: number): number =>
+    Math.round(((a >> shift) & 255) * 0.5 + ((b >> shift) & 255) * 0.5);
+  return (channel(16) << 16) | (channel(8) << 8) | channel(0);
+}
 
 /** Reuses the phase-3 shared HP, damage, slow and death events for all enemy types. */
 export class AdvancedEnemy extends Slime {
@@ -26,19 +34,23 @@ export class AdvancedEnemy extends Slime {
   private dashY = 0;
   private warning?: Phaser.GameObjects.Graphics;
   private readonly orbitSign: -1 | 1;
+  private readonly bossTint: number;
 
   public constructor(scene: Phaser.Scene, id: string, x: number, y: number,
-    kind: Exclude<EnemyKind, 'slime'>, roomNumber: number) {
-    const stats = getEnemyStatsForRoom(kind, roomNumber);
+    kind: Exclude<EnemyKind, 'slime'>, roomNumber: number,
+    worldId: WorldId = 1) {
+    const stats = getEnemyStatsForRoom(kind, roomNumber, worldId);
     super(scene, id, x, y, stats);
     this.kind = kind;
     this.roomNumber = roomNumber;
     this.stats = stats;
+    const originalTint = getBossProfile(roomNumber).color;
+    this.bossTint = worldId === 1 ? originalTint : blendColors(originalTint, getWorld(worldId).bossColor);
     this.orbitSign = id.length % 2 === 0 ? 1 : -1;
     this.setTexture('enemy-' + kind);
     if (kind === 'boss') {
       this.setScale(1.75);
-      this.setTint(getBossProfile(roomNumber).color);
+      this.setTint(this.bossTint);
       const body = this.body;
       if (body instanceof Phaser.Physics.Arcade.Body) body.setCircle(21, 3, 3);
     }
@@ -141,7 +153,7 @@ export class AdvancedEnemy extends Slime {
     if (this.isBoss) {
       this.scene.time.delayedCall(85, () => {
         if (this.active && this.aiState !== 'defeated') {
-          this.setTint(getBossProfile(this.roomNumber).color);
+          this.setTint(this.bossTint);
         }
       });
     }

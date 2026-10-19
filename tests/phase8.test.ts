@@ -22,7 +22,7 @@ describe('phase 8 run rewards', () => {
     run.recordDamage(27);
     run.recordDamage(-12);
     expect(run.report(true)).toEqual({
-      runId: 'test-run', reachedRoom: 5, roomsCleared: 1,
+      runId: 'test-run', worldId: 1, reachedRoom: 5, roomsCleared: 1,
       enemiesDefeated: 2, bossesDefeated: 1, totalDamage: 27,
       earnedGold: 7, victory: true,
     });

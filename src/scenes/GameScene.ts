@@ -5,7 +5,6 @@ import { DamageSystem, type DamageResult } from '../combat/damage';
 import { addAndLaunch } from '../combat/launchProjectile';
 import { GAME_SCENE_KEY, GAME_TITLE, GAME_OVER_SCENE_KEY } from '../config/constants';
 import { EnemySpawner } from '../enemies/EnemySpawner';
-import { getBossName } from '../enemies/enemyConfig';
 import { getBossProfile, getBossTier } from '../enemies/bossProfiles';
 import { AdvancedEnemy, type BulletPattern } from '../enemies/AdvancedEnemy';
 import { EnemyProjectile } from '../enemies/EnemyProjectile';
@@ -36,6 +35,7 @@ import { RunLedger } from '../progression/RunLedger';
 import { coinDropsForEnemy } from '../progression/coinRewards';
 import { roomClearHealing } from '../progression/roomHealing';
 import { RunUpgradeDeck, type RunUpgradeId } from '../progression/runUpgrades';
+import { getWorld, getWorldBossName, type WorldId } from '../worlds/worldConfig';
 import { findChainTargets } from '../weapons/chainLightning';
 
 type ArcadeCollisionObject =
@@ -80,7 +80,9 @@ export class GameScene extends Phaser.Scene {
   private chapterComplete = false;
   private choosingUpgrade = false;
   private upgradeOverlay?: Phaser.GameObjects.Container;
+  private worldId: WorldId = 1;
   private run = new RunLedger();
+  private upgradeReady = false;
   private upgrades = new RunUpgradeDeck();
   private readonly damageSystem = new DamageSystem();
   private readonly roomProgress = new RoomProgress(CHAPTER_ROOM_COUNT);
@@ -90,6 +92,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   public create(): void {
+    this.worldId = progressStore.current.selectedWorld;
     this.roomProgress.reset();
     this.clearCoins();
     this.aliveEnemies = 0;
@@ -97,11 +100,11 @@ export class GameScene extends Phaser.Scene {
     this.transitioning = false;
     this.chapterComplete = false;
     this.choosingUpgrade = false;
-    this.run = new RunLedger();
+    this.run = new RunLedger(undefined, this.worldId);
     this.upgrades = new RunUpgradeDeck();
     this.drawBackdrop();
 
-    const firstRoom = getRoomDefinition(1);
+    const firstRoom = getRoomDefinition(1, this.worldId);
     const profile = progressStore.current;
     this.player = new Player(
       this,
@@ -193,7 +196,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawBackdrop(): void {
-    this.cameras.main.setBackgroundColor('#08111f');
+    this.cameras.main.setBackgroundColor('#' + getWorld(this.worldId).wall.toString(16).padStart(6, '0'));
 
     this.add
       .text(18, 17, GAME_TITLE, {
@@ -278,17 +281,17 @@ export class GameScene extends Phaser.Scene {
       Phaser.Math.Linear(camera.scrollY, target.y, 0.16));
   }
 
-  /** Same established art direction, but nine different layouts and room-size
-   * dependent floor markings. Art is recycled at every room transition. */
+  /** Five distinct floor palettes/motifs with the existing 21 chamber layouts. */
   private drawArena(room: RoomDefinition): void {
     this.arenaArt?.destroy(true);
     const { bounds, accent } = room.layout;
+    const world = getWorld(this.worldId);
     const plate = this.add.rectangle(
       bounds.x + bounds.width / 2, bounds.y + bounds.height / 2,
-      bounds.width, bounds.height, 0x142033,
-    ).setStrokeStyle(6, accent, 0.65);
+      bounds.width, bounds.height, world.floor,
+    ).setStrokeStyle(6, world.accent, 0.7);
     const floor = this.add.graphics();
-    floor.lineStyle(1, 0x26364c, 0.65);
+    floor.lineStyle(1, world.grid, 0.55);
     for (let x = bounds.x + 30; x < bounds.x + bounds.width; x += 30) {
       floor.lineBetween(x, bounds.y, x, bounds.y + bounds.height);
     }
@@ -302,7 +305,45 @@ export class GameScene extends Phaser.Scene {
       floor.strokeCircle(x, y, 12 + (i % 3) * 9);
       floor.lineBetween(x - 9, y, x + 9, y);
     }
-    this.arenaArt = this.add.container(0, 0, [plate, floor]).setDepth(0);
+    // World-specific floor motifs give each campaign its own map identity.
+    // Cheap static vector graphics: regenerated only when changing chambers.
+    const motifs = this.add.graphics();
+    motifs.lineStyle(2, world.accent, 0.23);
+    for (let i = 0; i < 18; i++) {
+      const x = bounds.x + 45 + ((i * 137 + room.number * 43) % Math.max(55, bounds.width - 90));
+      const y = bounds.y + 46 + ((i * 241 + room.number * 61) % Math.max(65, bounds.height - 105));
+      switch (this.worldId) {
+        case 1: // Ferns and winding roots.
+          motifs.strokeCircle(x, y, 7 + (i % 3) * 3);
+          motifs.lineBetween(x - 12, y + 9, x + 12, y - 9);
+          break;
+        case 2: // Angular ice crystals and snowflake shards.
+          motifs.lineBetween(x, y - 14, x + 11, y);
+          motifs.lineBetween(x + 11, y, x, y + 14);
+          motifs.lineBetween(x, y + 14, x - 11, y);
+          motifs.lineBetween(x - 11, y, x, y - 14);
+          motifs.lineBetween(x - 8, y, x + 8, y);
+          break;
+        case 3: // Broken lava fissures.
+          motifs.lineBetween(x - 17, y - 12, x - 3, y - 2);
+          motifs.lineBetween(x - 3, y - 2, x - 8, y + 6);
+          motifs.lineBetween(x - 8, y + 6, x + 16, y + 12);
+          motifs.strokeCircle(x + 16, y - 7, 4);
+          break;
+        case 4: // Electric bolts.
+          motifs.lineBetween(x - 10, y - 16, x + 2, y - 5);
+          motifs.lineBetween(x + 2, y - 5, x - 4, y + 4);
+          motifs.lineBetween(x - 4, y + 4, x + 11, y + 14);
+          break;
+        case 5: // Arcane void sigils.
+          motifs.strokeCircle(x, y, 15);
+          motifs.strokeCircle(x, y, 5);
+          motifs.lineBetween(x - 18, y, x + 18, y);
+          motifs.lineBetween(x, y - 18, x, y + 18);
+          break;
+      }
+    }
+    this.arenaArt = this.add.container(0, 0, [plate, floor, motifs]).setDepth(0);
   }
 
   private createDoor(): void {
@@ -463,7 +504,7 @@ export class GameScene extends Phaser.Scene {
     if (!chosen.length) return [];
     const selected = new Set(chosen);
     this.pendingSpawnIndices = this.pendingSpawnIndices.filter(i => !selected.has(i));
-    const spawned = this.enemySpawner.spawnRoom(this.currentRoom, chosen);
+    const spawned = this.enemySpawner.spawnRoom(this.currentRoom, chosen, this.worldId);
     this.nextEnemyWaveAt = this.time.now + settings.intervalMs;
     return spawned;
   }
@@ -473,6 +514,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    const world = getWorld(this.worldId);
     for (const definition of room.layout.obstacles) {
       const obstacle = this.add
         .rectangle(
@@ -480,9 +522,9 @@ export class GameScene extends Phaser.Scene {
           definition.y,
           definition.width,
           definition.height,
-          0x27364b,
+          world.obstacle,
         )
-        .setStrokeStyle(3, 0x475569)
+        .setStrokeStyle(3, world.obstacleBorder)
         .setDepth(6);
       this.physics.add.existing(obstacle, true);
       this.obstacles.add(obstacle);
@@ -539,7 +581,7 @@ export class GameScene extends Phaser.Scene {
 
     this.cameras.main.fadeOut(180, 2, 6, 23);
     this.time.delayedCall(190, () => {
-      this.loadRoom(getRoomDefinition(nextRoomNumber), true);
+      this.loadRoom(getRoomDefinition(nextRoomNumber, this.worldId), true);
       this.cameras.main.fadeIn(180, 2, 6, 23);
       this.transitioning = false;
     });
@@ -550,7 +592,8 @@ export class GameScene extends Phaser.Scene {
       .text(
         195,
         350,
-        room.isBossRoom ? `BOSS: ${getBossName(room.number)}` : `KAMER ${room.number}`,
+        room.isBossRoom ? `BOSS: ${getWorldBossName(this.worldId, room.number)}` :
+          `WERELD ${this.worldId} · KAMER ${room.number}`,
         {
           color: room.isBossRoom ? '#fbbf24' : '#bae6fd',
           fontFamily: 'system-ui, sans-serif',
@@ -575,7 +618,9 @@ export class GameScene extends Phaser.Scene {
 
   private updateRoomHud(room: RoomDefinition): void {
     this.roomNumberText?.setText(`KAMER ${room.number}/${CHAPTER_ROOM_COUNT}`);
-    this.roomTypeText?.setText(room.isBossRoom ? 'BOSS FIGHT' : room.layout.id.toUpperCase());
+    this.roomTypeText?.setText('W' + this.worldId + ' · ' + getWorld(this.worldId).name.toUpperCase() +
+      (room.isBossRoom ? ' · BOSS' : ''));
+    this.roomTypeText?.setColor('#' + getWorld(this.worldId).accent.toString(16).padStart(6, '0'));
   }
 
   private readonly handleProjectileHit = (
@@ -761,7 +806,7 @@ export class GameScene extends Phaser.Scene {
     this.bossNameText.setVisible(visible);
     this.bossHealthBar.clear();
     if (!visible || !boss) return;
-    this.bossNameText.setText(getBossName(this.roomProgress.roomNumber) +
+    this.bossNameText.setText(getWorldBossName(this.worldId, this.roomProgress.roomNumber) +
       (boss.healthRatio <= 0.5 ? ' · FASE 2' : ' · FASE 1'));
     this.bossHealthBar.fillStyle(0x020617, 0.95);
     this.bossHealthBar.fillRoundedRect(60, 154, 270, 14, 4);
@@ -947,61 +992,91 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateGoldHud(): void {
-    this.goldHudText?.setText(`RUN: +${this.run.runGold} G  ·  MUNTEN ${this.coins.size}`);
+    this.goldHudText?.setText(`DEZE RUN: +${this.run.runGold} G  ·  MUNTEN ${this.coins.size}`);
   }
 
-  /** Offers three exclusive run-only improvements after selected cleared rooms. */
+  /** A brief magic pulse reveals the upgrade cards in sequence.
+   * Combat stays frozen until the offer is chosen. */
   private showUpgradeOffer(): void {
     if (!this.player || this.choosingUpgrade) return;
     const cards = this.upgrades.offer(this.player.currentHp < this.player.maxHp);
     if (cards.length < 3) return;
     this.choosingUpgrade = true;
+    this.upgradeReady = false;
     this.player.setVelocity(0, 0);
     this.controls?.cancelTouches();
     this.physics.world.pause();
+
     const overlay = this.add.container(0, 0).setDepth(170).setScrollFactor(0);
     this.upgradeOverlay = overlay;
-    const shade = this.add.rectangle(195, 422, 390, 844, 0x020617, 0.93)
+    const shade = this.add.rectangle(195, 422, 390, 844, 0x020617, 0.94)
       .setInteractive();
     overlay.add(shade);
-    overlay.add(this.add.text(195, 171, 'KIES EEN RUN-UPGRADE', {
-      fontFamily: 'system-ui, sans-serif', fontSize: '23px',
-      fontStyle: 'bold', color: '#fde68a',
-    }).setOrigin(0.5));
-    overlay.add(this.add.text(195, 212, 'Geldig tot het einde van deze run', {
+    overlay.setAlpha(0);
+    this.tweens.add({ targets: overlay, alpha: 1, duration: 210, ease: 'Sine.easeOut' });
+
+    const pulse = this.add.circle(195, 180, 20, 0xfde68a, 0.12)
+      .setStrokeStyle(4, 0xfbbf24, 0.92);
+    overlay.add(pulse);
+    this.tweens.add({
+      targets: pulse, scale: 4.8, alpha: 0, duration: 640,
+      ease: 'Cubic.easeOut', onComplete: () => pulse.destroy(),
+    });
+
+    const title = this.add.text(195, 174, '✦  POWER-UP!  ✦', {
+      fontFamily: 'system-ui, sans-serif', fontSize: '28px',
+      fontStyle: 'bold', color: '#fde68a', stroke: '#78350f', strokeThickness: 3,
+    }).setOrigin(0.5).setScale(0.35).setAlpha(0);
+    overlay.add(title);
+    this.tweens.add({
+      targets: title, scaleX: 1, scaleY: 1, alpha: 1,
+      duration: 440, ease: 'Back.easeOut',
+    });
+    const subtitle = this.add.text(195, 219, 'KIES ÉÉN VERSTERKING', {
       fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#cbd5e1',
-    }).setOrigin(0.5));
+    }).setOrigin(0.5).setAlpha(0);
+    overlay.add(subtitle);
+    this.tweens.add({ targets: subtitle, alpha: 1, duration: 240, delay: 310 });
 
     cards.forEach((card, index) => {
-      const y = 299 + index * 112;
+      const y = 302 + index * 112;
       const border = card.rarity === 'epic' ? 0xc084fc :
         card.rarity === 'rare' ? 0x38bdf8 : 0x94a3b8;
-      const plate = this.add.rectangle(195, y, 330, 99, 0x172338)
+      const cardContainer = this.add.container(195, y).setScale(0.65).setAlpha(0);
+      const plate = this.add.rectangle(0, 0, 330, 99, 0x172338)
         .setStrokeStyle(2, border).setInteractive({ useHandCursor: true });
       plate.on('pointerdown', () => this.chooseUpgrade(card.id));
-      overlay.add(plate);
-      overlay.add(this.add.text(46, y - 32, card.name.toUpperCase(), {
+      cardContainer.add(plate);
+      cardContainer.add(this.add.text(-149, -32, card.name.toUpperCase(), {
         fontFamily: 'system-ui, sans-serif', fontSize: '17px',
         fontStyle: 'bold', color: '#f8fafc',
       }));
-      overlay.add(this.add.text(46, y - 5, card.description, {
+      cardContainer.add(this.add.text(-149, -5, card.description, {
         fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#cbd5e1',
       }));
-      overlay.add(this.add.text(46, y + 19,
+      cardContainer.add(this.add.text(-149, 19,
         card.rarity.toUpperCase() + '   ·   ' + (this.upgrades.count(card.id) + 1) + '/' + card.maxStacks, {
         fontFamily: 'system-ui, sans-serif', fontSize: '11px', color: '#94a3b8',
       }));
+      overlay.add(cardContainer);
+      this.tweens.add({
+        targets: cardContainer, scaleX: 1, scaleY: 1, alpha: 1,
+        delay: 480 + index * 135, duration: 360, ease: 'Back.easeOut',
+        onComplete: () => { if (index === cards.length - 1) this.upgradeReady = true; },
+      });
     });
   }
 
   private chooseUpgrade(id: RunUpgradeId): void {
-    if (!this.choosingUpgrade || !this.player || !this.weapon || !this.upgrades.choose(id)) return;
+    if (!this.choosingUpgrade || !this.upgradeReady || !this.player || !this.weapon ||
+      !this.upgrades.choose(id)) return;
     if (id === 'projectile') this.weapon.extraProjectiles += 1;
     else if (id === 'piercing') this.weapon.extraPiercing += 1;
     else this.player.applyRunBonus(id);
     this.upgradeOverlay?.destroy(true);
     this.upgradeOverlay = undefined;
     this.choosingUpgrade = false;
+    this.upgradeReady = false;
     this.physics.world.resume();
     this.drawPlayerHealth();
   }
@@ -1035,6 +1110,7 @@ export class GameScene extends Phaser.Scene {
     this.clearBossBombs();
     this.upgradeOverlay?.destroy(true);
     this.upgradeOverlay = undefined;
+    this.upgradeReady = false;
     this.abilities?.destroy();
     this.abilities = undefined;
     this.controls?.destroy();

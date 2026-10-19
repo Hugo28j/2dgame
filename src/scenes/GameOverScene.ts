@@ -3,6 +3,7 @@ import { GAME_OVER_SCENE_KEY, GAME_SCENE_KEY, MENU_SCENE_KEY } from '../config/c
 import type { RunReport } from '../progression/RunLedger';
 import { progressStore } from '../progression/ProgressStore';
 import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
+import { getWorld } from '../worlds/worldConfig';
 
 interface GameOverData {
   report: RunReport;
@@ -26,6 +27,8 @@ export class GameOverScene extends Phaser.Scene {
       if (this.scene.isSleeping(GAME_SCENE_KEY)) this.scene.stop(GAME_SCENE_KEY);
     });
     const { report } = data;
+    const profile = progressStore.current;
+    const world = getWorld(report.worldId);
     const fontFamily = 'system-ui, sans-serif';
     this.cameras.main.setBackgroundColor('#081525');
     this.add.rectangle(195, 422, 364, 760, 0x101d30)
@@ -39,28 +42,40 @@ export class GameOverScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     const rows = [
+      ['Wereld', world.id + '/5 · ' + world.name],
       ['Bereikte kamer', String(report.reachedRoom) + '/' + CHAPTER_ROOM_COUNT],
       ['Kamers voltooid', String(report.roomsCleared)],
       ['Vijanden verslagen', String(report.enemiesDefeated)],
-      ['Bosses verslagen', String(report.bossesDefeated)],
+      ['Bosses verslagen', String(report.bossesDefeated) + '/10'],
       ['Totale schade', String(report.totalDamage)],
-      ['Verdiend goud', '+' + report.earnedGold + ' G'],
-      ['Totaal goud', String(progressStore.current.gold) + ' G'],
-      ['Persoonlijk record', 'Kamer ' + progressStore.current.highestRoom],
+      ['VERDIEND DEZE RUN', '+' + report.earnedGold + ' G'],
+      ['TOTAAL OOIT VERDIEND', profile.totalGoldEarned.toLocaleString('nl-BE') + ' G'],
+      ['Huidig goudsaldo', profile.gold.toLocaleString('nl-BE') + ' G'],
+      ['Wereldrecord', 'Kamer ' + profile.worldBestRooms[world.id - 1]],
     ];
     rows.forEach(([label, value], index) => {
-      const y = 178 + index * 40;
-      this.add.text(43, y, label ?? '', { fontFamily, fontSize: '14px', color: '#94a3b8' });
+      const y = 162 + index * 33;
+      this.add.text(43, y, label ?? '', {
+        fontFamily, fontSize: index === 6 || index === 7 ? '12px' : '13px',
+        fontStyle: index === 6 || index === 7 ? 'bold' : 'normal',
+        color: index === 6 || index === 7 ? '#fde68a' : '#94a3b8',
+      });
       this.add.text(349, y, value ?? '', {
-        fontFamily, fontSize: '14px', fontStyle: 'bold', color: index === 5 ? '#fde68a' : '#f8fafc',
+        fontFamily, fontSize: '13px', fontStyle: 'bold',
+        color: index === 6 || index === 7 ? '#fde68a' : '#f8fafc',
       }).setOrigin(1, 0);
     });
 
+    if (report.victory && world.id < 5) {
+      this.add.text(195, 629, '✦  WERELD ' + (world.id + 1) + ' ONTGRENDELD!  ✦', {
+        fontFamily, fontSize: '15px', fontStyle: 'bold', color: '#86efac',
+      }).setOrigin(0.5);
+    }
     const upgrades = data.chosenUpgrades;
-    this.add.text(43, 511, 'TIJDELIJKE UPGRADES', {
+    this.add.text(43, 503, 'TIJDELIJKE UPGRADES', {
       fontFamily, fontSize: '13px', fontStyle: 'bold', color: '#7dd3fc',
     });
-    this.add.text(43, 534,
+    this.add.text(43, 526,
       upgrades.length ? upgrades.map(u => u.name + (u.stacks > 1 ? ' ×' + u.stacks : '')).join(', ') : 'Geen',
       { fontFamily, fontSize: '12px', color: '#cbd5e1', wordWrap: { width: 310 } },
     );
@@ -80,7 +95,7 @@ export class GameOverScene extends Phaser.Scene {
     };
     button(686, 'OPNIEUW SPELEN', () => navigate(GAME_SCENE_KEY), true);
     button(755, 'HOOFDMENU', () => navigate(MENU_SCENE_KEY));
-    this.add.text(195, 811, 'Goud is eenmaal aan je profiel toegevoegd', {
+    this.add.text(195, 811, 'Alleen opgeraapt goud telt mee — eenmaal opgeslagen', {
       fontFamily, fontSize: '10px', color: '#94a3b8',
     }).setOrigin(0.5);
   }
