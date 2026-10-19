@@ -4,18 +4,19 @@ Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de br
 
 ## Huidige fase
 
-Fase 0 – Projectbasis:
+Fase 1 – Speler en bediening:
 
-- vaste versies van Phaser, TypeScript, Vite en Vitest;
-- strict TypeScript;
-- lege responsive Phaser-scene;
-- Arcade Physics geconfigureerd;
-- basis voor multitouch (`4` actieve pointers);
-- safe-area- en mobiele browser-CSS;
-- geautomatiseerde typecheck, tests en productiebuild;
-- GitHub Pages-workflow die pas vanaf `main` publiceert.
+- eenvoudige arena met Arcade Physics-wereldgrenzen;
+- tijdelijke, richtinggevoelige spelerssprite;
+- linker virtuele joystick voor analoge beweging;
+- rechter virtuele joystick voor 360-graden richten;
+- onafhankelijk finger ownership voor beide joysticks;
+- reset bij loslaten, pointer cancellation, focusverlies en verborgen tab;
+- WASD-beweging en muisrichting voor desktoptests;
+- genormaliseerde diagonale beweging;
+- responsive portretweergave met safe-area-ondersteuning.
 
-Gameplay, speler, joysticks en combat horen nog niet bij deze fase.
+Schieten, projectielen, abilities, schade en vijanden horen bij latere fasen en zijn bewust nog niet toegevoegd.
 
 ## Lokaal starten
 
@@ -50,6 +51,8 @@ De productiebuild gebruikt het basispad `/2dgame/`, passend bij:
 ```text
 src/
 ├── config/     # spelconfiguratie en constanten
+├── entities/   # Phaser-gameobjecten zoals de speler
+├── input/      # joysticks, pointer ownership en invoerlogica
 ├── scenes/     # Phaser-scenes
 ├── main.ts     # applicatie-entrypoint
 └── style.css   # mobiele pagina- en safe-area-stijlen

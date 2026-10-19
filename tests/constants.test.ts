@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   BOOT_SCENE_KEY,
+  GAME_SCENE_KEY,
   GAME_HEIGHT,
   GAME_TITLE,
   GAME_WIDTH,
@@ -14,8 +15,9 @@ describe('phase 0 game constants', () => {
     expect(GAME_HEIGHT).toBe(844);
   });
 
-  it('provides stable identifiers for the boot scene', () => {
+  it('provides stable identifiers for the phase 1 scenes', () => {
     expect(GAME_TITLE).toBe('Dungeon Ascent');
     expect(BOOT_SCENE_KEY).toBe('BootScene');
+    expect(GAME_SCENE_KEY).toBe('GameScene');
   });
 });

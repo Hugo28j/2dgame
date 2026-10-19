@@ -1,6 +1,10 @@
 import Phaser from 'phaser';
 
-import { BOOT_SCENE_KEY, GAME_TITLE } from '../config/constants';
+import {
+  BOOT_SCENE_KEY,
+  GAME_SCENE_KEY,
+  PLAYER_TEXTURE_KEY,
+} from '../config/constants';
 
 export class BootScene extends Phaser.Scene {
   public constructor() {
@@ -8,23 +12,23 @@ export class BootScene extends Phaser.Scene {
   }
 
   public create(): void {
-    const { width, height } = this.scale;
+    this.createPlayerTexture();
+    this.scene.start(GAME_SCENE_KEY);
+  }
 
-    this.add
-      .text(width / 2, height / 2, GAME_TITLE, {
-        color: '#f8fafc',
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '38px',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5);
+  private createPlayerTexture(): void {
+    if (this.textures.exists(PLAYER_TEXTURE_KEY)) {
+      return;
+    }
 
-    this.add
-      .text(width / 2, height / 2 + 52, 'Fase 0 · Projectbasis actief', {
-        color: '#94a3b8',
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '16px',
-      })
-      .setOrigin(0.5);
+    const graphics = this.make.graphics({ x: 0, y: 0 }, false);
+    graphics.fillStyle(0x22d3ee, 1);
+    graphics.fillCircle(24, 24, 16);
+    graphics.fillStyle(0xf8fafc, 1);
+    graphics.fillTriangle(25, 15, 46, 24, 25, 33);
+    graphics.lineStyle(3, 0x0e7490, 1);
+    graphics.strokeCircle(24, 24, 16);
+    graphics.generateTexture(PLAYER_TEXTURE_KEY, 48, 48);
+    graphics.destroy();
   }
 }
