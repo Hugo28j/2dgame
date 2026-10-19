@@ -17,6 +17,7 @@ export class InputController {
   private readonly pressedAbilities = new Set<ControlAction>();
   private readonly keyboard: Phaser.Input.Keyboard.KeyboardPlugin;
   private lastAim: Vector2Value = { x: 1, y: 0 };
+  private lastTouchTime = -Infinity;
 
   private readonly reset = (): void => {
     this.movementJoystick.reset();
@@ -41,7 +42,14 @@ export class InputController {
     }
   };
 
+  private readonly onTouchPointer = (event: PointerEvent): void => {
+    if (event.pointerType === 'touch') this.lastTouchTime = Date.now();
+  };
+
   private readonly onMouseDown = (event: MouseEvent): void => {
+    // Browsers may synthesize a mouse click after a mobile touch. Do not fire
+    // an extra bullet or skill when using touch joysticks and ability buttons.
+    if (Date.now() - this.lastTouchTime < 850) return;
     const key = mouseButtonKey(event.button);
     if (!key) return;
     const action = CONTROL_ACTIONS.find(id => this.bindings[id].includes(key));
@@ -56,6 +64,7 @@ export class InputController {
 
   private readonly onMouseUp = (event: MouseEvent): void => {
     const key = mouseButtonKey(event.button);
+    if (key && this.heldKeys.has(key) && event.button !== 0) event.preventDefault();
     if (key) this.heldKeys.delete(key);
   };
 
@@ -100,6 +109,7 @@ export class InputController {
     this.keyboard.on('keyup', this.onKeyUp);
     // Mouse bindings only apply on the game canvas. Mouseup listens globally so
     // releasing outside the canvas never leaves a stuck held button.
+    scene.game.canvas.addEventListener('pointerdown', this.onTouchPointer);
     scene.game.canvas.addEventListener('mousedown', this.onMouseDown);
     window.addEventListener('mouseup', this.onMouseUp);
     scene.game.canvas.addEventListener('contextmenu', this.preventContextMenu);
@@ -160,6 +170,7 @@ export class InputController {
   public destroy(): void {
     this.keyboard.off('keydown', this.onKeyDown);
     this.keyboard.off('keyup', this.onKeyUp);
+    this.scene.game.canvas.removeEventListener('pointerdown', this.onTouchPointer);
     this.scene.game.canvas.removeEventListener('mousedown', this.onMouseDown);
     window.removeEventListener('mouseup', this.onMouseUp);
     this.scene.game.canvas.removeEventListener('contextmenu', this.preventContextMenu);
