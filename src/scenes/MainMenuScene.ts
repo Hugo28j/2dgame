@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_SCENE_KEY, MENU_SCENE_KEY } from '../config/constants';
+import { GAME_SCENE_KEY, GAME_WIDTH, MENU_SCENE_KEY } from '../config/constants';
 import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
 import { WORLDS, isWorldUnlocked, getWorld } from '../worlds/worldConfig';
 import {
@@ -40,6 +40,8 @@ export class MainMenuScene extends Phaser.Scene {
   public constructor() { super(MENU_SCENE_KEY); }
 
   public create(): void {
+    // Center the original menu inside the wider desktop viewport.
+    this.cameras.main.setScroll((390 - GAME_WIDTH) / 2, 0);
     this.drawBackground();
     this.drawHeader();
     this.drawNavigation();

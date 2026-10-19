@@ -1,11 +1,11 @@
+import { GAME_HEIGHT, GAME_WIDTH } from '../config/constants';
 import type { ArenaRectangle } from './roomConfig';
 
-/** Preserve the familiar 390x844 presentation. The camera pans behind fixed HUD
- * rather than zooming the game or moving the mobile joystick controls. */
+/** Pan the room behind a HUD fixed to the active mobile or desktop viewport. */
 export interface CameraScroll { x: number; y: number }
 export function targetArenaScroll(
   playerX: number, playerY: number, bounds: Readonly<ArenaRectangle>,
-  screenWidth = 390, screenHeight = 844,
+  screenWidth = GAME_WIDTH, screenHeight = GAME_HEIGHT,
 ): CameraScroll {
   const maxX = Math.max(0, bounds.x + bounds.width + 18 - screenWidth);
   const maxY = Math.max(0, bounds.y + bounds.height + 204 - screenHeight);
