@@ -9,6 +9,14 @@ Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de br
 - Reguliere schoten verdwijnen bij een treffer op een muur of vijand; bestaande piercing-wapens/upgrades blijven doelbewust meerdere vijanden kunnen doorboren tot hun hitlimiet. Vijandelijke schoten verdwijnen bij een botsing met muur of speler.
 - Vijanden krijgen na toevoegen aan de Physics Group expliciet botsing met kamergrenzen, ook tijdens boss charges.
 
+## Instelbare besturing en vernieuwd menu
+
+- Het hoofdmenu is opnieuw ingedeeld met heldere kaarten voor helden, wapens, upgrades en instellingen, met een prominente speelknop.
+- Open **Opties → Toetsenbord & besturing** en klik op een toets naast een actie. Druk daarna op de nieuwe toets; **Escape** annuleert.
+- Zowel beweging als Dash, Fire Nova en Ice Blast kunnen worden aangepast. Standaard werken WASD én ZQSD, met vaardigheden op 1, 2 en 3.
+- Een reeds toegewezen toets wordt niet zonder waarschuwing overgenomen. Gebruik **Standaardtoetsen herstellen** om uitsluitend de besturing te herstellen.
+- Toetsinstellingen worden met het profiel in de browser opgeslagen. Oude savebestanden blijven leesbaar. Op mobiel werken de joysticks en skillknoppen ongewijzigd.
+
 ## Huidige fase
 
 Fase 8 – Progressie en economie:

@@ -249,7 +249,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.add
-      .text(107, 660, 'WASD/ZQSD + muis', {
+      .text(107, 660, 'BESTURING: zie opties in menu', {
         color: '#64748b',
         fontFamily: 'system-ui, sans-serif',
         fontSize: '12px',

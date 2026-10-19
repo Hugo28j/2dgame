@@ -26,7 +26,6 @@ interface AbilityButton {
 export class AbilityController {
   private readonly cooldowns = new AbilityCooldowns();
   private readonly dash = new DashState();
-  private readonly keys: Phaser.Input.Keyboard.Key[] = [];
   private readonly buttons: AbilityButton[] = [];
   private readonly scene: Phaser.Scene;
 
@@ -41,17 +40,6 @@ export class AbilityController {
   ) {
     this.scene = scene;
 
-    const keyboard = scene.input.keyboard;
-    if (keyboard) {
-      for (const code of [
-        Phaser.Input.Keyboard.KeyCodes.ONE,
-        Phaser.Input.Keyboard.KeyCodes.TWO,
-        Phaser.Input.Keyboard.KeyCodes.THREE,
-      ]) {
-        this.keys.push(keyboard.addKey(code));
-      }
-    }
-
     // The ability hit circles end before the right joystick's interactive zone starts.
     // Phaser activePointers=4 allows both sticks plus a third finger for abilities.
     ABILITY_SLOTS.forEach((id, index) => {
@@ -65,7 +53,8 @@ export class AbilityController {
         fontFamily: 'system-ui, sans-serif', fontSize: '23px',
         fontStyle: 'bold', color: '#f8fafc',
       }).setOrigin(0.5).setDepth(122);
-      const hint = scene.add.text(x, y + 30, String(index + 1), {
+      const hint = scene.add.text(x, y + 30, this.inputs.getAbilityLabel(
+        id === 'dash' ? 'dash' : id === 'fire-nova' ? 'fireNova' : 'iceBlast'), {
         fontFamily: 'system-ui, sans-serif', fontSize: '10px', color: '#cbd5e1',
       }).setOrigin(0.5).setDepth(122);
       const overlay = scene.add.graphics().setDepth(123);
@@ -82,12 +71,12 @@ export class AbilityController {
   }
 
   public update(now: number): void {
-    // JustDown works independently of both joystick pointers and mouse firing.
-    for (let i = 0; i < this.keys.length; i += 1) {
-      const key = this.keys[i];
-      const id = ABILITY_SLOTS[i];
-      if (key && id && Phaser.Input.Keyboard.JustDown(key)) this.cast(id, now);
-    }
+    // Key presses are consumed from the shared, remappable input controller.
+    const actions = ['dash', 'fireNova', 'iceBlast'] as const;
+    ABILITY_SLOTS.forEach((id, index) => {
+      const action = actions[index];
+      if (action && this.inputs.consumeAbilityPressed(action)) this.cast(id, now);
+    });
 
     const velocity = this.dash.velocity(now, DASH_SPEED);
     if (velocity && !this.blocked()) this.player.setVelocity(velocity.x, velocity.y);
@@ -100,7 +89,6 @@ export class AbilityController {
 
   public destroy(): void {
     this.dash.cancel();
-    for (const key of this.keys) this.scene.input.keyboard?.removeKey(key.keyCode);
     for (const button of this.buttons) {
       button.background.removeAllListeners();
       button.background.destroy();
