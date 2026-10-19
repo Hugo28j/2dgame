@@ -27,9 +27,13 @@ export function roomClearHealing(
 
   const milestone = clearedRoom % 3 === 0;
   const boss = clearedRoom % 5 === 0;
-  const base = 0.06 + Math.min(4, Math.floor((clearedRoom - 1) / 10)) * 0.01;
-  const percent = Math.min(0.30, base + (milestone ? 0.08 : 0) + (boss ? 0.14 : 0));
+  // Calculate whole percentage points before dividing: 0.06 + 0.08
+  // can be 0.14000000000000001 and accidentally round 14 HP up to 15.
+  const points = Math.min(30,
+    6 + Math.min(4, Math.floor((clearedRoom - 1) / 10)) +
+    (milestone ? 8 : 0) + (boss ? 14 : 0));
+  const percent = points / 100;
   const missingHp = Math.max(0, maxHp - currentHp);
-  const amount = Math.min(missingHp, Math.ceil(maxHp * percent));
+  const amount = Math.min(missingHp, Math.ceil(maxHp * points / 100));
   return { amount, percent, milestone, boss };
 }
