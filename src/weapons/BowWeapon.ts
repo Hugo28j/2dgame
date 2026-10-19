@@ -43,6 +43,6 @@ export class BowWeapon {
       BOW_CONFIG.piercing,
     );
 
-    addAndLaunch(this.projectiles, projectile, direction, BOW_CONFIG.projectileSpeed);
+    addAndLaunch(projectile, () => this.projectiles.add(projectile), direction, BOW_CONFIG.projectileSpeed);
   }
 }
