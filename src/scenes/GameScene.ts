@@ -17,6 +17,7 @@ import {
   Slime,
 } from '../enemies/Slime';
 import { Player } from '../entities/Player';
+import { CoinPickup } from '../entities/CoinPickup';
 import { Projectile } from '../entities/Projectile';
 import { InputController } from '../input/InputController';
 import {
@@ -32,6 +33,7 @@ import { WEAPONS } from '../weapons/weaponConfig';
 import { progressStore } from '../progression/ProgressStore';
 import { permanentBonuses } from '../progression/economy';
 import { RunLedger } from '../progression/RunLedger';
+import { coinDropsForEnemy } from '../progression/coinRewards';
 import { roomClearHealing } from '../progression/roomHealing';
 import { RunUpgradeDeck, type RunUpgradeId } from '../progression/runUpgrades';
 import { findChainTargets } from '../weapons/chainLightning';
@@ -48,6 +50,7 @@ export class GameScene extends Phaser.Scene {
   private weapon?: WeaponController;
   private abilities?: AbilityController;
   private goldHudText?: Phaser.GameObjects.Text;
+  private readonly coins = new Set<CoinPickup>();
   private projectiles?: Phaser.Physics.Arcade.Group;
   private enemies?: Phaser.Physics.Arcade.Group;
   private enemyProjectiles?: Phaser.Physics.Arcade.Group;
@@ -88,6 +91,7 @@ export class GameScene extends Phaser.Scene {
 
   public create(): void {
     this.roomProgress.reset();
+    this.clearCoins();
     this.aliveEnemies = 0;
     this.gameOver = false;
     this.transitioning = false;
@@ -135,7 +139,7 @@ export class GameScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
 
-  public override update(): void {
+  public override update(_time: number, delta: number): void {
     if (
       !this.player ||
       !this.controls ||
@@ -152,6 +156,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.player.move(this.controls.getMovement());
+    this.collectNearbyCoins(delta);
     this.updateEnemyWaves();
     this.updateCamera();
     const aim = this.controls.getAim(this.player.x, this.player.y);
@@ -375,6 +380,7 @@ export class GameScene extends Phaser.Scene {
 
     this.abilities?.cancelMotion();
     this.clearBossBombs();
+    this.clearCoins();
     this.activeBoss = undefined;
     this.enemyProjectiles?.clear(true, true);
     this.enemies.clear(true, true);
@@ -769,9 +775,9 @@ export class GameScene extends Phaser.Scene {
   };
 
   private readonly handleEnemyDefeated = (enemy: Slime): void => {
-    if (this.gameOver || !this.run.defeatEnemy(
-      enemy.enemyId, enemy instanceof AdvancedEnemy ? enemy.kind : 'slime',
-    )) return;
+    const kind = enemy instanceof AdvancedEnemy ? enemy.kind : 'slime';
+    if (this.gameOver || !this.run.defeatEnemy(enemy.enemyId, kind)) return;
+    this.spawnCoins(enemy.x, enemy.y, kind);
     this.aliveEnemies = Math.max(0, this.aliveEnemies - 1);
     this.updateEnemyCount();
     if (this.roomProgress.registerEnemyDefeated()) {
@@ -791,6 +797,57 @@ export class GameScene extends Phaser.Scene {
     }
     this.updateGoldHud();
   };
+
+  /** Coin drops remain in the chamber until picked up, never grant gold
+   * instantly, and are discarded at room exit / run end. */
+  private spawnCoins(x: number, y: number, kind: Parameters<typeof coinDropsForEnemy>[0]): void {
+    const drops = coinDropsForEnemy(kind);
+    const bounds = this.currentRoom?.layout.bounds;
+    if (!bounds) return;
+    for (let i = 0; i < drops.length; i += 1) {
+      const angle = Math.PI * 2 * i / drops.length - Math.PI / 2;
+      const offset = drops.length === 1 ? 0 : 27;
+      const coinX = Phaser.Math.Clamp(x + Math.cos(angle) * offset,
+        bounds.x + 12, bounds.x + bounds.width - 12);
+      const coinY = Phaser.Math.Clamp(y + Math.sin(angle) * offset,
+        bounds.y + 12, bounds.y + bounds.height - 12);
+      const coin = new CoinPickup(this, coinX, coinY, drops[i]!);
+      this.coins.add(coin);
+    }
+  }
+
+  private collectNearbyCoins(deltaMs: number): void {
+    if (!this.player || this.coins.size === 0) return;
+    let collected = 0;
+    for (const coin of this.coins) {
+      if (!coin.tick(this.player, deltaMs)) continue;
+      const x = coin.x;
+      const y = coin.y;
+      const value = coin.value;
+      if (this.run.collectGold(value)) {
+        collected += value;
+        // Small world-space feedback, no Arcade body or expensive overlap collider.
+        const label = this.add.text(x, y - 10, `+${value}`, {
+          color: '#fde047', fontFamily: 'system-ui, sans-serif',
+          fontSize: '13px', fontStyle: 'bold',
+          stroke: '#020617', strokeThickness: 3,
+        }).setOrigin(0.5).setDepth(60);
+        this.tweens.add({
+          targets: label, y: y - 36, alpha: 0, duration: 500,
+          onComplete: () => label.destroy(),
+        });
+      }
+      this.coins.delete(coin);
+      coin.destroy();
+    }
+    if (collected > 0) this.updateGoldHud();
+  }
+
+  private clearCoins(): void {
+    for (const coin of this.coins) coin.destroy();
+    this.coins.clear();
+    this.updateGoldHud();
+  }
 
   private grantRoomClearHealing(clearedRoom: number): void {
     if (!this.player) return;
@@ -890,7 +947,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateGoldHud(): void {
-    this.goldHudText?.setText(`RUN: +${this.run.runGold} G`);
+    this.goldHudText?.setText(`RUN: +${this.run.runGold} G  ·  MUNTEN ${this.coins.size}`);
   }
 
   /** Offers three exclusive run-only improvements after selected cleared rooms. */
@@ -974,6 +1031,7 @@ export class GameScene extends Phaser.Scene {
 
   private shutdown(): void {
     this.physics.world.resume();
+    this.clearCoins();
     this.clearBossBombs();
     this.upgradeOverlay?.destroy(true);
     this.upgradeOverlay = undefined;
