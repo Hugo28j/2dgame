@@ -47,22 +47,33 @@ export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number): Slime
 export const getSlimeStatsForRoom = (roomNumber: number): SlimeRuntimeStats =>
   getEnemyStatsForRoom('slime', roomNumber);
 
-/** Deterministic enemy roster; later rooms add types while preserving some basic Slimes. */
+/** First rooms contain only slimes. New enemies unlock gradually, then become
+ * more frequent as the dungeon gets deeper. Deterministic for reproducible runs. */
+export const ENEMY_UNLOCK_ROOMS = {
+  slime: 1, archer: 7, charger: 12, tank: 17, mage: 23, bomber: 29,
+} as const;
+
 export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number): EnemyKind => {
-  if (roomNumber % 5 === 0) return 'boss';
-  const pool: EnemyKind[] = ['slime'];
-  if (roomNumber >= 2) pool.push('archer');
-  if (roomNumber >= 3) pool.push('charger');
-  if (roomNumber >= 4) pool.push('tank');
-  if (roomNumber >= 6) pool.push('mage');
-  if (roomNumber >= 7) pool.push('bomber');
+  const room = Math.max(1, Math.floor(roomNumber));
+  if (room % 5 === 0) return 'boss';
   const index = Math.max(0, Math.floor(spawnIndex));
-  // Always showcase a newly introduced enemy in its first available room.
-  const debut: Partial<Record<number, EnemyKind>> = {
-    2: 'archer', 3: 'charger', 4: 'tank', 6: 'mage', 7: 'bomber',
-  };
-  const introduced = debut[roomNumber];
-  if (index === 0 && introduced) return introduced;
-  return pool[(index + roomNumber - 1) % pool.length] ?? 'slime';
+  const entries = Object.entries(ENEMY_UNLOCK_ROOMS) as Array<
+    [Exclude<EnemyKind, 'boss'>, number]>;
+  // A new enemy always appears when its type is first introduced.
+  const newKind = entries.find(([, unlock]) => unlock === room);
+  if (newKind && index === 0) return newKind[0];
+
+  const weighted: EnemyKind[] = [];
+  for (const [kind, unlock] of entries) {
+    if (room < unlock) continue;
+    const weight = kind === 'slime'
+      ? Math.max(2, 7 - Math.floor(room / 9))
+      : Math.min(6, 2 + Math.floor((room - unlock) / 5));
+    for (let i = 0; i < weight; i++) weighted.push(kind);
+  }
+  // Alternate deterministic pseudo-random slots so consecutive rooms do not
+  // have identical mixes while types never spawn before their unlock room.
+  const position = ((Math.imul(index + 13, 41) ^ Math.imul(room + 11, 31)) >>> 0) % weighted.length;
+  return weighted[position] ?? 'slime';
 };
 export const getBossName = (roomNumber: number): string => getBossProfile(roomNumber).name;

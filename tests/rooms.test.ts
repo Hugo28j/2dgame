@@ -95,7 +95,8 @@ describe('phase 4 room configuration', () => {
 
     expect(roomTwenty.maxHp).toBeGreaterThan(roomOne.maxHp);
     expect(roomTwenty.damage).toBeGreaterThan(roomOne.damage);
-    expect(getEnemyCountForRoom(20)).toBe(ROOM_DIFFICULTY.maxEnemyCount);
+    expect(getEnemyCountForRoom(20)).toBeGreaterThan(getEnemyCountForRoom(1));
+    expect(getEnemyCountForRoom(49)).toBeGreaterThan(getEnemyCountForRoom(20));
     expect(getEnemyCountForRoom(200)).toBe(ROOM_DIFFICULTY.maxEnemyCount);
   });
 });

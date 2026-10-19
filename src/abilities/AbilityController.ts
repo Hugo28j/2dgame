@@ -48,21 +48,21 @@ export class AbilityController {
       const y = 655;
       const background = scene.add.circle(x, y, 22, 0x172338)
         .setStrokeStyle(2.5, config.color).setDepth(121)
-        .setInteractive({ useHandCursor: true });
+        .setScrollFactor(0).setInteractive({ useHandCursor: true });
       const icon = scene.add.text(x, y - 2, config.symbol, {
         fontFamily: 'system-ui, sans-serif', fontSize: '23px',
         fontStyle: 'bold', color: '#f8fafc',
-      }).setOrigin(0.5).setDepth(122);
+      }).setOrigin(0.5).setDepth(122).setScrollFactor(0);
       const hint = scene.add.text(x, y + 30, this.inputs.getAbilityLabel(
         id === 'dash' ? 'dash' : id === 'fire-nova' ? 'fireNova' : 'iceBlast'), {
         fontFamily: 'system-ui, sans-serif', fontSize: '10px', color: '#cbd5e1',
       }).setOrigin(0.5).setDepth(122);
-      const overlay = scene.add.graphics().setDepth(123);
+      const overlay = scene.add.graphics().setDepth(123).setScrollFactor(0);
       const cooldownText = scene.add.text(x, y, '', {
         fontFamily: 'system-ui, sans-serif', fontSize: '13px',
         fontStyle: 'bold', color: '#ffffff',
         stroke: '#020617', strokeThickness: 3,
-      }).setOrigin(0.5).setDepth(124);
+      }).setOrigin(0.5).setDepth(124).setScrollFactor(0);
 
       background.on('pointerdown', () => this.cast(id, scene.time.now));
       this.buttons.push({ id, x, y, background, icon, hint, overlay, cooldownText });

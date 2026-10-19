@@ -46,12 +46,12 @@ export class VirtualJoystick {
     this.base = scene.add
       .circle(options.x, options.y, options.radius, 0x0f172a, 0.7)
       .setStrokeStyle(3, options.accentColor, 0.55)
-      .setDepth(100);
+      .setDepth(100).setScrollFactor(0);
 
     this.thumb = scene.add
       .circle(options.x, options.y, options.radius * 0.43, options.accentColor, 0.72)
       .setStrokeStyle(2, 0xffffff, 0.6)
-      .setDepth(102);
+      .setDepth(102).setScrollFactor(0);
 
     this.label = scene.add
       .text(options.x, options.y + options.radius + 15, options.label, {
@@ -66,7 +66,7 @@ export class VirtualJoystick {
     this.zone = scene.add
       .zone(options.x, options.y, options.interactionSize, options.interactionSize)
       .setInteractive()
-      .setDepth(103);
+      .setDepth(103).setScrollFactor(0);
 
     this.zone.on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, this.handleDown);
     scene.input.on(Phaser.Input.Events.POINTER_MOVE, this.handleMove);

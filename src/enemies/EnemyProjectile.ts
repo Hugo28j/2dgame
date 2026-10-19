@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
 import type { AttackData } from '../combat/damage';
-import { ARENA_BOUNDS } from '../config/gameplay';
 
 export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
   public readonly attack: Readonly<AttackData>;
@@ -25,7 +24,8 @@ export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
     }
   }
   public isOutsideArena(): boolean {
-    return this.x < ARENA_BOUNDS.x || this.x > ARENA_BOUNDS.x + ARENA_BOUNDS.width ||
-      this.y < ARENA_BOUNDS.y || this.y > ARENA_BOUNDS.y + ARENA_BOUNDS.height;
+    const bounds = this.scene.physics.world.bounds;
+    return this.x < bounds.x || this.x > bounds.right ||
+      this.y < bounds.y || this.y > bounds.bottom;
   }
 }
