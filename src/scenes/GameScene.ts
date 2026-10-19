@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { AbilityController } from '../abilities/AbilityController';
 
 import { DamageSystem, type DamageResult } from '../combat/damage';
-import { GAME_SCENE_KEY, GAME_TITLE, MENU_SCENE_KEY } from '../config/constants';
+import { GAME_SCENE_KEY, GAME_TITLE, GAME_OVER_SCENE_KEY } from '../config/constants';
 import { ARENA_BOUNDS } from '../config/gameplay';
 import { EnemySpawner } from '../enemies/EnemySpawner';
 import { getBossName } from '../enemies/enemyConfig';
@@ -27,6 +27,9 @@ import { RoomProgress } from '../rooms/RoomProgress';
 import { WeaponController } from '../weapons/WeaponController';
 import { WEAPONS } from '../weapons/weaponConfig';
 import { progressStore } from '../progression/ProgressStore';
+import { permanentBonuses } from '../progression/economy';
+import { RunLedger } from '../progression/RunLedger';
+import { RunUpgradeDeck, type RunUpgradeId } from '../progression/runUpgrades';
 import { findChainTargets } from '../weapons/chainLightning';
 
 type ArcadeCollisionObject =
@@ -63,6 +66,10 @@ export class GameScene extends Phaser.Scene {
   private gameOver = false;
   private transitioning = false;
   private chapterComplete = false;
+  private choosingUpgrade = false;
+  private upgradeOverlay?: Phaser.GameObjects.Container;
+  private run = new RunLedger();
+  private upgrades = new RunUpgradeDeck();
   private readonly damageSystem = new DamageSystem();
   private readonly roomProgress = new RoomProgress(CHAPTER_ROOM_COUNT);
 
@@ -76,6 +83,9 @@ export class GameScene extends Phaser.Scene {
     this.gameOver = false;
     this.transitioning = false;
     this.chapterComplete = false;
+    this.choosingUpgrade = false;
+    this.run = new RunLedger();
+    this.upgrades = new RunUpgradeDeck();
     this.drawBackdrop();
     this.physics.world.setBounds(
       ARENA_BOUNDS.x,
@@ -96,6 +106,7 @@ export class GameScene extends Phaser.Scene {
       firstRoom.layout.playerSpawn.y,
       profile.selectedHero,
       profile.heroLevels[profile.selectedHero],
+      permanentBonuses(profile.permanentLevels),
     );
     this.controls = new InputController(this);
     this.projectiles = this.physics.add.group({ allowGravity: false });
@@ -105,6 +116,8 @@ export class GameScene extends Phaser.Scene {
     this.weapon = new WeaponController(
       this, this.player, this.projectiles,
       profile.selectedWeapon, profile.weaponLevels[profile.selectedWeapon],
+      permanentBonuses(profile.permanentLevels).weaponDamage,
+      permanentBonuses(profile.permanentLevels).weaponSpeed,
     );
     this.enemySpawner = new EnemySpawner(this, this.enemies);
 
@@ -117,7 +130,7 @@ export class GameScene extends Phaser.Scene {
     this.abilities = new AbilityController(
       this, this.player, this.enemies, this.controls, this.damageSystem,
       (x, y, result) => this.showDamageNumber(x, y, result),
-      () => this.gameOver || this.transitioning || this.chapterComplete,
+      () => this.gameOver || this.transitioning || this.chapterComplete || this.choosingUpgrade,
     );
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
@@ -134,7 +147,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    if (this.gameOver || this.transitioning || this.chapterComplete) {
+    if (this.gameOver || this.transitioning || this.chapterComplete || this.choosingUpgrade) {
       this.player.setVelocity(0, 0);
       return;
     }
@@ -347,6 +360,7 @@ export class GameScene extends Phaser.Scene {
     this.obstacles.clear(true, true);
     this.aliveEnemies = 0;
     this.roomProgress.startRoom(room.enemyCount);
+    this.run.enterRoom(room.number);
     this.closeDoor();
     this.createObstacles(room);
 
@@ -625,20 +639,27 @@ export class GameScene extends Phaser.Scene {
     this.updateEnemyCount();
   };
 
-  private readonly handleEnemyDefeated = (): void => {
+  private readonly handleEnemyDefeated = (enemy: Slime): void => {
+    if (this.gameOver || !this.run.defeatEnemy(
+      enemy.enemyId, enemy instanceof AdvancedEnemy ? enemy.kind : 'slime',
+    )) return;
     this.aliveEnemies = Math.max(0, this.aliveEnemies - 1);
     this.updateEnemyCount();
-    if (this.roomProgress.registerEnemyDefeated() && !this.gameOver) {
-      // Prevent lingering projectiles from damaging the player after victory.
+    if (this.roomProgress.registerEnemyDefeated()) {
+      // All scheduled enemies are dead; residual bullets must not harm the player.
       this.enemyProjectiles?.clear(true, true);
+      this.run.clearRoom(this.roomProgress.roomNumber);
       this.openDoor();
-      // One payment per cleared room. Full run rewards follow in phase 8.
-      progressStore.dispatch({ type: 'awardGold', amount: 20 + this.roomProgress.roomNumber * 3 });
-      this.updateGoldHud();
+      if (this.roomProgress.roomNumber < CHAPTER_ROOM_COUNT &&
+        [2, 4, 7, 10, 13, 16, 19].includes(this.roomProgress.roomNumber)) {
+        this.showUpgradeOffer();
+      }
     }
+    this.updateGoldHud();
   };
 
   private showDamageNumber(x: number, y: number, result: DamageResult): void {
+    this.run.recordDamage(result.amount);
     const text = this.add
       .text(x, y - 20, `${result.amount}${result.critical ? '!' : ''}`, {
         color: result.critical ? '#fde047' : '#f8fafc',
@@ -712,83 +733,91 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateGoldHud(): void {
-    this.goldHudText?.setText(`GOUD: ${progressStore.current.gold}`);
+    this.goldHudText?.setText(`RUN: +${this.run.runGold} G`);
   }
 
-  private finishChapterRooms(): void {
-    this.abilities?.cancelMotion();
-    this.enemyProjectiles?.clear(true, true);
-    this.chapterComplete = true;
-    this.transitioning = false;
-    this.add
-      .rectangle(195, 361, 318, 150, 0x020617, 0.92)
-      .setStrokeStyle(2, 0x38bdf8)
-      .setDepth(70);
-    this.add
-      .text(195, 338, '20 KAMERS VOLTOOID', {
-        color: '#7dd3fc',
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '24px',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5)
-      .setDepth(71);
-    this.add
-      .text(195, 382, 'Tik om terug naar het hoofdmenu te gaan', {
-        color: '#cbd5e1',
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '13px',
-      })
-      .setOrigin(0.5)
-      .setDepth(71);
-    this.time.delayedCall(350, () => {
-      this.input.once(Phaser.Input.Events.POINTER_DOWN, () => this.scene.start(MENU_SCENE_KEY));
-    });
-  }
-
-  private endRun(): void {
-    if (!this.player || this.gameOver) {
-      return;
-    }
-
-    this.gameOver = true;
-    this.abilities?.cancelMotion();
-    this.enemyProjectiles?.clear(true, true);
+  /** Offers three exclusive run-only improvements after selected cleared rooms. */
+  private showUpgradeOffer(): void {
+    if (!this.player || this.choosingUpgrade) return;
+    const cards = this.upgrades.offer(this.player.currentHp < this.player.maxHp);
+    if (cards.length < 3) return;
+    this.choosingUpgrade = true;
     this.player.setVelocity(0, 0);
-    this.player.setTint(0x7f1d1d).setTintMode(Phaser.TintModes.FILL);
-    for (const child of this.enemies?.getChildren() ?? []) {
-      if (child instanceof Slime) {
-        child.setVelocity(0, 0);
-      }
-    }
+    this.controls?.cancelTouches();
+    this.physics.world.pause();
+    const overlay = this.add.container(0, 0).setDepth(170);
+    this.upgradeOverlay = overlay;
+    const shade = this.add.rectangle(195, 422, 390, 844, 0x020617, 0.93)
+      .setInteractive();
+    overlay.add(shade);
+    overlay.add(this.add.text(195, 171, 'KIES EEN RUN-UPGRADE', {
+      fontFamily: 'system-ui, sans-serif', fontSize: '23px',
+      fontStyle: 'bold', color: '#fde68a',
+    }).setOrigin(0.5));
+    overlay.add(this.add.text(195, 212, 'Geldig tot het einde van deze run', {
+      fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#cbd5e1',
+    }).setOrigin(0.5));
 
-    this.add
-      .rectangle(195, 361, 300, 128, 0x020617, 0.9)
-      .setStrokeStyle(2, 0xef4444)
-      .setDepth(70);
-    this.add
-      .text(195, 338, 'VERSLAGEN', {
-        color: '#fca5a5',
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '28px',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5)
-      .setDepth(71);
-    this.add
-      .text(195, 383, 'Tik om naar hoofdmenu te gaan', {
-        color: '#cbd5e1',
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '14px',
-      })
-      .setOrigin(0.5)
-      .setDepth(71);
-    this.time.delayedCall(400, () => {
-      this.input.once(Phaser.Input.Events.POINTER_DOWN, () => this.scene.start(MENU_SCENE_KEY));
+    cards.forEach((card, index) => {
+      const y = 299 + index * 112;
+      const border = card.rarity === 'epic' ? 0xc084fc :
+        card.rarity === 'rare' ? 0x38bdf8 : 0x94a3b8;
+      const plate = this.add.rectangle(195, y, 330, 99, 0x172338)
+        .setStrokeStyle(2, border).setInteractive({ useHandCursor: true });
+      plate.on('pointerdown', () => this.chooseUpgrade(card.id));
+      overlay.add(plate);
+      overlay.add(this.add.text(46, y - 32, card.name.toUpperCase(), {
+        fontFamily: 'system-ui, sans-serif', fontSize: '17px',
+        fontStyle: 'bold', color: '#f8fafc',
+      }));
+      overlay.add(this.add.text(46, y - 5, card.description, {
+        fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#cbd5e1',
+      }));
+      overlay.add(this.add.text(46, y + 19,
+        card.rarity.toUpperCase() + '   ·   ' + (this.upgrades.count(card.id) + 1) + '/' + card.maxStacks, {
+        fontFamily: 'system-ui, sans-serif', fontSize: '11px', color: '#94a3b8',
+      }));
     });
   }
+
+  private chooseUpgrade(id: RunUpgradeId): void {
+    if (!this.choosingUpgrade || !this.player || !this.weapon || !this.upgrades.choose(id)) return;
+    if (id === 'projectile') this.weapon.extraProjectiles += 1;
+    else if (id === 'piercing') this.weapon.extraPiercing += 1;
+    else this.player.applyRunBonus(id);
+    this.upgradeOverlay?.destroy(true);
+    this.upgradeOverlay = undefined;
+    this.choosingUpgrade = false;
+    this.physics.world.resume();
+    this.drawPlayerHealth();
+  }
+
+  private completeRun(victory: boolean): void {
+    if (this.gameOver || this.chapterComplete) return;
+    if (victory) this.chapterComplete = true;
+    else this.gameOver = true;
+    this.abilities?.cancelMotion();
+    this.enemyProjectiles?.clear(true, true);
+    this.player?.setVelocity(0, 0);
+    this.upgradeOverlay?.destroy(true);
+    this.upgradeOverlay = undefined;
+    this.choosingUpgrade = false;
+    this.physics.world.resume();
+    const report = this.run.report(victory);
+    progressStore.dispatch({ type: 'settleRun', report });
+    this.scene.start(GAME_OVER_SCENE_KEY, {
+      report, chosenUpgrades: this.upgrades.chosen(),
+    });
+  }
+
+  private finishChapterRooms(): void { this.completeRun(true); }
+
+  private endRun(): void { this.completeRun(false); }
 
   private shutdown(): void {
+    this.physics.world.resume();
+    this.upgradeOverlay?.destroy(true);
+    this.upgradeOverlay = undefined;
     this.abilities?.destroy();
     this.abilities = undefined;
     this.controls?.destroy();
