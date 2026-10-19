@@ -156,9 +156,10 @@ export function applyProfileAction(profile: Profile, action: ProfileAction): Pro
 export class SaveManager {
   private profile: Profile;
   public constructor(private readonly storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>) {
-    const store = storage ?? (typeof window === 'undefined' ? undefined : window.localStorage);
     let loaded: unknown;
     try {
+      // Accessing localStorage itself may throw on restrictive mobile browsers.
+      const store = storage ?? (typeof window === 'undefined' ? undefined : window.localStorage);
       const raw = store?.getItem(STORAGE_KEY) ?? store?.getItem(LEGACY_KEY);
       loaded = raw ? JSON.parse(raw) : null;
     } catch { loaded = null; }
