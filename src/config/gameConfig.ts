@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from './constants';
 import { BootScene } from '../scenes/BootScene';
 import { GameScene } from '../scenes/GameScene';
+import { GameOverScene } from '../scenes/GameOverScene';
 import { MainMenuScene } from '../scenes/MainMenuScene';
 
 export const gameConfig: Phaser.Types.Core.GameConfig = {
@@ -11,7 +12,7 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
   width: GAME_WIDTH,
   height: GAME_HEIGHT,
   backgroundColor: '#111827',
-  scene: [BootScene, MainMenuScene, GameScene],
+  scene: [BootScene, MainMenuScene, GameScene, GameOverScene],
   physics: {
     default: 'arcade',
     arcade: {
