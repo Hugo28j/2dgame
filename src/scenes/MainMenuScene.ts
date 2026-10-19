@@ -381,7 +381,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.text(x, y, label, fontSize, textColor, true, true);
     if (!disabled) {
       graphic.setInteractive(new Phaser.Geom.Rectangle(0, 0, width, height),
-        Phaser.Geom.Rectangle.Contains, { useHandCursor: true });
+        Phaser.Geom.Rectangle.Contains);
       graphic.on('pointerover', () => render(true));
       graphic.on('pointerout', () => render(false));
       graphic.on('pointerdown', action);
