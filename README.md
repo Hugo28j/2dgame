@@ -73,6 +73,23 @@ Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de br
 - Tijdens een run zie je **DEZE RUN: +... G** bij de coin-teller. Op het Game Over / overwinning-scherm staan het goud van deze run, het **totale ooit verdiende** goud en het actuele saldo naast elkaar. Het levenslange totaal telt vanaf de installatie van deze update, want oudere aankopen maken dat historisch totaal niet betrouwbaar reconstrueerbaar.
 - Voor de power-upkeuze komt een korte **glow/pulse-animatie**; daarna verschijnen de drie upgrade-kaarten één voor één. De game blijft gepauzeerd tijdens de keuze.
 
+## Nieuwe helden en monsters per wereld
+
+- **30 nieuwe wereldgebonden vijandpersonages**: 6 herkenbare types (slime, boogschutter, charger, mage, tank, bomber) per wereld, elk met eigen naam, kleuren en originele vectorillustratie. De bestaande AI-rollen blijven behouden zodat herkenbare aanvallen en gedrag bruikbaar blijven.
+  - Verdant Ruins: Mossling, Briar Hunter, Horned Beetle, Willow Wisp, Ancient Treant, Sporecap.
+  - Frozen Hollow: Snow Puff, Frost Ranger, Icefang Wolf, Aurora Spirit, Glacier Golem, Frostburst Imp.
+  - Ember Wastes: Cinderling, Ash Marksman, Magma Hound, Flame Oracle, Obsidian Titan, Volatile Ember.
+  - Storm Citadel: Spark Sprite, Sky Sharpshooter, Volt Raptor, Thunder Seer, Iron Sentinel, Storm Mine.
+  - Void Realm: Void Spawn, Abyss Stalker, Rift Prowler, Nebula Witch, Dark Colossus, Singularity.
+- Alle **50 bossgevechten** hebben nu een eigen wereldgebonden boss-sprite met aangepaste helm/kroon, spijkers, magische tekens en wereldpalet. De tien bestaande aanvalspatronen en twee bossfases blijven werken.
+- **Vier extra speelbare helden** met unieke illustraties en werkelijke speelstats/passives (naast Ranger, Mage en Guardian):
+  - **Frostblade** (Frozen Hollow, 180 G): snelle ijskrijger met verhoogde critkans.
+  - **Pyromancer** (Ember Wastes, 250 G): zware magische/vaardigheidsschade.
+  - **Stormstrider** (Storm Citadel, 350 G): zeer hoge loopsnelheid en kortere cooldowns.
+  - **Voidwalker** (Void Realm, 475 G): critkracht, sterke magische vaardigheden.
+- Nieuwe helden zijn pas met goud te kopen nadat hun wereld is vrijgespeeld. Het menu gebruikt pagina's voor alle zeven helden en de twaalf uitrustingsupgrades; bestaande saves migreren veilig met nieuwe helden op level 1.
+- Alle personageillustraties zijn lokaal via Phaser Graphics getekend en vooraf als textures gegenereerd; geen externe afbeeldingen, netwerkverzoeken of dure per-frame tekenoperaties.
+
 ## Huidige fase
 
 Fase 8 – Progressie en economie:

@@ -7,8 +7,8 @@ import { findChainTargets } from '../src/weapons/chainLightning';
 import { WEAPONS, WEAPON_IDS, getWeaponStats, weaponUpgradeCost } from '../src/weapons/weaponConfig';
 
 describe('phase 5 heroes and weapons', () => {
-  it('defines three distinct heroes with positive stats and unlock rules', () => {
-    expect(HERO_IDS).toHaveLength(3);
+  it('defines seven distinct heroes with positive stats and unlock rules', () => {
+    expect(HERO_IDS).toHaveLength(7);
     expect(HEROES.ranger.stats.movementSpeed).toBeGreaterThan(HEROES.guardian.stats.movementSpeed);
     expect(HEROES.guardian.stats.maxHp).toBeGreaterThan(HEROES.mage.stats.maxHp);
     for (const id of HERO_IDS) {

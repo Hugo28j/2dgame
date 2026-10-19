@@ -28,6 +28,8 @@ const COLOR = {
 
 export class MainMenuScene extends Phaser.Scene {
   private tab: MenuTab = 'worlds';
+  private heroPage = 0;
+  private upgradePage = 0;
   private upgradeCategory: 'equipment' | 'permanent' = 'permanent';
   private settingsView: 'general' | 'controls' = 'general';
   private resetRequested = false;
@@ -117,6 +119,8 @@ export class MainMenuScene extends Phaser.Scene {
 
   private chooseTab(tab: MenuTab): void {
     this.tab = tab;
+    if (tab === 'heroes') this.heroPage = Math.floor(
+      Math.max(0, HERO_IDS.indexOf(progressStore.current.selectedHero)) / 4);
     if (tab !== 'settings') this.settingsView = 'general';
     this.resetRequested = false;
     this.awaitingKey = undefined;
@@ -156,28 +160,44 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   private drawHeroes(): void {
-    this.section('KIES JE HELD', 'Elke held heeft een unieke speelstijl');
+    this.section('KIES JE HELD', '4 nieuwe helden uit de ontgrendelbare werelden');
     const profile = progressStore.current;
-    HERO_IDS.forEach((id, index) => {
+    const pageSize = 4;
+    const pages = Math.ceil(HERO_IDS.length / pageSize);
+    this.heroPage = Math.max(0, Math.min(this.heroPage, pages - 1));
+    HERO_IDS.slice(this.heroPage * pageSize, (this.heroPage + 1) * pageSize).forEach((id, index) => {
       const hero = HEROES[id];
-      const y = 337 + index * 130;
+      const y = 324 + index * 94;
       const unlocked = profile.unlockedHeroes.includes(id);
+      const available = isWorldUnlocked(hero.requiredWorld, profile.completedWorlds);
       const selected = profile.selectedHero === id;
-      this.plate(195, y, 330, 120,
-        selected ? 0x173447 : COLOR.card, selected ? COLOR.accent : COLOR.border, 12);
-      this.add.circle(56, y - 33, 18, hero.color).setStrokeStyle(2, 0xcbd5e1);
-      this.text(85, y - 47, hero.name.toUpperCase(), 16, COLOR.white, false, true);
-      this.text(85, y - 24, 'LEVEL ' + profile.heroLevels[id], 10, '#93c5fd');
-      this.text(46, y - 2, hero.description, 11, COLOR.secondary);
-      this.text(46, y + 20, hero.passive, 11, '#fcd34d');
+      this.plate(195, y, 330, 88,
+        selected ? 0x173447 : COLOR.card, selected ? hero.color : COLOR.border, 10);
+      this.add.image(63, y - 19, hero.textureKey).setDisplaySize(42, 42);
+      this.text(89, y - 31, hero.name.toUpperCase(), 13, COLOR.white, false, true);
+      this.text(89, y - 13, 'LV.' + profile.heroLevels[id] + ' · ' + hero.description, 9, COLOR.secondary);
+      this.text(44, y + 8, hero.passive, 10, '#fcd34d');
       const stats = getHeroStats(id, profile.heroLevels[id]);
-      this.text(46, y + 42, 'HP ' + stats.maxHp + '   DMG ' + stats.damage + '   DEF ' + stats.defense,
-        10, COLOR.secondary);
-      const label = selected ? 'ACTIEF' : unlocked ? 'KIEZEN' : hero.unlockCost + ' G';
-      this.button(311, y + 39, 87, 33, label, () => this.runAction(
+      this.text(44, y + 28, 'HP ' + stats.maxHp + ' · DMG ' + stats.damage + ' · DEF ' +
+        stats.defense, 10, COLOR.secondary);
+      const label = selected ? 'ACTIEF' : unlocked ? 'KIEZEN' :
+        !available ? 'WERELD ' + hero.requiredWorld : hero.unlockCost + ' G';
+      this.button(309, y + 24, 90, 32, label, () => this.runAction(
         unlocked ? { type: 'selectHero', id } : { type: 'unlockHero', id },
-      ), selected ? 'selected' : 'normal', selected || (!unlocked && profile.gold < hero.unlockCost), 10);
+      ), selected ? 'selected' : 'normal',
+      selected || (!unlocked && (!available || profile.gold < hero.unlockCost)), 10);
     });
+    if (pages > 1) {
+      this.button(95, 703, 111, 27, '‹ VORIGE', () => {
+        this.heroPage = Math.max(0, this.heroPage - 1);
+        this.scene.restart();
+      }, 'quiet', this.heroPage === 0, 10);
+      this.text(195, 703, (this.heroPage + 1) + ' / ' + pages, 11, COLOR.secondary, true, true);
+      this.button(295, 703, 111, 27, 'VOLGENDE ›', () => {
+        this.heroPage = Math.min(pages - 1, this.heroPage + 1);
+        this.scene.restart();
+      }, 'quiet', this.heroPage === pages - 1, 10);
+    }
   }
 
   private drawWeapons(): void {
@@ -234,7 +254,12 @@ export class MainMenuScene extends Phaser.Scene {
         ];
 
     const compact = this.upgradeCategory === 'equipment';
-    rows.forEach((row, index) => {
+    const pageSize = 8;
+    const pages = compact ? Math.ceil(rows.length / pageSize) : 1;
+    this.upgradePage = Math.max(0, Math.min(this.upgradePage, pages - 1));
+    const visibleRows = compact ? rows.slice(this.upgradePage * pageSize,
+      (this.upgradePage + 1) * pageSize) : rows;
+    visibleRows.forEach((row, index) => {
       const y = compact ? 330 + index * 45 : 347 + index * 67;
       const height = compact ? 41 : 61;
       this.plate(195, y, 330, height, COLOR.card, COLOR.border, 9);
@@ -247,10 +272,22 @@ export class MainMenuScene extends Phaser.Scene {
       this.button(307, y + (compact ? 0 : 7), 89, 30, label, () => this.runAction(row.action),
         'normal', !row.unlocked || row.level >= row.max || profile.gold < row.cost, 10);
     });
+    if (compact && pages > 1) {
+      this.button(99, 700, 111, 28, '‹ VORIGE', () => {
+        this.upgradePage = Math.max(0, this.upgradePage - 1);
+        this.scene.restart();
+      }, 'quiet', this.upgradePage === 0, 10);
+      this.text(195, 700, (this.upgradePage + 1) + '/' + pages, 11, COLOR.secondary, true);
+      this.button(292, 700, 111, 28, 'VOLGENDE ›', () => {
+        this.upgradePage = Math.min(pages - 1, this.upgradePage + 1);
+        this.scene.restart();
+      }, 'quiet', this.upgradePage === pages - 1, 10);
+    }
   }
 
   private setUpgradeCategory(category: 'equipment' | 'permanent'): void {
     this.upgradeCategory = category;
+    this.upgradePage = 0;
     this.scene.restart();
   }
 

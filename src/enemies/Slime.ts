@@ -33,8 +33,9 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
     x: number,
     y: number,
     stats: Readonly<SlimeRuntimeStats>,
+    textureKey = SLIME_TEXTURE_KEY,
   ) {
-    super(scene, x, y, SLIME_TEXTURE_KEY);
+    super(scene, x, y, textureKey);
 
     this.defense = stats.defense;
     this.maxHp = stats.maxHp;
