@@ -28,7 +28,7 @@ export class EnemySpawner {
             { ...getSlimeStatsForRoom(room.number) })
         : new AdvancedEnemy(this.scene, `${kind}-${this.nextEnemyNumber++}`,
             point.x, point.y, kind, room.number);
-      addBoundedEnemy(this.enemyGroup, enemy);
+      addBoundedEnemy(enemy, () => this.enemyGroup.add(enemy));
       return enemy;
     });
   }
@@ -45,7 +45,7 @@ export class EnemySpawner {
         point.y,
         stats,
       );
-      addBoundedEnemy(this.enemyGroup, slime);
+      addBoundedEnemy(slime, () => this.enemyGroup.add(slime));
       return slime;
     });
   }
