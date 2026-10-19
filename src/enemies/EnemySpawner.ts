@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 
+import type { SlimeRuntimeStats } from './enemyConfig';
 import { Slime } from './Slime';
 
 export interface SpawnPoint {
@@ -15,13 +16,17 @@ export class EnemySpawner {
     private readonly enemyGroup: Phaser.Physics.Arcade.Group,
   ) {}
 
-  public spawnSlimes(spawnPoints: readonly SpawnPoint[]): readonly Slime[] {
+  public spawnSlimes(
+    spawnPoints: readonly SpawnPoint[],
+    stats: Readonly<SlimeRuntimeStats>,
+  ): readonly Slime[] {
     return spawnPoints.map((point) => {
       const slime = new Slime(
         this.scene,
         `slime-${this.nextEnemyNumber++}`,
         point.x,
         point.y,
+        stats,
       );
       this.enemyGroup.add(slime);
       return slime;

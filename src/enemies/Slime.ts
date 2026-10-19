@@ -2,8 +2,8 @@ import Phaser from 'phaser';
 
 import type { AttackData, Damageable } from '../combat/damage';
 import { SLIME_TEXTURE_KEY } from '../config/constants';
-import { SLIME_CONFIG } from './enemyConfig';
-import { getChaseVelocity } from './slimeMovement';
+import type { SlimeRuntimeStats } from './enemyConfig';
+import { getChaseVelocity, getObstacleAvoidanceVelocity } from './slimeMovement';
 
 export const ENEMY_SPAWNED_EVENT = 'enemy-spawned';
 export const ENEMY_DEFEATED_EVENT = 'enemy-defeated';
@@ -11,14 +11,16 @@ export const ENEMY_DEFEATED_EVENT = 'enemy-defeated';
 export type SlimeAiState = 'chasing' | 'defeated';
 
 export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
-  public readonly defense = SLIME_CONFIG.defense;
-  public readonly contactAttack: Readonly<AttackData> = Object.freeze({
-    damage: SLIME_CONFIG.damage,
-    criticalChance: 0,
-    criticalMultiplier: 1,
-  });
+  public readonly defense: number;
+  public readonly contactAttack: Readonly<AttackData>;
+  public readonly attackIntervalMs: number;
   public aiState: SlimeAiState = 'chasing';
-  private currentHp = SLIME_CONFIG.maxHp;
+  private readonly maxHp: number;
+  private readonly movementSpeed: number;
+  private readonly avoidanceSign: -1 | 1;
+  private avoidanceUntil = 0;
+  private avoidanceVelocity = { x: 0, y: 0 };
+  private currentHp: number;
   private readonly healthBar: Phaser.GameObjects.Graphics;
 
   public constructor(
@@ -26,8 +28,21 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
     public readonly enemyId: string,
     x: number,
     y: number,
+    stats: Readonly<SlimeRuntimeStats>,
   ) {
     super(scene, x, y, SLIME_TEXTURE_KEY);
+
+    this.defense = stats.defense;
+    this.maxHp = stats.maxHp;
+    this.currentHp = stats.maxHp;
+    this.movementSpeed = stats.movementSpeed;
+    this.avoidanceSign = enemyId.length % 2 === 0 ? 1 : -1;
+    this.attackIntervalMs = stats.attackIntervalMs;
+    this.contactAttack = Object.freeze({
+      damage: stats.damage,
+      criticalChance: 0,
+      criticalMultiplier: 1,
+    });
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -52,13 +67,32 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
       return;
     }
 
-    const velocity = getChaseVelocity(
-      this.x,
-      this.y,
-      targetX,
-      targetY,
-      SLIME_CONFIG.movementSpeed,
-    );
+    const body = this.body;
+    const blockedHorizontally =
+      body instanceof Phaser.Physics.Arcade.Body && (body.blocked.left || body.blocked.right);
+    const blockedVertically =
+      body instanceof Phaser.Physics.Arcade.Body && (body.blocked.up || body.blocked.down);
+
+    if (this.scene.time.now >= this.avoidanceUntil && (blockedHorizontally || blockedVertically)) {
+      this.avoidanceVelocity = getObstacleAvoidanceVelocity(
+        blockedHorizontally,
+        targetX - this.x,
+        targetY - this.y,
+        this.movementSpeed,
+        this.avoidanceSign,
+      );
+      this.avoidanceUntil = this.scene.time.now + 420;
+    }
+
+    const velocity = this.scene.time.now < this.avoidanceUntil
+      ? this.avoidanceVelocity
+      : getChaseVelocity(
+          this.x,
+          this.y,
+          targetX,
+          targetY,
+          this.movementSpeed,
+        );
     this.setVelocity(velocity.x, velocity.y);
     this.setFlipX(velocity.x < 0);
     this.drawHealthBar();
@@ -114,7 +148,7 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
 
   private drawHealthBar(): void {
     const width = 40;
-    const ratio = this.currentHp / SLIME_CONFIG.maxHp;
+    const ratio = this.currentHp / this.maxHp;
     this.healthBar.clear();
     this.healthBar.fillStyle(0x020617, 0.9);
     this.healthBar.fillRoundedRect(this.x - width / 2, this.y - 29, width, 6, 2);
