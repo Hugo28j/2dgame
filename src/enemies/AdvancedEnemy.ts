@@ -151,15 +151,28 @@ export class AdvancedEnemy extends Slime {
   private drawWarning(radius: number, color: number): void {
     if (!this.warning) this.warning = this.scene.add.graphics().setDepth(25);
     this.warning.clear();
-    this.warning.lineStyle(3, color, 0.85);
-    this.warning.strokeCircle(this.x, this.y, radius);
-    this.warning.fillStyle(color, 0.11);
-    this.warning.fillCircle(this.x, this.y, radius);
-    if (this.kind !== 'bomber') {
-      this.warning.lineStyle(5, color, 0.7);
-      this.warning.lineBetween(this.x, this.y,
-        this.x + this.dashX * 135, this.y + this.dashY * 135);
+    if (this.kind === 'bomber') {
+      this.warning.lineStyle(3, color, 0.85);
+      this.warning.strokeCircle(this.x, this.y, radius);
+      this.warning.fillStyle(color, 0.16);
+      this.warning.fillCircle(this.x, this.y, radius);
+      return;
     }
+    // Warn about the full dash corridor, not an unrelated circle.
+    const reach = (this.isBoss ? 360 : 430) * 0.36;
+    const halfWidth = this.isBoss ? 32 : 24;
+    const normalX = -this.dashY * halfWidth;
+    const normalY = this.dashX * halfWidth;
+    const points = [
+      { x: this.x + normalX, y: this.y + normalY },
+      { x: this.x + this.dashX * reach + normalX, y: this.y + this.dashY * reach + normalY },
+      { x: this.x + this.dashX * reach - normalX, y: this.y + this.dashY * reach - normalY },
+      { x: this.x - normalX, y: this.y - normalY },
+    ];
+    this.warning.fillStyle(color, 0.18);
+    this.warning.fillPoints(points, true);
+    this.warning.lineStyle(3, color, 0.9);
+    this.warning.strokePoints(points, true);
   }
   private clearWarning(): void {
     this.windupEndsAt = 0;
