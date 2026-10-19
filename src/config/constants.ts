@@ -6,6 +6,7 @@ export const PLAYER_TEXTURE_KEY = 'player-placeholder';
 export const ARROW_TEXTURE_KEY = 'arrow-placeholder';
 export const TARGET_TEXTURE_KEY = 'target-placeholder';
 export const SLIME_TEXTURE_KEY = 'slime-placeholder';
+export const ENEMY_BULLET_TEXTURE_KEY = 'enemy-bullet';
 
 export const GAME_WIDTH = 390;
 export const GAME_HEIGHT = 844;

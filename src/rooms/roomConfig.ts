@@ -128,12 +128,15 @@ export const getRoomDefinition = (roomNumber: number): RoomDefinition => {
     throw new Error('Room layout configuration is empty.');
   }
 
-  const enemyCount = getEnemyCountForRoom(normalizedRoom);
+  // A boss room has one real boss; normal rooms retain phase-4 scaling.
+  const enemyCount = isBossRoom ? 1 : getEnemyCountForRoom(normalizedRoom);
   return {
     number: normalizedRoom,
     isBossRoom,
     enemyCount,
     layout,
-    enemySpawns: layout.enemySpawns.slice(0, enemyCount),
+    enemySpawns: isBossRoom
+      ? [{ x: ARENA_BOUNDS.x + ARENA_BOUNDS.width / 2, y: ARENA_BOUNDS.y + 165 }]
+      : layout.enemySpawns.slice(0, enemyCount),
   };
 };

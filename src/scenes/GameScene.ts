@@ -5,7 +5,10 @@ import { DamageSystem, type DamageResult } from '../combat/damage';
 import { GAME_SCENE_KEY, GAME_TITLE, MENU_SCENE_KEY } from '../config/constants';
 import { ARENA_BOUNDS } from '../config/gameplay';
 import { EnemySpawner } from '../enemies/EnemySpawner';
-import { getSlimeStatsForRoom } from '../enemies/enemyConfig';
+import { getBossName } from '../enemies/enemyConfig';
+import { AdvancedEnemy, type BulletPattern } from '../enemies/AdvancedEnemy';
+import { EnemyProjectile } from '../enemies/EnemyProjectile';
+import { withinRadius } from '../enemies/enemyMovement';
 import {
   ENEMY_DEFEATED_EVENT,
   ENEMY_SPAWNED_EVENT,
@@ -42,6 +45,10 @@ export class GameScene extends Phaser.Scene {
   private goldHudText?: Phaser.GameObjects.Text;
   private projectiles?: Phaser.Physics.Arcade.Group;
   private enemies?: Phaser.Physics.Arcade.Group;
+  private enemyProjectiles?: Phaser.Physics.Arcade.Group;
+  private activeBoss?: AdvancedEnemy;
+  private bossHealthBar?: Phaser.GameObjects.Graphics;
+  private bossNameText?: Phaser.GameObjects.Text;
   private obstacles?: Phaser.Physics.Arcade.StaticGroup;
   private enemySpawner?: EnemySpawner;
   private door?: Phaser.GameObjects.Rectangle;
@@ -92,6 +99,7 @@ export class GameScene extends Phaser.Scene {
     this.controls = new InputController(this);
     this.projectiles = this.physics.add.group({ allowGravity: false });
     this.enemies = this.physics.add.group({ allowGravity: false });
+    this.enemyProjectiles = this.physics.add.group({ allowGravity: false });
     this.obstacles = this.physics.add.staticGroup();
     this.weapon = new WeaponController(
       this, this.player, this.projectiles,
@@ -137,10 +145,17 @@ export class GameScene extends Phaser.Scene {
     this.weapon.update(this.time.now, this.controls.isShooting(), aim);
 
     for (const child of this.enemies.getChildren()) {
-      if (child instanceof Slime) {
+      if (child instanceof AdvancedEnemy) {
+        child.updateAI(this.player.x, this.player.y, this.time.now,
+          this.fireEnemyProjectiles, this.explodeEnemy);
+      } else if (child instanceof Slime) {
         child.chase(this.player.x, this.player.y);
       }
     }
+    for (const child of this.enemyProjectiles?.getChildren() ?? []) {
+      if (child instanceof EnemyProjectile && child.isOutsideArena()) child.destroy();
+    }
+    this.updateBossHud();
 
     for (const child of this.projectiles.getChildren()) {
       if (child instanceof Projectile && child.isOutsideArena()) {
@@ -189,7 +204,7 @@ export class GameScene extends Phaser.Scene {
       .setDepth(10);
 
     this.enemyCountText = this.add
-      .text(372, 51, 'SLIMES 0', {
+      .text(372, 51, 'VIJANDEN 0', {
         color: '#bef264',
         fontFamily: 'system-ui, sans-serif',
         fontSize: '11px',
@@ -243,6 +258,11 @@ export class GameScene extends Phaser.Scene {
       fontSize: '12px', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(10);
     this.updateGoldHud();
+    this.bossHealthBar = this.add.graphics().setDepth(41).setVisible(false);
+    this.bossNameText = this.add.text(195, 137, '', {
+      color: '#fde68a', fontFamily: 'system-ui, sans-serif',
+      fontSize: '13px', fontStyle: 'bold', stroke: '#020617', strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(42).setVisible(false);
   }
 
   private createDoor(): void {
@@ -258,7 +278,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.door);
 
     this.doorStatusText = this.add
-      .text(DOOR_X, DOOR_Y + 18, 'VERSLA ALLE SLIMES', {
+      .text(DOOR_X, DOOR_Y + 18, 'VERSLA ALLE VIJANDEN', {
         color: '#fca5a5',
         fontFamily: 'system-ui, sans-serif',
         fontSize: '9px',
@@ -287,6 +307,14 @@ export class GameScene extends Phaser.Scene {
       undefined,
       this,
     );
+    if (this.enemyProjectiles) {
+      this.physics.add.overlap(
+        this.player, this.enemyProjectiles, this.handleEnemyBulletHit, undefined, this,
+      );
+      this.physics.add.collider(
+        this.enemyProjectiles, this.obstacles, this.handleEnemyBulletObstacle, undefined, this,
+      );
+    }
     this.physics.add.collider(this.enemies, this.enemies);
     this.physics.add.collider(this.player, this.obstacles);
     this.physics.add.collider(this.enemies, this.obstacles);
@@ -311,6 +339,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.abilities?.cancelMotion();
+    this.activeBoss = undefined;
+    this.enemyProjectiles?.clear(true, true);
     this.enemies.clear(true, true);
     this.projectiles.clear(true, true);
     this.obstacles.clear(true, true);
@@ -326,9 +356,12 @@ export class GameScene extends Phaser.Scene {
       playerBody.reset(room.layout.playerSpawn.x, room.layout.playerSpawn.y);
     }
 
-    const slimeStats = getSlimeStatsForRoom(room.number);
-    this.enemySpawner.spawnSlimes(room.enemySpawns, slimeStats);
+    const spawned = this.enemySpawner.spawnRoom(room);
+    this.activeBoss = spawned.find(
+      (enemy): enemy is AdvancedEnemy => enemy instanceof AdvancedEnemy && enemy.isBoss,
+    );
     this.updateRoomHud(room);
+    this.updateBossHud();
     this.updateEnemyCount();
 
     if (showBanner) {
@@ -363,7 +396,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.door.setFillStyle(0x7f1d1d).setStrokeStyle(3, 0xfca5a5);
-    this.doorStatusText?.setText('VERSLA ALLE SLIMES').setColor('#fca5a5');
+    this.doorStatusText?.setText('VERSLA ALLE VIJANDEN').setColor('#fca5a5');
     const body = this.door.body;
     if (body instanceof Phaser.Physics.Arcade.StaticBody) {
       body.enable = true;
@@ -416,7 +449,7 @@ export class GameScene extends Phaser.Scene {
       .text(
         195,
         350,
-        room.isBossRoom ? `BOSSKAMER-SLOT ${room.number}` : `KAMER ${room.number}`,
+        room.isBossRoom ? `BOSS: ${getBossName(room.number)}` : `KAMER ${room.number}`,
         {
           color: room.isBossRoom ? '#fbbf24' : '#bae6fd',
           fontFamily: 'system-ui, sans-serif',
@@ -441,7 +474,7 @@ export class GameScene extends Phaser.Scene {
 
   private updateRoomHud(room: RoomDefinition): void {
     this.roomNumberText?.setText(`KAMER ${room.number}/${CHAPTER_ROOM_COUNT}`);
-    this.roomTypeText?.setText(room.isBossRoom ? 'BOSSKAMER-SLOT' : room.layout.id.toUpperCase());
+    this.roomTypeText?.setText(room.isBossRoom ? 'BOSS FIGHT' : room.layout.id.toUpperCase());
   }
 
   private readonly handleProjectileHit = (
@@ -494,6 +527,56 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private readonly fireEnemyProjectiles = (enemy: AdvancedEnemy, pattern: BulletPattern): void => {
+    if (!this.player || !this.enemyProjectiles || this.gameOver || this.transitioning) return;
+    const angle = Math.atan2(this.player.y - enemy.y, this.player.x - enemy.x);
+    const offsets = pattern === 'single' ? [0] :
+      pattern === 'double' ? [-0.14, 0.14] :
+      pattern === 'fan' ? [-0.28, 0, 0.28] :
+      [-0.7, -0.35, 0, 0.35, 0.7];
+    const speed = enemy.kind === 'boss' ? 260 : enemy.kind === 'mage' ? 220 : 320;
+    const color = enemy.kind === 'mage' ? 0xa78bfa : enemy.kind === 'boss' ? 0xf59e0b : 0xfb7185;
+    for (const offset of offsets) {
+      const direction = angle + offset;
+      const bullet = new EnemyProjectile(
+        this, enemy.x + Math.cos(direction) * 30,
+        enemy.y + Math.sin(direction) * 30,
+        Math.cos(direction), Math.sin(direction),
+        speed, enemy.stats.damage, color,
+      );
+      this.enemyProjectiles.add(bullet);
+    }
+  };
+
+  private readonly explodeEnemy = (enemy: AdvancedEnemy, radius: number): void => {
+    const ring = this.add.circle(enemy.x, enemy.y, radius, 0xf97316, 0.3)
+      .setStrokeStyle(4, 0xfbbf24).setDepth(28);
+    this.tweens.add({
+      targets: ring, alpha: 0, duration: 210, onComplete: () => ring.destroy(),
+    });
+    if (!this.player || this.gameOver || !withinRadius(
+      enemy.x, enemy.y, this.player.x, this.player.y, radius,
+    )) return;
+    this.damagePlayer(enemy.contactAttack);
+  };
+
+  private readonly handleEnemyBulletHit = (
+    playerObject: ArcadeCollisionObject,
+    bulletObject: ArcadeCollisionObject,
+  ): void => {
+    if (!(playerObject instanceof Player) || !(bulletObject instanceof EnemyProjectile)) return;
+    // Destroy on first overlap, even during i-frames: no late/double contact.
+    const attack = bulletObject.attack;
+    bulletObject.destroy();
+    this.damagePlayer(attack);
+  };
+
+  private readonly handleEnemyBulletObstacle = (
+    projectileObject: ArcadeCollisionObject,
+  ): void => {
+    if (projectileObject instanceof EnemyProjectile) projectileObject.destroy();
+  };
+
   private readonly handleProjectileObstacle = (
     projectileObject: ArcadeCollisionObject,
   ): void => {
@@ -510,20 +593,34 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    const now = this.time.now;
-    if (!playerObject.canReceiveContactDamage(now) || enemyObject.aiState === 'defeated') {
-      return;
-    }
-
-    const result = this.damageSystem.apply(playerObject, enemyObject.contactAttack);
-    playerObject.beginInvulnerability(now, enemyObject.attackIntervalMs);
-    this.drawPlayerHealth();
-    if (result.defeated) {
-      this.endRun();
-    } else {
-      this.showPlayerHit();
-    }
+    if (enemyObject.aiState === 'defeated') return;
+    this.damagePlayer(enemyObject.contactAttack, enemyObject.attackIntervalMs);
   };
+
+  private damagePlayer(attack: Readonly<Projectile['attack']>, iframeMs = 650): void {
+    if (!this.player || this.gameOver || !this.player.canReceiveContactDamage(this.time.now)) return;
+    const result = this.damageSystem.apply(this.player, attack);
+    this.player.beginInvulnerability(this.time.now, iframeMs);
+    this.drawPlayerHealth();
+    if (result.defeated) this.endRun();
+    else this.showPlayerHit();
+  }
+
+  private updateBossHud(): void {
+    if (!this.bossHealthBar || !this.bossNameText) return;
+    const boss = this.activeBoss;
+    const visible = !!boss && boss.active && boss.aiState !== 'defeated';
+    this.bossHealthBar.setVisible(visible);
+    this.bossNameText.setVisible(visible);
+    this.bossHealthBar.clear();
+    if (!visible || !boss) return;
+    this.bossNameText.setText(getBossName(this.roomProgress.roomNumber) +
+      (boss.healthRatio <= 0.5 ? ' · FASE 2' : ' · FASE 1'));
+    this.bossHealthBar.fillStyle(0x020617, 0.95);
+    this.bossHealthBar.fillRoundedRect(60, 154, 270, 14, 4);
+    this.bossHealthBar.fillStyle(boss.healthRatio <= 0.5 ? 0xef4444 : 0xf59e0b);
+    this.bossHealthBar.fillRoundedRect(62, 156, 266 * boss.healthRatio, 10, 3);
+  }
 
   private readonly handleEnemySpawned = (): void => {
     this.aliveEnemies += 1;
@@ -611,7 +708,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateEnemyCount(): void {
-    this.enemyCountText?.setText(`SLIMES ${this.aliveEnemies}`);
+    this.enemyCountText?.setText(`VIJANDEN ${this.aliveEnemies}`);
   }
 
   private updateGoldHud(): void {
@@ -620,6 +717,7 @@ export class GameScene extends Phaser.Scene {
 
   private finishChapterRooms(): void {
     this.abilities?.cancelMotion();
+    this.enemyProjectiles?.clear(true, true);
     this.chapterComplete = true;
     this.transitioning = false;
     this.add
@@ -636,7 +734,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(71);
     this.add
-      .text(195, 382, 'Tik voor hoofdmenu · Bosses in fase 7', {
+      .text(195, 382, 'Tik om terug naar het hoofdmenu te gaan', {
         color: '#cbd5e1',
         fontFamily: 'system-ui, sans-serif',
         fontSize: '13px',
@@ -655,6 +753,7 @@ export class GameScene extends Phaser.Scene {
 
     this.gameOver = true;
     this.abilities?.cancelMotion();
+    this.enemyProjectiles?.clear(true, true);
     this.player.setVelocity(0, 0);
     this.player.setTint(0x7f1d1d).setTintMode(Phaser.TintModes.FILL);
     for (const child of this.enemies?.getChildren() ?? []) {
@@ -695,6 +794,7 @@ export class GameScene extends Phaser.Scene {
     this.controls?.destroy();
     this.projectiles?.clear(true, true);
     this.enemies?.clear(true, true);
+    this.enemyProjectiles?.clear(true, true);
     this.obstacles?.clear(true, true);
     this.events.off(ENEMY_SPAWNED_EVENT, this.handleEnemySpawned);
     this.events.off(ENEMY_DEFEATED_EVENT, this.handleEnemyDefeated);
@@ -702,6 +802,10 @@ export class GameScene extends Phaser.Scene {
     this.weapon = undefined;
     this.projectiles = undefined;
     this.enemies = undefined;
+    this.enemyProjectiles = undefined;
+    this.activeBoss = undefined;
+    this.bossHealthBar = undefined;
+    this.bossNameText = undefined;
     this.obstacles = undefined;
     this.enemySpawner = undefined;
     this.door = undefined;

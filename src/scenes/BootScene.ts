@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import type { EnemyKind } from '../enemies/enemyConfig';
 import { HERO_IDS, HEROES } from '../heroes/heroConfig';
 
 import {
@@ -20,6 +21,7 @@ export class BootScene extends Phaser.Scene {
     this.createArrowTexture();
     this.createTargetTexture();
     this.createSlimeTexture();
+    this.createEnemyTextures();
     this.createHeroTextures();
     this.createWeaponTextures();
     this.scene.start(MENU_SCENE_KEY);
@@ -128,6 +130,45 @@ export class BootScene extends Phaser.Scene {
       graphics.generateTexture(key, 24, 24);
       graphics.destroy();
     });
+  }
+
+  private createEnemyTextures(): void {
+    const colors: Record<Exclude<EnemyKind, 'slime'>, number> = {
+      archer: 0x84cc16, charger: 0xef4444, mage: 0xa78bfa,
+      tank: 0x94a3b8, bomber: 0xf97316, boss: 0xf59e0b,
+    };
+    for (const kind of Object.keys(colors) as Array<Exclude<EnemyKind, 'slime'>>) {
+      const key = 'enemy-' + kind;
+      if (this.textures.exists(key)) continue;
+      const gfx = this.make.graphics({ x: 0, y: 0 }, false);
+      gfx.fillStyle(0x0f172a); gfx.fillCircle(24, 24, 21);
+      gfx.fillStyle(colors[kind]); gfx.fillCircle(24, 24, kind === 'boss' ? 21 : 17);
+      gfx.lineStyle(3, 0xf1f5f9); gfx.strokeCircle(24, 24, 18);
+      // Original enemy silhouettes; graphical polish follows in phase 9.
+      if (kind === 'archer') {
+        gfx.fillStyle(0x132a13); gfx.fillTriangle(10, 18, 38, 18, 24, 35);
+      } else if (kind === 'charger') {
+        gfx.fillStyle(0xfee2e2); gfx.fillTriangle(8, 4, 16, 18, 4, 18);
+        gfx.fillTriangle(40, 4, 44, 18, 32, 18);
+      } else if (kind === 'mage') {
+        gfx.fillStyle(0xffffff); gfx.fillCircle(24, 24, 8);
+      } else if (kind === 'tank') {
+        gfx.fillStyle(0x334155); gfx.fillRect(15, 15, 18, 18);
+      } else if (kind === 'bomber') {
+        gfx.fillStyle(0xfef08a); gfx.fillCircle(24, 21, 7);
+      } else {
+        gfx.fillStyle(0x78350f); gfx.fillTriangle(8, 6, 22, 24, 4, 19);
+        gfx.fillTriangle(40, 6, 44, 19, 26, 24);
+      }
+      gfx.generateTexture(key, 48, 48);
+      gfx.destroy();
+    }
+    if (!this.textures.exists('enemy-bullet')) {
+      const gfx = this.make.graphics({ x: 0, y: 0 }, false);
+      gfx.fillStyle(0xffffff); gfx.fillCircle(8, 8, 6);
+      gfx.generateTexture('enemy-bullet', 16, 16);
+      gfx.destroy();
+    }
   }
 
 }
