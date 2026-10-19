@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 
 import type { AttackData } from '../combat/damage';
+import { addAndLaunch } from '../combat/launchProjectile';
 import { PLAYER_BASE_CRITICAL_CHANCE } from '../config/gameplay';
 import { Projectile } from '../entities/Projectile';
 import type { Player } from '../entities/Player';
@@ -42,6 +43,6 @@ export class BowWeapon {
       BOW_CONFIG.piercing,
     );
 
-    this.projectiles.add(projectile);
+    addAndLaunch(projectile, () => this.projectiles.add(projectile), direction, BOW_CONFIG.projectileSpeed);
   }
 }
