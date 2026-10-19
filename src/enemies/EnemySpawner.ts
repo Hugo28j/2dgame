@@ -6,6 +6,7 @@ import { Slime } from './Slime';
 import { AdvancedEnemy } from './AdvancedEnemy';
 import { addBoundedEnemy } from './addBoundedEnemy';
 import { getEnemyKindForRoom, getSlimeStatsForRoom } from './enemyConfig';
+import { getWorldCharacter } from './worldCharacters';
 import type { RoomDefinition } from '../rooms/roomConfig';
 
 export interface SpawnPoint {
@@ -30,7 +31,8 @@ export class EnemySpawner {
       const kind = getEnemyKindForRoom(room.number, index);
       const enemy = kind === 'slime'
         ? new Slime(this.scene, `slime-${this.nextEnemyNumber++}`, point.x, point.y,
-            { ...getSlimeStatsForRoom(room.number, worldId) })
+            { ...getSlimeStatsForRoom(room.number, worldId) },
+            getWorldCharacter(worldId, kind, room.number).textureKey)
         : new AdvancedEnemy(this.scene, `${kind}-${this.nextEnemyNumber++}`,
             point.x, point.y, kind, room.number, worldId);
       addBoundedEnemy(enemy, () => this.enemyGroup.add(enemy));
