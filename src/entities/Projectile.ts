@@ -3,7 +3,6 @@ import Phaser from 'phaser';
 import type { AttackData } from '../combat/damage';
 import { HitRegistry } from '../combat/HitRegistry';
 import { ARROW_TEXTURE_KEY } from '../config/constants';
-import { ARENA_BOUNDS } from '../config/gameplay';
 import type { Vector2Value } from '../input/vectorMath';
 import type { WeaponEffect } from '../weapons/weaponConfig';
 
@@ -59,12 +58,13 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
   }
 
   public isOutsideArena(): boolean {
+    const bounds = this.scene.physics.world.bounds;
     return (
       Math.hypot(this.x - this.spawnX, this.y - this.spawnY) > this.maxRange ||
-      this.x < ARENA_BOUNDS.x ||
-      this.x > ARENA_BOUNDS.x + ARENA_BOUNDS.width ||
-      this.y < ARENA_BOUNDS.y ||
-      this.y > ARENA_BOUNDS.y + ARENA_BOUNDS.height
+      this.x < bounds.x ||
+      this.x > bounds.right ||
+      this.y < bounds.y ||
+      this.y > bounds.bottom
     );
   }
 }
