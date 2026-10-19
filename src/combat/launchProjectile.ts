@@ -3,12 +3,12 @@
  * a child is added. Launch only AFTER membership has been established.
  */
 export function addAndLaunch<T extends { setVelocity(x: number, y: number): unknown }>(
-  group: { add(child: T): unknown },
   projectile: T,
+  addToGroup: () => unknown,
   direction: Readonly<{ x: number; y: number }>,
   speed: number,
 ): T {
-  group.add(projectile);
+  addToGroup();
   const length = Math.hypot(direction.x, direction.y);
   if (length === 0 || !Number.isFinite(length) || !Number.isFinite(speed) || speed <= 0) {
     projectile.setVelocity(0, 0);
