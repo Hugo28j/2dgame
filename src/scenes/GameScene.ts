@@ -165,7 +165,7 @@ export class GameScene extends Phaser.Scene {
     for (const child of this.enemies.getChildren()) {
       if (child instanceof AdvancedEnemy) {
         child.updateAI(this.player.x, this.player.y, this.time.now,
-          this.fireEnemyProjectiles, this.explodeEnemy);
+          this.fireEnemyProjectiles, this.explodeEnemy, this.dropBossBombs);
       } else if (child instanceof Slime) {
         child.chase(this.player.x, this.player.y);
       }
