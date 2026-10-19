@@ -26,6 +26,15 @@ Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de br
 - Desktop: stel zowel toetsenbordtoetsen als muisknoppen 1–5 in via **Opties → Besturing**. Zelfs de vuurknop kan worden verplaatst. Mobiele sticks en skillknoppen blijven werken.
 - Een toets/muisknop kan maar voor één actie tegelijk worden gebruikt. Oude profielopslag wordt gemigreerd zonder je voortgang te wissen.
 
+## Progressieve vijanden en scrollende kamers
+
+- **Camera scrolling**: vanaf grotere kamers volgt de camera het personage. De wereld is groter dan het 390×844-scherm; de mobiele joysticks, abilities en HUD blijven op vaste schermposities.
+- **Geleidelijk nieuwe vijanden**: kamers 1–6 (behalve de boss op 5) bevatten alleen slimes. Boogschutters komen op kamer 7, chargers op 12, tanks op 17, mages op 23 en bombers op 29. Na introductie neemt hun aandeel toe.
+- **Groeiende groepsgrootte**: gewone kamers beginnen met 3 vijanden, groeien gemiddeld elke 3 kamers en tellen richting het einde maximaal 20 vijanden. Bosskamers blijven één boss per vijf kamers.
+- **Negen kamerpatronen** met zuilen, ruïnes, gangen, altaren, een open arena, enz. Obstakels en spawns worden per kamer binnen de actuele grenzen geplaatst; vijanden staan niet op obstakels of vlak bij je spawn.
+- **Variabele afmetingen**: breedte en hoogte groeien trapsgewijs tot ver boven de zichtbare viewport. De camera en dynamische physics-grenzen passen zich bij elke kamer aan; kogels despawnen pas voorbij de échte kamerrand of hun eigen bereik.
+- De grafische sfeer en bestaande 50 kamers, bossen, besturing en opslag blijven behouden.
+
 ## Huidige fase
 
 Fase 8 – Progressie en economie:
