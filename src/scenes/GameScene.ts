@@ -200,7 +200,7 @@ export class GameScene extends Phaser.Scene {
         fontStyle: 'bold',
       })
       .setOrigin(1, 0)
-      .setDepth(10);
+      .setDepth(10).setScrollFactor(0);
 
     this.roomTypeText = this.add
       .text(372, 34, '', {
@@ -210,7 +210,7 @@ export class GameScene extends Phaser.Scene {
         fontStyle: 'bold',
       })
       .setOrigin(1, 0)
-      .setDepth(10);
+      .setDepth(10).setScrollFactor(0);
 
     this.enemyCountText = this.add
       .text(372, 51, 'VIJANDEN 0', {
@@ -220,7 +220,7 @@ export class GameScene extends Phaser.Scene {
         fontStyle: 'bold',
       })
       .setOrigin(1, 0)
-      .setDepth(10);
+      .setDepth(10).setScrollFactor(0);
 
     this.add
       .text(107, 660, 'BESTURING: zie opties in menu', {
@@ -229,7 +229,7 @@ export class GameScene extends Phaser.Scene {
         fontSize: '12px',
       })
       .setOrigin(0.5)
-      .setDepth(10);
+      .setDepth(10).setScrollFactor(0);
 
     const profile = progressStore.current;
     this.add
@@ -240,7 +240,7 @@ export class GameScene extends Phaser.Scene {
         fontStyle: 'bold',
       })
       .setOrigin(0.5)
-      .setDepth(10);
+      .setDepth(10).setScrollFactor(0);
 
     this.goldHudText = this.add.text(107, 692, '', {
       color: '#fbbf24', fontFamily: 'system-ui, sans-serif',
