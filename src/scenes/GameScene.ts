@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { AbilityController } from '../abilities/AbilityController';
 
 import { DamageSystem, type DamageResult } from '../combat/damage';
+import { addAndLaunch } from '../combat/launchProjectile';
 import { GAME_SCENE_KEY, GAME_TITLE, GAME_OVER_SCENE_KEY } from '../config/constants';
 import { ARENA_BOUNDS } from '../config/gameplay';
 import { EnemySpawner } from '../enemies/EnemySpawner';
@@ -110,7 +111,7 @@ export class GameScene extends Phaser.Scene {
     );
     this.controls = new InputController(this);
     this.projectiles = this.physics.add.group({ allowGravity: false });
-    this.enemies = this.physics.add.group({ allowGravity: false });
+    this.enemies = this.physics.add.group({ allowGravity: false, collideWorldBounds: true });
     this.enemyProjectiles = this.physics.add.group({ allowGravity: false });
     this.obstacles = this.physics.add.staticGroup();
     this.weapon = new WeaponController(
@@ -248,7 +249,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.add
-      .text(107, 660, 'WASD + muis', {
+      .text(107, 660, 'WASD/ZQSD + muis', {
         color: '#64748b',
         fontFamily: 'system-ui, sans-serif',
         fontSize: '12px',
@@ -556,7 +557,8 @@ export class GameScene extends Phaser.Scene {
         Math.cos(direction), Math.sin(direction),
         speed, enemy.stats.damage, color,
       );
-      this.enemyProjectiles.add(bullet);
+      addAndLaunch(this.enemyProjectiles, bullet,
+        { x: Math.cos(direction), y: Math.sin(direction) }, speed);
     }
   };
 
