@@ -17,6 +17,15 @@ Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de br
 - Een reeds toegewezen toets wordt niet zonder waarschuwing overgenomen. Gebruik **Standaardtoetsen herstellen** om uitsluitend de besturing te herstellen.
 - Toetsinstellingen worden met het profiel in de browser opgeslagen. Oude savebestanden blijven leesbaar. Op mobiel werken de joysticks en skillknoppen ongewijzigd.
 
+## Uitbreiding naar 50 kamers en tien unieke bossen
+
+- De dungeon bevat 50 kamers; elke vijfde kamer is een aparte bossfight (kamers 5 t.e.m. 50).
+- Alle tien bossen hebben een eigen gevechtsprofiel en onderscheiden fase-1/fase-2-aanvallen. Onder meer mitrailleurvuur, spiraalvormige kogels, draaiende ringen en telegraphed bommenvelden.
+- Bosses groeien per kamer/tier in HP en schade. Gewone vijanden blijven met de kamers meegroeien.
+- De speler kan om de twee gewone, even kamers een tijdelijke upgrade kiezen, zodat het langere avontuur ook upgrades biedt.
+- Desktop: stel zowel toetsenbordtoetsen als muisknoppen 1–5 in via **Opties → Besturing**. Zelfs de vuurknop kan worden verplaatst. Mobiele sticks en skillknoppen blijven werken.
+- Een toets/muisknop kan maar voor één actie tegelijk worden gebruikt. Oude profielopslag wordt gemigreerd zonder je voortgang te wissen.
+
 ## Huidige fase
 
 Fase 8 – Progressie en economie:
