@@ -6,6 +6,7 @@ import {
 } from './economy';
 import type { RunReport } from './RunLedger';
 import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
+import { WORLD_COUNT, isWorldUnlocked, toWorldId, type WorldId } from '../worlds/worldConfig';
 import {
   defaultKeyBindings, rebindKey, validateKeyBindings,
   type ControlAction, type KeyBindings,
@@ -27,6 +28,10 @@ export interface Profile {
   weaponLevels: Record<WeaponId, number>;
   permanentLevels: PermanentLevels;
   highestRoom: number;
+  selectedWorld: WorldId;
+  completedWorlds: number;
+  worldBestRooms: number[];
+  totalGoldEarned: number;
   settledRunIds: string[];
   settings: { musicEnabled: boolean; sfxEnabled: boolean; keyBindings: KeyBindings };
 }
@@ -37,6 +42,8 @@ export function defaultProfile(): Profile {
     heroLevels: { ranger: 1, mage: 1, guardian: 1 },
     weaponLevels: { bow: 1, crossbow: 1, staff: 1, daggers: 1, lightning: 1 },
     permanentLevels: defaultPermanentLevels(), highestRoom: 1,
+    selectedWorld: 1, completedWorlds: 0, worldBestRooms: [1, 1, 1, 1, 1],
+    totalGoldEarned: 0,
     settledRunIds: [], settings: { musicEnabled: true, sfxEnabled: true, keyBindings: defaultKeyBindings() },
   };
 }
@@ -65,6 +72,15 @@ export function validateProfile(raw: unknown): Profile {
   const selectedHero = heroes.includes(input.selectedHero as HeroId) ? input.selectedHero as HeroId : 'ranger';
   const selectedWeapon = weapons.includes(input.selectedWeapon as WeaponId) ? input.selectedWeapon as WeaponId : 'bow';
   const settings = input.settings;
+  const completedWorlds = validLevel(input.completedWorlds, 0, WORLD_COUNT);
+  const requestedWorld = toWorldId(input.selectedWorld);
+  const selectedWorld = isWorldUnlocked(requestedWorld, completedWorlds) ? requestedWorld : 1;
+  const worldBestRooms = Array.from({ length: WORLD_COUNT }, (_, index) =>
+    validLevel(input.worldBestRooms?.[index],
+      1, CHAPTER_ROOM_COUNT));
+  // Existing v2 profiles tracked one chapter. Preserve that record in world 1
+  // even if no world-specific fields exist yet.
+  worldBestRooms[0] = Math.max(worldBestRooms[0]!, validLevel(input.highestRoom, 1, CHAPTER_ROOM_COUNT));
   return {
     version: 2,
     gold: typeof input.gold === 'number' && Number.isFinite(input.gold)
@@ -72,6 +88,8 @@ export function validateProfile(raw: unknown): Profile {
     selectedHero, selectedWeapon, unlockedHeroes: heroes, unlockedWeapons: weapons,
     heroLevels, weaponLevels, permanentLevels,
     highestRoom: validLevel(input.highestRoom, 1, CHAPTER_ROOM_COUNT),
+    selectedWorld, completedWorlds, worldBestRooms,
+    totalGoldEarned: validLevel(input.totalGoldEarned, 0, MAX_GOLD),
     settledRunIds: Array.isArray(input.settledRunIds)
       ? [...new Set(input.settledRunIds.filter(
           (id): id is string => typeof id === 'string' && id.length > 0 && id.length <= 100,
@@ -85,6 +103,7 @@ export function validateProfile(raw: unknown): Profile {
 }
 
 export type ProfileAction =
+  | { type: 'selectWorld'; id: WorldId }
   | { type: 'selectHero'; id: HeroId }
   | { type: 'selectWeapon'; id: WeaponId }
   | { type: 'unlockHero'; id: HeroId }
@@ -102,6 +121,8 @@ export type ProfileAction =
 export function applyProfileAction(profile: Profile, action: ProfileAction): Profile {
   const p = validateProfile(profile);
   switch (action.type) {
+    case 'selectWorld':
+      return isWorldUnlocked(action.id, p.completedWorlds) ? { ...p, selectedWorld: action.id } : p;
     case 'selectHero':
       return p.unlockedHeroes.includes(action.id) ? { ...p, selectedHero: action.id } : p;
     case 'selectWeapon':
@@ -157,9 +178,19 @@ export function applyProfileAction(profile: Profile, action: ProfileAction): Pro
       const reward = Number.isFinite(report.earnedGold)
         ? Math.max(0, Math.min(MAX_GOLD, Math.floor(report.earnedGold))) : 0;
       const reached = validLevel(report.reachedRoom, 1, CHAPTER_ROOM_COUNT);
+      const worldId = toWorldId(report.worldId);
+      const worldBestRooms = [...p.worldBestRooms];
+      worldBestRooms[worldId - 1] = Math.max(worldBestRooms[worldId - 1] ?? 1, reached);
+      // Only the currently playable next world can unlock a new world.
+      const completesWorld = report.victory && reached === CHAPTER_ROOM_COUNT &&
+        worldId <= p.completedWorlds + 1;
+      const completedWorlds = completesWorld ?
+        Math.max(p.completedWorlds, worldId) : p.completedWorlds;
       return {
         ...p, gold: Math.min(MAX_GOLD, p.gold + reward),
+        totalGoldEarned: Math.min(MAX_GOLD, p.totalGoldEarned + reward),
         highestRoom: Math.max(p.highestRoom, reached),
+        worldBestRooms, completedWorlds,
         settledRunIds: [...p.settledRunIds, report.runId].slice(-MAX_SETTLED_RUNS),
       };
     }
