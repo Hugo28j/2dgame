@@ -1,5 +1,6 @@
 import { ARENA_BOUNDS } from '../config/gameplay';
 import type { SpawnPoint } from '../enemies/EnemySpawner';
+import type { WorldId } from '../worlds/worldConfig';
 
 export const CHAPTER_ROOM_COUNT = 50;
 export const BOSS_ROOM_INTERVAL = 5;
@@ -151,13 +152,14 @@ export const getEnemyCountForRoom = (roomNumber: number): number => {
     Math.floor((room - 1) / 10));
 };
 
-export const getRoomDefinition = (roomNumber: number): RoomDefinition => {
+export const getRoomDefinition = (roomNumber: number, worldId: WorldId = 1): RoomDefinition => {
   const room = Math.min(CHAPTER_ROOM_COUNT, Math.max(1, Math.floor(roomNumber)));
   const isBossRoom = room % BOSS_ROOM_INTERVAL === 0;
   // Count only normal rooms to cycle through *every* layout, not skip a
   // pattern whenever its previous index happens to land on a boss chamber.
   const regularIndex = (room - 1) - Math.floor((room - 1) / BOSS_ROOM_INTERVAL);
-  const index = regularIndex % TEMPLATES.length;
+  // Each world visits the same 21 hand-designed patterns in a different order.
+  const index = (regularIndex + (worldId - 1) * 4) % TEMPLATES.length;
   const layout = makeLayout(room, index);
   const enemyCount = isBossRoom ? 1 : getEnemyCountForRoom(room);
   // Bosses receive an open arena: mobility and projectile patterns remain fair.
