@@ -74,7 +74,8 @@ export class AbilityController {
     // Key presses are consumed from the shared, remappable input controller.
     const actions = ['dash', 'fireNova', 'iceBlast'] as const;
     ABILITY_SLOTS.forEach((id, index) => {
-      if (this.inputs.consumeAbilityPressed(actions[index])) this.cast(id, now);
+      const action = actions[index];
+      if (action && this.inputs.consumeAbilityPressed(action)) this.cast(id, now);
     });
 
     const velocity = this.dash.velocity(now, DASH_SPEED);
