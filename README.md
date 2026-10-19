@@ -4,19 +4,18 @@ Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de br
 
 ## Huidige fase
 
-Fase 1 – Speler en bediening:
+Fase 2 – Schieten en basiscombat:
 
-- eenvoudige arena met Arcade Physics-wereldgrenzen;
-- tijdelijke, richtinggevoelige spelerssprite;
-- linker virtuele joystick voor analoge beweging;
-- rechter virtuele joystick voor 360-graden richten;
-- onafhankelijk finger ownership voor beide joysticks;
-- reset bij loslaten, pointer cancellation, focusverlies en verborgen tab;
-- WASD-beweging en muisrichting voor desktoptests;
-- genormaliseerde diagonale beweging;
-- responsive portretweergave met safe-area-ondersteuning.
+- alle speler- en bedieningsfuncties uit fase 1;
+- continu boogschieten via de rechter joystick;
+- richten met de muis en schieten met de linkermuisknop;
+- configureerbaar wapen met fire rate, damage, snelheid, crit en piercing;
+- projectielen die verdwijnen bij een muur of niet-piercende treffer;
+- centraal damage-systeem met defense en critical hits;
+- statische oefendoelen met HP-balk, hitflash, damage numbers en death-feedback;
+- unit tests voor damage, fire rate en bescherming tegen dubbele treffers.
 
-Schieten, projectielen, abilities, schade en vijanden horen bij latere fasen en zijn bewust nog niet toegevoegd.
+Volledige vijand-AI, abilities, kamerprogressie en permanente upgrades horen bij latere fasen.
 
 ## Lokaal starten
 
@@ -51,9 +50,11 @@ De productiebuild gebruikt het basispad `/2dgame/`, passend bij:
 ```text
 src/
 ├── config/     # spelconfiguratie en constanten
+├── combat/     # centrale schaderekening
 ├── entities/   # Phaser-gameobjecten zoals de speler
 ├── input/      # joysticks, pointer ownership en invoerlogica
 ├── scenes/     # Phaser-scenes
+├── weapons/    # wapenconfiguratie en aanvalmodules
 ├── main.ts     # applicatie-entrypoint
 └── style.css   # mobiele pagina- en safe-area-stijlen
 tests/          # geautomatiseerde tests
