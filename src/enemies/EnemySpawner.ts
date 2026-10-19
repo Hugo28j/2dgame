@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 import type { SlimeRuntimeStats } from './enemyConfig';
 import { Slime } from './Slime';
 import { AdvancedEnemy } from './AdvancedEnemy';
+import { addBoundedEnemy } from './addBoundedEnemy';
 import { getEnemyKindForRoom, getSlimeStatsForRoom } from './enemyConfig';
 import type { RoomDefinition } from '../rooms/roomConfig';
 
@@ -27,7 +28,7 @@ export class EnemySpawner {
             { ...getSlimeStatsForRoom(room.number) })
         : new AdvancedEnemy(this.scene, `${kind}-${this.nextEnemyNumber++}`,
             point.x, point.y, kind, room.number);
-      this.enemyGroup.add(enemy);
+      addBoundedEnemy(this.enemyGroup, enemy);
       return enemy;
     });
   }
@@ -44,7 +45,7 @@ export class EnemySpawner {
         point.y,
         stats,
       );
-      this.enemyGroup.add(slime);
+      addBoundedEnemy(this.enemyGroup, slime);
       return slime;
     });
   }
