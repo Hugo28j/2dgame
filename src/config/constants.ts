@@ -1,6 +1,7 @@
 export const GAME_TITLE = 'Dungeon Ascent';
 export const BOOT_SCENE_KEY = 'BootScene';
 export const GAME_SCENE_KEY = 'GameScene';
+export const GAME_OVER_SCENE_KEY = 'GameOverScene';
 export const MENU_SCENE_KEY = 'MainMenuScene';
 export const PLAYER_TEXTURE_KEY = 'player-placeholder';
 export const ARROW_TEXTURE_KEY = 'arrow-placeholder';

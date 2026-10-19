@@ -4,16 +4,16 @@ Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de br
 
 ## Huidige fase
 
-Fase 7 – Vijanden en bossgevechten:
+Fase 8 – Progressie en economie:
 
-- Moss Slime, Thorn Archer, Rush Beetle (Charger), Rune Wisp (Mage), Stone Brute (Tank) en Blast Shroom (Bomber) met verschillende AI en eigen stats;
-- afstandsschoten, ontwijken/straffen, charges met visuele waarschuwing, en ontploffingen met een zichtbaar gevarengebied;
-- één echte boss in kamer 5, 10, 15 en 20 (vier unieke namen), met een boss-HP-balk en snellere, zwaardere aanvallen vanaf 50% HP;
-- vijandelijke projectielen botsen met speler en muren en gebruiken het centrale damage-systeem;
-- bestaande wapens, Dash, Fire Nova, Ice Blast, invulnerability frames en kamerprogressie blijven behouden;
-- tests voor vijandselectie, stats, bosskamers en bewegingshelpers.
+- Alle fase-7-vijanden, vier bosskamers, boss-fases, eerlijke dash-waarschuwingen en originele projectile patterns.
+- Goud voor vijanden, kamers en bosses wordt tijdens een run bijgehouden. Bij overlijden of winnen wordt het precies eenmaal aan je permanente balans toegevoegd.
+- Een apart Game Over / Chapter Complete scherm toont kamer, kills, damage, beloningen, blijvende goudbalans en je tijdelijke upgrades.
+- Je bestaande hero- en wapenniveaus blijven bestaan. Vijf globale permanente upgrade-tracks (HP, damage, defense, wapenschade en aanvalssnelheid) komen erbij.
+- Na kamer 2, 4, 7, 10, 13, 16 en 19 kies je één van drie tijdelijke run-upgrades. Bij een volgende run begin je zonder tijdelijke bonussen.
+- SaveManager v2 valideert en migreert oude lokale v1-savebestanden, bewaart persoonlijke records en ondersteunt reset na bevestiging.
 
-De volledige beloningseconomie volgt in fase 8; de visuele en audio-afwerking in fase 9.
+De audio-instellingen zijn voorbereid; geluid en definitieve sprites volgen in fase 9. De eerste versie gebruikt geen online accounts of aankopen.
 
 ## Lokaal starten
 

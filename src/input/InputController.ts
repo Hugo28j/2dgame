@@ -59,6 +59,8 @@ export class InputController {
     document.addEventListener('visibilitychange', this.handleVisibilityChange);
   }
 
+  public cancelTouches(): void { this.reset(); }
+
   public getMovement(): Vector2Value {
     if (this.movementJoystick.isActive) {
       return { ...this.movementJoystick.vector };

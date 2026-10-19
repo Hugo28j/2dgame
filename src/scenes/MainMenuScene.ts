@@ -4,15 +4,19 @@ import {
   HERO_IDS, HEROES, getHeroStats, heroUpgradeCost, MAX_HERO_LEVEL,
 } from '../heroes/heroConfig';
 import { progressStore, type ProfileAction } from '../progression/ProgressStore';
+import { MAX_PERMANENT_LEVEL, PERMANENT_UPGRADE_IDS, PERMANENT_UPGRADES,
+  permanentUpgradeCost } from '../progression/economy';
 import {
   WEAPON_IDS, WEAPONS, getWeaponStats, weaponUpgradeCost, MAX_WEAPON_LEVEL,
 } from '../weapons/weaponConfig';
 
-type MenuTab = 'heroes' | 'weapons' | 'upgrades';
+type MenuTab = 'heroes' | 'weapons' | 'upgrades' | 'settings';
 const FONT = 'system-ui, sans-serif';
 
 export class MainMenuScene extends Phaser.Scene {
   private tab: MenuTab = 'heroes';
+  private upgradeCategory: 'equipment' | 'permanent' = 'permanent';
+  private resetRequested = false;
   public constructor() { super(MENU_SCENE_KEY); }
 
   public create(): void {
@@ -34,22 +38,25 @@ export class MainMenuScene extends Phaser.Scene {
     this.add.text(25, 127, 'WAPEN: ' + WEAPONS[profile.selectedWeapon].name, {
       fontFamily: FONT, fontSize: '12px', color: '#c4b5fd',
     });
-    this.button(72, 176, 110, 42, 'HEROES', () => this.chooseTab('heroes'), this.tab === 'heroes');
-    this.button(195, 176, 110, 42, 'WEAPONS', () => this.chooseTab('weapons'), this.tab === 'weapons');
-    this.button(318, 176, 110, 42, 'UPGRADES', () => this.chooseTab('upgrades'), this.tab === 'upgrades');
+    this.button(53, 176, 84, 42, 'HEROES', () => this.chooseTab('heroes'), this.tab === 'heroes');
+    this.button(148, 176, 84, 42, 'WEAPONS', () => this.chooseTab('weapons'), this.tab === 'weapons');
+    this.button(243, 176, 84, 42, 'UPGRADES', () => this.chooseTab('upgrades'), this.tab === 'upgrades');
+    this.button(338, 176, 84, 42, 'SETTINGS', () => this.chooseTab('settings'), this.tab === 'settings');
 
     if (this.tab === 'heroes') this.drawHeroes();
     else if (this.tab === 'weapons') this.drawWeapons();
-    else this.drawUpgrades();
+    else if (this.tab === 'upgrades') this.drawUpgrades();
+    else this.drawSettings();
 
     this.button(195, 758, 300, 62, '▶  PLAY', () => this.scene.start(GAME_SCENE_KEY), true);
-    this.add.text(195, 808, 'Fase 6 · Abilities: 1 / 2 / 3', {
+    this.add.text(195, 808, 'Fase 8 · Goud & run-upgrades', {
       fontFamily: FONT, fontSize: '11px', color: '#64748b',
     }).setOrigin(0.5);
   }
 
   private chooseTab(tab: MenuTab): void {
     this.tab = tab;
+    this.resetRequested = false;
     this.scene.restart();
   }
 
@@ -116,34 +123,97 @@ export class MainMenuScene extends Phaser.Scene {
 
   private drawUpgrades(): void {
     const profile = progressStore.current;
-    const rows: Array<{ label: string; level: number; unlocked: boolean;
-      max: number; cost: number; action: ProfileAction }> = [
-      ...HERO_IDS.map(id => ({
-        label: HEROES[id].name, level: profile.heroLevels[id],
-        unlocked: profile.unlockedHeroes.includes(id),
-        max: MAX_HERO_LEVEL, cost: heroUpgradeCost(profile.heroLevels[id]),
-        action: { type: 'upgradeHero', id } as const,
-      })),
-      ...WEAPON_IDS.map(id => ({
-        label: WEAPONS[id].name, level: profile.weaponLevels[id],
-        unlocked: profile.unlockedWeapons.includes(id),
-        max: MAX_WEAPON_LEVEL, cost: weaponUpgradeCost(profile.weaponLevels[id]),
-        action: { type: 'upgradeWeapon', id } as const,
-      })),
-    ];
+    this.button(107, 221, 165, 35, 'PERMANENT', () => this.setUpgradeCategory('permanent'),
+      this.upgradeCategory === 'permanent');
+    this.button(283, 221, 165, 35, 'HELD / WAPEN', () => this.setUpgradeCategory('equipment'),
+      this.upgradeCategory === 'equipment');
+
+    const rows: Array<{ label: string; description: string; level: number; unlocked: boolean;
+      max: number; cost: number; action: ProfileAction }> = this.upgradeCategory === 'permanent'
+      ? PERMANENT_UPGRADE_IDS.map(id => ({
+          label: PERMANENT_UPGRADES[id].name, description: PERMANENT_UPGRADES[id].description,
+          level: profile.permanentLevels[id], unlocked: true, max: MAX_PERMANENT_LEVEL,
+          cost: permanentUpgradeCost(id, profile.permanentLevels[id]),
+          action: { type: 'upgradePermanent', id } as const,
+        }))
+      : [
+          ...HERO_IDS.map(id => ({
+            label: HEROES[id].name, description: 'Hero bonus', level: profile.heroLevels[id],
+            unlocked: profile.unlockedHeroes.includes(id),
+            max: MAX_HERO_LEVEL, cost: heroUpgradeCost(profile.heroLevels[id]),
+            action: { type: 'upgradeHero', id } as const,
+          })),
+          ...WEAPON_IDS.map(id => ({
+            label: WEAPONS[id].name, description: 'Wapen bonus', level: profile.weaponLevels[id],
+            unlocked: profile.unlockedWeapons.includes(id),
+            max: MAX_WEAPON_LEVEL, cost: weaponUpgradeCost(profile.weaponLevels[id]),
+            action: { type: 'upgradeWeapon', id } as const,
+          })),
+        ];
+    const rowHeight = this.upgradeCategory === 'equipment' ? 53 : 83;
     rows.forEach((row, index) => {
-      const y = 224 + index * 61;
-      this.add.rectangle(195, y, 352, 56, 0x172338).setStrokeStyle(1, 0x334155);
-      this.add.text(32, y - 19, row.label, {
+      const y = 276 + index * rowHeight;
+      this.add.rectangle(195, y, 352, rowHeight - 5, 0x172338).setStrokeStyle(1, 0x334155);
+      this.add.text(32, y - rowHeight / 2 + 7, row.label, {
         fontFamily: FONT, fontSize: '14px', fontStyle: 'bold', color: '#f8fafc',
       });
-      this.add.text(32, y + 3, 'Level ' + row.level + '/' + row.max, {
+      if (this.upgradeCategory === 'permanent') {
+        this.add.text(32, y - 6, row.description, {
+          fontFamily: FONT, fontSize: '12px', color: '#94a3b8',
+        });
+      }
+      this.add.text(32, y + rowHeight / 2 - 19, 'Level ' + row.level + '/' + row.max, {
         fontFamily: FONT, fontSize: '11px', color: '#94a3b8',
       });
       const label = !row.unlocked ? 'GESLOTEN' : row.level >= row.max ? 'MAX' : row.cost + ' G';
-      this.button(312, y, 102, 38, label, () => this.runAction(row.action),
+      this.button(311, y, 104, 38, label, () => this.runAction(row.action),
         false, !row.unlocked || row.level >= row.max || profile.gold < row.cost);
     });
+  }
+
+  private setUpgradeCategory(category: 'equipment' | 'permanent'): void {
+    this.upgradeCategory = category;
+    this.scene.restart();
+  }
+
+  private drawSettings(): void {
+    const profile = progressStore.current;
+    this.add.text(195, 243, 'VOORTGANG & INSTELLINGEN', {
+      fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: '#f8fafc',
+    }).setOrigin(0.5);
+    this.add.text(40, 302, 'Hoogste kamer: ' + profile.highestRoom + '/20', {
+      fontFamily: FONT, fontSize: '15px', color: '#7dd3fc',
+    });
+    this.button(195, 377, 310, 48,
+      'MUZIEK: ' + (profile.settings.musicEnabled ? 'AAN' : 'UIT'),
+      () => this.runAction({ type: 'setSetting', key: 'musicEnabled',
+        value: !profile.settings.musicEnabled }));
+    this.button(195, 442, 310, 48,
+      'GELUID: ' + (profile.settings.sfxEnabled ? 'AAN' : 'UIT'),
+      () => this.runAction({ type: 'setSetting', key: 'sfxEnabled',
+        value: !profile.settings.sfxEnabled }));
+    this.add.text(195, 509, 'Audio zelf volgt in fase 9.', {
+      fontFamily: FONT, fontSize: '12px', color: '#94a3b8',
+    }).setOrigin(0.5);
+    if (!this.resetRequested) {
+      this.button(195, 588, 310, 46, 'RESET VOORTGANG', () => {
+        this.resetRequested = true;
+        this.scene.restart();
+      });
+    } else {
+      this.add.text(195, 548, 'Alles wissen? Dit kan niet ongedaan worden.', {
+        fontFamily: FONT, fontSize: '12px', color: '#fca5a5',
+      }).setOrigin(0.5);
+      this.button(116, 602, 145, 47, 'JA, WISSEN', () => {
+        progressStore.reset();
+        this.resetRequested = false;
+        this.scene.restart();
+      });
+      this.button(274, 602, 145, 47, 'ANNULEREN', () => {
+        this.resetRequested = false;
+        this.scene.restart();
+      }, true);
+    }
   }
 
   private button(x: number, y: number, width: number, height: number, label: string,
