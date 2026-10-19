@@ -3,7 +3,7 @@ import { AbilityController } from '../abilities/AbilityController';
 
 import { DamageSystem, type DamageResult } from '../combat/damage';
 import { addAndLaunch } from '../combat/launchProjectile';
-import { GAME_SCENE_KEY, GAME_TITLE, GAME_OVER_SCENE_KEY } from '../config/constants';
+import { GAME_SCENE_KEY, GAME_TITLE, GAME_OVER_SCENE_KEY, GAME_WIDTH } from '../config/constants';
 import { EnemySpawner } from '../enemies/EnemySpawner';
 import { getBossProfile, getBossTier } from '../enemies/bossProfiles';
 import { AdvancedEnemy, type BulletPattern } from '../enemies/AdvancedEnemy';
@@ -37,6 +37,7 @@ import { roomClearHealing } from '../progression/roomHealing';
 import { RunUpgradeDeck, type RunUpgradeId } from '../progression/runUpgrades';
 import { getWorld, getWorldBossName, type WorldId } from '../worlds/worldConfig';
 import { findChainTargets } from '../weapons/chainLightning';
+import { upgradeCardBounds } from '../ui/upgradeLayout';
 
 type ArcadeCollisionObject =
   | Phaser.Types.Physics.Arcade.GameObjectWithBody
@@ -80,6 +81,7 @@ export class GameScene extends Phaser.Scene {
   private chapterComplete = false;
   private choosingUpgrade = false;
   private upgradeOverlay?: Phaser.GameObjects.Container;
+  private upgradeHitAreas: Phaser.GameObjects.Zone[] = [];
   private worldId: WorldId = 1;
   private run = new RunLedger();
   private upgradeReady = false;
@@ -160,7 +162,7 @@ export class GameScene extends Phaser.Scene {
 
     this.player.move(this.controls.getMovement());
     this.collectNearbyCoins(delta);
-    this.updateEnemyWaves();
+    // No scheduled reinforcements: every enemy is spawned when the room loads.
     this.updateCamera();
     const aim = this.controls.getAim(this.player.x, this.player.y);
     this.player.face(aim);
@@ -208,7 +210,7 @@ export class GameScene extends Phaser.Scene {
       .setDepth(10).setScrollFactor(0);
 
     this.roomNumberText = this.add
-      .text(372, 14, 'KAMER 1/' + CHAPTER_ROOM_COUNT, {
+      .text(GAME_WIDTH - 18, 14, 'KAMER 1/' + CHAPTER_ROOM_COUNT, {
         color: '#7dd3fc',
         fontFamily: 'system-ui, sans-serif',
         fontSize: '14px',
@@ -218,7 +220,7 @@ export class GameScene extends Phaser.Scene {
       .setDepth(10).setScrollFactor(0);
 
     this.roomTypeText = this.add
-      .text(372, 34, '', {
+      .text(GAME_WIDTH - 18, 34, '', {
         color: '#f59e0b',
         fontFamily: 'system-ui, sans-serif',
         fontSize: '10px',
@@ -228,7 +230,7 @@ export class GameScene extends Phaser.Scene {
       .setDepth(10).setScrollFactor(0);
 
     this.enemyCountText = this.add
-      .text(372, 51, 'VIJANDEN 0', {
+      .text(GAME_WIDTH - 18, 51, 'VIJANDEN 0', {
         color: '#bef264',
         fontFamily: 'system-ui, sans-serif',
         fontSize: '11px',
@@ -248,7 +250,7 @@ export class GameScene extends Phaser.Scene {
 
     const profile = progressStore.current;
     this.add
-      .text(195, 62, `${WEAPONS[profile.selectedWeapon].name} · LV.${profile.weaponLevels[profile.selectedWeapon]}`, {
+      .text(GAME_WIDTH / 2, 62, `${WEAPONS[profile.selectedWeapon].name} · LV.${profile.weaponLevels[profile.selectedWeapon]}`, {
         color: '#fbbf24',
         fontFamily: 'system-ui, sans-serif',
         fontSize: '12px',
@@ -262,12 +264,12 @@ export class GameScene extends Phaser.Scene {
       fontSize: '12px', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(10).setScrollFactor(0);
     this.updateGoldHud();
-    this.doorHintText = this.add.text(195, 100, 'DEUR OPEN ↑  ·  GA NAAR HET NOORDEN', {
+    this.doorHintText = this.add.text(GAME_WIDTH / 2, 100, 'DEUR OPEN ↑  ·  GA NAAR HET NOORDEN', {
       color: '#86efac', fontFamily: 'system-ui, sans-serif',
       fontSize: '11px', fontStyle: 'bold', stroke: '#020617', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(43).setScrollFactor(0).setVisible(false);
     this.bossHealthBar = this.add.graphics().setDepth(41).setScrollFactor(0).setVisible(false);
-    this.bossNameText = this.add.text(195, 137, '', {
+    this.bossNameText = this.add.text(GAME_WIDTH / 2, 137, '', {
       color: '#fde68a', fontFamily: 'system-ui, sans-serif',
       fontSize: '13px', fontStyle: 'bold', stroke: '#020617', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(42).setScrollFactor(0).setVisible(false);
@@ -590,7 +592,7 @@ export class GameScene extends Phaser.Scene {
   private showRoomBanner(room: RoomDefinition): void {
     const banner = this.add
       .text(
-        195,
+        GAME_WIDTH / 2,
         350,
         room.isBossRoom ? `BOSS: ${getWorldBossName(this.worldId, room.number)}` :
           `WERELD ${this.worldId} · KAMER ${room.number}`,
@@ -809,9 +811,9 @@ export class GameScene extends Phaser.Scene {
     this.bossNameText.setText(getWorldBossName(this.worldId, this.roomProgress.roomNumber) +
       (boss.healthRatio <= 0.5 ? ' · FASE 2' : ' · FASE 1'));
     this.bossHealthBar.fillStyle(0x020617, 0.95);
-    this.bossHealthBar.fillRoundedRect(60, 154, 270, 14, 4);
+    this.bossHealthBar.fillRoundedRect((GAME_WIDTH - 270) / 2, 154, 270, 14, 4);
     this.bossHealthBar.fillStyle(boss.healthRatio <= 0.5 ? 0xef4444 : 0xf59e0b);
-    this.bossHealthBar.fillRoundedRect(62, 156, 266 * boss.healthRatio, 10, 3);
+    this.bossHealthBar.fillRoundedRect((GAME_WIDTH - 270) / 2 + 2, 156, 266 * boss.healthRatio, 10, 3);
   }
 
   private readonly handleEnemySpawned = (): void => {
@@ -905,7 +907,7 @@ export class GameScene extends Phaser.Scene {
 
     const label = reward.boss ? 'BOSSBONUS' :
       reward.milestone ? 'MIJLPAAL' : 'KAMER VOLTOOID';
-    const toast = this.add.text(195, 115, `+${Math.ceil(restored)} HP  ·  ${label}`, {
+    const toast = this.add.text(GAME_WIDTH / 2, 115, `+${Math.ceil(restored)} HP  ·  ${label}`, {
       color: '#86efac', fontFamily: 'system-ui, sans-serif',
       fontSize: '14px', fontStyle: 'bold',
       stroke: '#020617', strokeThickness: 4,
@@ -1007,15 +1009,16 @@ export class GameScene extends Phaser.Scene {
     this.controls?.cancelTouches();
     this.physics.world.pause();
 
+    const centerX = GAME_WIDTH / 2;
     const overlay = this.add.container(0, 0).setDepth(170).setScrollFactor(0);
     this.upgradeOverlay = overlay;
-    const shade = this.add.rectangle(195, 422, 390, 844, 0x020617, 0.94)
+    const shade = this.add.rectangle(centerX, 422, GAME_WIDTH, 844, 0x020617, 0.94)
       .setInteractive();
     overlay.add(shade);
     overlay.setAlpha(0);
     this.tweens.add({ targets: overlay, alpha: 1, duration: 210, ease: 'Sine.easeOut' });
 
-    const pulse = this.add.circle(195, 180, 20, 0xfde68a, 0.12)
+    const pulse = this.add.circle(centerX, 180, 20, 0xfde68a, 0.12)
       .setStrokeStyle(4, 0xfbbf24, 0.92);
     overlay.add(pulse);
     this.tweens.add({
@@ -1023,7 +1026,7 @@ export class GameScene extends Phaser.Scene {
       ease: 'Cubic.easeOut', onComplete: () => pulse.destroy(),
     });
 
-    const title = this.add.text(195, 174, '✦  POWER-UP!  ✦', {
+    const title = this.add.text(centerX, 174, '✦  POWER-UP!  ✦', {
       fontFamily: 'system-ui, sans-serif', fontSize: '28px',
       fontStyle: 'bold', color: '#fde68a', stroke: '#78350f', strokeThickness: 3,
     }).setOrigin(0.5).setScale(0.35).setAlpha(0);
@@ -1032,20 +1035,26 @@ export class GameScene extends Phaser.Scene {
       targets: title, scaleX: 1, scaleY: 1, alpha: 1,
       duration: 440, ease: 'Back.easeOut',
     });
-    const subtitle = this.add.text(195, 219, 'KIES ÉÉN VERSTERKING', {
+    const subtitle = this.add.text(centerX, 219, 'KIES ÉÉN VERSTERKING', {
       fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#cbd5e1',
     }).setOrigin(0.5).setAlpha(0);
     overlay.add(subtitle);
     this.tweens.add({ targets: subtitle, alpha: 1, duration: 240, delay: 310 });
 
     cards.forEach((card, index) => {
-      const y = 302 + index * 112;
+      const { x, y, width, height } = upgradeCardBounds(GAME_WIDTH, index);
       const border = card.rarity === 'epic' ? 0xc084fc :
         card.rarity === 'rare' ? 0x38bdf8 : 0x94a3b8;
-      const cardContainer = this.add.container(195, y).setScale(0.65).setAlpha(0);
-      const plate = this.add.rectangle(0, 0, 330, 99, 0x172338)
-        .setStrokeStyle(2, border).setInteractive({ useHandCursor: true });
-      plate.on('pointerdown', () => this.chooseUpgrade(card.id));
+      const cardContainer = this.add.container(x, y).setScale(0.65).setAlpha(0);
+      const plate = this.add.rectangle(0, 0, width, height, 0x172338)
+        .setStrokeStyle(2, border);
+      // Stable top-level hit box, independent of animated nested Container
+      // transforms and the scrolling world camera.
+      const hitArea = this.add.zone(x, y, width, height)
+        .setScrollFactor(0).setDepth(171)
+        .setInteractive({ useHandCursor: true });
+      hitArea.on('pointerdown', () => this.chooseUpgrade(card.id));
+      this.upgradeHitAreas.push(hitArea);
       cardContainer.add(plate);
       cardContainer.add(this.add.text(-149, -32, card.name.toUpperCase(), {
         fontFamily: 'system-ui, sans-serif', fontSize: '17px',
@@ -1073,6 +1082,8 @@ export class GameScene extends Phaser.Scene {
     if (id === 'projectile') this.weapon.extraProjectiles += 1;
     else if (id === 'piercing') this.weapon.extraPiercing += 1;
     else this.player.applyRunBonus(id);
+    this.upgradeHitAreas.forEach(hitArea => hitArea.destroy());
+    this.upgradeHitAreas = [];
     this.upgradeOverlay?.destroy(true);
     this.upgradeOverlay = undefined;
     this.choosingUpgrade = false;
@@ -1108,6 +1119,8 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.resume();
     this.clearCoins();
     this.clearBossBombs();
+    this.upgradeHitAreas.forEach(hitArea => hitArea.destroy());
+    this.upgradeHitAreas = [];
     this.upgradeOverlay?.destroy(true);
     this.upgradeOverlay = undefined;
     this.upgradeReady = false;
