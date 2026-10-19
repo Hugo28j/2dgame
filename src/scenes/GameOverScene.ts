@@ -19,6 +19,12 @@ export class GameOverScene extends Phaser.Scene {
       this.scene.start(MENU_SCENE_KEY);
       return;
     }
+    // First show the menu immediately; dispose of the sleeping combat scene
+    // only after the first Game Over frame can render. This prevents a heavy
+    // 30-enemy teardown from blocking the death screen.
+    this.time.delayedCall(180, () => {
+      if (this.scene.isSleeping(GAME_SCENE_KEY)) this.scene.stop(GAME_SCENE_KEY);
+    });
     const { report } = data;
     const fontFamily = 'system-ui, sans-serif';
     this.cameras.main.setBackgroundColor('#081525');
@@ -67,8 +73,13 @@ export class GameOverScene extends Phaser.Scene {
         .setOrigin(0.5);
       plate.on('pointerdown', callback);
     };
-    button(686, 'OPNIEUW SPELEN', () => this.scene.start(GAME_SCENE_KEY), true);
-    button(755, 'HOOFDMENU', () => this.scene.start(MENU_SCENE_KEY));
+    const navigate = (target: string): void => {
+      // Also safe when the user clicks before deferred cleanup fires.
+      if (this.scene.isSleeping(GAME_SCENE_KEY)) this.scene.stop(GAME_SCENE_KEY);
+      this.scene.start(target);
+    };
+    button(686, 'OPNIEUW SPELEN', () => navigate(GAME_SCENE_KEY), true);
+    button(755, 'HOOFDMENU', () => navigate(MENU_SCENE_KEY));
     this.add.text(195, 811, 'Goud is eenmaal aan je profiel toegevoegd', {
       fontFamily, fontSize: '10px', color: '#94a3b8',
     }).setOrigin(0.5);

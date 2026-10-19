@@ -5,6 +5,11 @@ export const CHAPTER_ROOM_COUNT = 50;
 export const BOSS_ROOM_INTERVAL = 5;
 export const SAFE_SPAWN_DISTANCE = 140;
 
+/** Keep late enemies well outside the player's starting viewport. */
+export function getMinimumSpawnDistance(roomNumber: number): number {
+  return Math.min(340, SAFE_SPAWN_DISTANCE + Math.floor((Math.max(1, roomNumber) - 1) / 5) * 25);
+}
+
 export interface ArenaRectangle {
   x: number; y: number; width: number; height: number;
 }
@@ -29,8 +34,8 @@ export interface RoomDefinition {
 
 export const ROOM_DIFFICULTY = Object.freeze({
   baseEnemyCount: 3,
-  roomsPerExtraEnemy: 3,
-  maxEnemyCount: 20,
+  roomsPerExtraEnemy: 2,
+  maxEnemyCount: 32,
   bossRoomBonusEnemies: 0,
 });
 
@@ -115,7 +120,7 @@ function makeLayout(room: number, styleIndex: number): RoomLayout {
       const jitterX = (row % 2 ? 7 : -7) * (room % 3);
       const point = { x: bounds.x + bounds.width * fx + jitterX,
         y: bounds.y + bounds.height * fy };
-      if (isSpawnSafe(point, layout) && candidates.every(previous =>
+      if (isSpawnSafe(point, layout, getMinimumSpawnDistance(room)) && candidates.every(previous =>
         Math.hypot(point.x - previous.x, point.y - previous.y) >= 56)) candidates.push(point);
     }
   }
@@ -142,7 +147,8 @@ export const getEnemyCountForRoom = (roomNumber: number): number => {
   const room = Math.max(1, Math.floor(roomNumber));
   return Math.min(ROOM_DIFFICULTY.maxEnemyCount,
     ROOM_DIFFICULTY.baseEnemyCount +
-    Math.floor((room - 1) / ROOM_DIFFICULTY.roomsPerExtraEnemy));
+    Math.floor((room - 1) / ROOM_DIFFICULTY.roomsPerExtraEnemy) +
+    Math.floor((room - 1) / 10));
 };
 
 export const getRoomDefinition = (roomNumber: number): RoomDefinition => {

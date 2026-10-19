@@ -20,8 +20,11 @@ export class EnemySpawner {
     private readonly enemyGroup: Phaser.Physics.Arcade.Group,
   ) {}
 
-  public spawnRoom(room: Readonly<RoomDefinition>): readonly Slime[] {
-    return room.enemySpawns.map((point, index) => {
+  public spawnRoom(room: Readonly<RoomDefinition>, indices?: readonly number[]): readonly Slime[] {
+    const toSpawn = indices ?? room.enemySpawns.map((_, index) => index);
+    return toSpawn.map(index => {
+      const point = room.enemySpawns[index];
+      if (!point) throw new Error('Missing enemy spawn point for index ' + index);
       const kind = getEnemyKindForRoom(room.number, index);
       const enemy = kind === 'slime'
         ? new Slime(this.scene, `slime-${this.nextEnemyNumber++}`, point.x, point.y,
