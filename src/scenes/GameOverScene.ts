@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME_OVER_SCENE_KEY, GAME_SCENE_KEY, MENU_SCENE_KEY } from '../config/constants';
 import type { RunReport } from '../progression/RunLedger';
 import { progressStore } from '../progression/ProgressStore';
+import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
 
 interface GameOverData {
   report: RunReport;
@@ -32,7 +33,7 @@ export class GameOverScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     const rows = [
-      ['Bereikte kamer', String(report.reachedRoom) + '/20'],
+      ['Bereikte kamer', String(report.reachedRoom) + '/' + CHAPTER_ROOM_COUNT],
       ['Kamers voltooid', String(report.roomsCleared)],
       ['Vijanden verslagen', String(report.enemiesDefeated)],
       ['Bosses verslagen', String(report.bossesDefeated)],
