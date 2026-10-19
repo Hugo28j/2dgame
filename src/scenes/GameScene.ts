@@ -7,6 +7,7 @@ import { GAME_SCENE_KEY, GAME_TITLE, GAME_OVER_SCENE_KEY } from '../config/const
 import { ARENA_BOUNDS } from '../config/gameplay';
 import { EnemySpawner } from '../enemies/EnemySpawner';
 import { getBossName } from '../enemies/enemyConfig';
+import { getBossProfile, getBossTier } from '../enemies/bossProfiles';
 import { AdvancedEnemy, type BulletPattern } from '../enemies/AdvancedEnemy';
 import { EnemyProjectile } from '../enemies/EnemyProjectile';
 import { withinRadius } from '../enemies/enemyMovement';
@@ -51,6 +52,8 @@ export class GameScene extends Phaser.Scene {
   private projectiles?: Phaser.Physics.Arcade.Group;
   private enemies?: Phaser.Physics.Arcade.Group;
   private enemyProjectiles?: Phaser.Physics.Arcade.Group;
+  private readonly bombTimers = new Set<Phaser.Time.TimerEvent>();
+  private readonly bombWarnings = new Set<Phaser.GameObjects.Arc>();
   private activeBoss?: AdvancedEnemy;
   private bossHealthBar?: Phaser.GameObjects.Graphics;
   private bossNameText?: Phaser.GameObjects.Text;
@@ -354,6 +357,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.abilities?.cancelMotion();
+    this.clearBossBombs();
     this.activeBoss = undefined;
     this.enemyProjectiles?.clear(true, true);
     this.enemies.clear(true, true);
@@ -469,7 +473,7 @@ export class GameScene extends Phaser.Scene {
         {
           color: room.isBossRoom ? '#fbbf24' : '#bae6fd',
           fontFamily: 'system-ui, sans-serif',
-          fontSize: '24px',
+          fontSize: room.isBossRoom ? '18px' : '24px',
           fontStyle: 'bold',
           stroke: '#020617',
           strokeThickness: 6,
@@ -544,23 +548,69 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private readonly fireEnemyProjectiles = (enemy: AdvancedEnemy, pattern: BulletPattern): void => {
+  private readonly fireEnemyProjectiles = (enemy: AdvancedEnemy, pattern: BulletPattern,
+    volley = 0, speedFactor = 1): void => {
     if (!this.player || !this.enemyProjectiles || this.gameOver || this.transitioning) return;
     const angle = Math.atan2(this.player.y - enemy.y, this.player.x - enemy.x);
-    const angles = shotAngles(pattern, angle);
-    const speed = enemy.kind === 'boss' ? 260 : enemy.kind === 'mage' ? 220 : 320;
-    const color = enemy.kind === 'mage' ? 0xa78bfa : enemy.kind === 'boss' ? 0xf59e0b : 0xfb7185;
+    const angles = shotAngles(pattern, angle, volley);
+    const speed = (enemy.kind === 'boss' ? 220 + getBossTier(enemy.stats.roomNumber) * 8 :
+      enemy.kind === 'mage' ? 220 : 320) * speedFactor;
+    const color = enemy.isBoss ? getBossProfile(enemy.stats.roomNumber).color :
+      enemy.kind === 'mage' ? 0xa78bfa : 0xfb7185;
     for (const direction of angles) {
       const bullet = new EnemyProjectile(
         this, enemy.x + Math.cos(direction) * 30,
         enemy.y + Math.sin(direction) * 30,
         Math.cos(direction), Math.sin(direction),
-        speed, enemy.stats.damage, color,
+        speed, enemy.stats.damage * (enemy.isBoss ? 0.57 : 1), color,
       );
       addAndLaunch(bullet, () => this.enemyProjectiles!.add(bullet),
         { x: Math.cos(direction), y: Math.sin(direction) }, speed);
     }
   };
+
+  /** Telegraph targeted bombs well before detonation. All timers are cancelled on room exit. */
+  private readonly dropBossBombs = (enemy: AdvancedEnemy, targetX: number, targetY: number,
+    count: number, radius: number, windupMs: number): void => {
+    if (!this.player || this.gameOver || this.transitioning || this.roomProgress.doorOpen) return;
+    for (let i = 0; i < count; i++) {
+      const angle = (i - 1) * Math.PI * 2 / Math.max(1, count - 1) + this.time.now / 1300;
+      const distance = i === 0 ? 0 : 86;
+      const x = Phaser.Math.Clamp(targetX + Math.cos(angle) * distance,
+        ARENA_BOUNDS.x + radius + 6, ARENA_BOUNDS.x + ARENA_BOUNDS.width - radius - 6);
+      const y = Phaser.Math.Clamp(targetY + Math.sin(angle) * distance,
+        ARENA_BOUNDS.y + radius + 6, ARENA_BOUNDS.y + ARENA_BOUNDS.height - radius - 6);
+      const warning = this.add.circle(x, y, radius, 0xfb923c, 0.14)
+        .setStrokeStyle(3, 0xfbbf24, 0.92).setDepth(24);
+      this.bombWarnings.add(warning);
+      let timer: Phaser.Time.TimerEvent;
+      timer = this.time.delayedCall(windupMs, () => {
+        this.bombTimers.delete(timer);
+        this.bombWarnings.delete(warning);
+        if (!warning.active) return;
+        warning.destroy();
+        if (!enemy.active || enemy.aiState === 'defeated' || this.gameOver ||
+          this.transitioning || this.choosingUpgrade || this.roomProgress.doorOpen) return;
+        const impact = this.add.circle(x, y, radius, 0xf97316, 0.55)
+          .setStrokeStyle(3, 0xffedd5).setDepth(29);
+        this.tweens.add({ targets: impact, alpha: 0, scale: 1.1, duration: 235,
+          onComplete: () => impact.destroy() });
+        if (this.player && withinRadius(x, y, this.player.x, this.player.y, radius)) {
+          this.damagePlayer({
+            damage: enemy.stats.damage * 0.62, criticalChance: 0, criticalMultiplier: 1,
+          });
+        }
+      });
+      this.bombTimers.add(timer);
+    }
+  };
+
+  private clearBossBombs(): void {
+    for (const timer of this.bombTimers) timer.remove(false);
+    this.bombTimers.clear();
+    for (const warning of this.bombWarnings) if (warning.active) warning.destroy();
+    this.bombWarnings.clear();
+  }
 
   private readonly explodeEnemy = (enemy: AdvancedEnemy, radius: number): void => {
     const ring = this.add.circle(enemy.x, enemy.y, radius, 0xf97316, 0.3)
@@ -650,10 +700,11 @@ export class GameScene extends Phaser.Scene {
     if (this.roomProgress.registerEnemyDefeated()) {
       // All scheduled enemies are dead; residual bullets must not harm the player.
       this.enemyProjectiles?.clear(true, true);
+      this.clearBossBombs();
       this.run.clearRoom(this.roomProgress.roomNumber);
       this.openDoor();
       if (this.roomProgress.roomNumber < CHAPTER_ROOM_COUNT &&
-        [2, 4, 7, 10, 13, 16, 19].includes(this.roomProgress.roomNumber)) {
+        this.roomProgress.roomNumber % 2 === 0 && this.roomProgress.roomNumber % 5 !== 0) {
         this.showUpgradeOffer();
       }
     }
@@ -800,6 +851,7 @@ export class GameScene extends Phaser.Scene {
     else this.gameOver = true;
     this.abilities?.cancelMotion();
     this.enemyProjectiles?.clear(true, true);
+    this.clearBossBombs();
     this.player?.setVelocity(0, 0);
     this.upgradeOverlay?.destroy(true);
     this.upgradeOverlay = undefined;
@@ -818,6 +870,7 @@ export class GameScene extends Phaser.Scene {
 
   private shutdown(): void {
     this.physics.world.resume();
+    this.clearBossBombs();
     this.upgradeOverlay?.destroy(true);
     this.upgradeOverlay = undefined;
     this.abilities?.destroy();
