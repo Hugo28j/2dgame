@@ -68,6 +68,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
     this.setRotation(Math.atan2(direction.y, direction.x));
   }
 
+  /** Recover at most the missing HP; dead players cannot be revived by a room clear. */
+  public heal(amount: number): number {
+    if (!Number.isFinite(amount) || amount <= 0 || this.currentHp <= 0) return 0;
+    const previous = this.currentHp;
+    this.currentHp = Math.min(this.maxHp, this.currentHp + amount);
+    return this.currentHp - previous;
+  }
+
   public receiveDamage(amount: number): boolean {
     this.currentHp = Math.max(0, this.currentHp - amount);
     return this.currentHp === 0;

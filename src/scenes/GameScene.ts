@@ -31,6 +31,7 @@ import { WEAPONS } from '../weapons/weaponConfig';
 import { progressStore } from '../progression/ProgressStore';
 import { permanentBonuses } from '../progression/economy';
 import { RunLedger } from '../progression/RunLedger';
+import { roomClearHealing } from '../progression/roomHealing';
 import { RunUpgradeDeck, type RunUpgradeId } from '../progression/runUpgrades';
 import { findChainTargets } from '../weapons/chainLightning';
 
@@ -730,7 +731,11 @@ export class GameScene extends Phaser.Scene {
       // All scheduled enemies are dead; residual bullets must not harm the player.
       this.enemyProjectiles?.clear(true, true);
       this.clearBossBombs();
-      this.run.clearRoom(this.roomProgress.roomNumber);
+      // RunLedger tracks unique clears: extra death events must never grant
+      // repeated healing or gold for an already cleared chamber.
+      if (this.run.clearRoom(this.roomProgress.roomNumber)) {
+        this.grantRoomClearHealing(this.roomProgress.roomNumber);
+      }
       this.openDoor();
       if (this.roomProgress.roomNumber < CHAPTER_ROOM_COUNT &&
         this.roomProgress.roomNumber % 2 === 0 && this.roomProgress.roomNumber % 5 !== 0) {
@@ -739,6 +744,29 @@ export class GameScene extends Phaser.Scene {
     }
     this.updateGoldHud();
   };
+
+  private grantRoomClearHealing(clearedRoom: number): void {
+    if (!this.player) return;
+    const reward = roomClearHealing(
+      clearedRoom, this.player.currentHp, this.player.maxHp,
+    );
+    const restored = this.player.heal(reward.amount);
+    if (restored <= 0) return;
+    this.drawPlayerHealth();
+
+    const label = reward.boss ? 'BOSSBONUS' :
+      reward.milestone ? 'MIJLPAAL' : 'KAMER VOLTOOID';
+    const toast = this.add.text(195, 115, `+${Math.ceil(restored)} HP  ·  ${label}`, {
+      color: '#86efac', fontFamily: 'system-ui, sans-serif',
+      fontSize: '14px', fontStyle: 'bold',
+      stroke: '#020617', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(130).setScrollFactor(0);
+    this.tweens.add({
+      targets: toast, y: 96, alpha: 0,
+      delay: 400, duration: 1300, ease: 'Sine.easeOut',
+      onComplete: () => toast.destroy(),
+    });
+  }
 
   private showDamageNumber(x: number, y: number, result: DamageResult): void {
     this.run.recordDamage(result.amount);

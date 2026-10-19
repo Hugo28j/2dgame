@@ -35,6 +35,15 @@ Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de br
 - **Variabele afmetingen**: breedte en hoogte groeien trapsgewijs tot ver boven de zichtbare viewport. De camera en dynamische physics-grenzen passen zich bij elke kamer aan; kogels despawnen pas voorbij de échte kamerrand of hun eigen bereik.
 - De grafische sfeer en bestaande 50 kamers, bossen, besturing en opslag blijven behouden.
 
+## Uitgebreide kamerpatronen en herstel na kamers
+
+- **21 verschillende kamerpatronen** (12 nieuwe boven op de bestaande 9), met verschillende opstellingen van losstaande pilaren, ruïnes, hallen, tempels, poorten en crypten. Alle 21 verschijnen tijdens een volledige campagne van 50 kamers; bosskamers houden hun open arena zodat speciale aanvallen ontwijkbaar zijn.
+- Kamerbreedte, camerascrolling, vijandspawns en obstakelbeveiliging blijven werken. Nieuwe layout-elementen mogen de speler niet insluiten en vijanden mogen niet in obstakels verschijnen.
+- **HP-herstel bij het leegmaken van een kamer**: iedere voltooide kamer herstelt 6% van maximale HP, plus 1 procentpunt per 10 kamers voortgang (tot 10% bij kamer 41–50). Elke derde kamer komt daar 8 procentpunten bij, en elke vijfde (bosskamer) nog eens 14 procentpunten.
+- Het totale herstel per kamer is maximaal 30% van de maximale HP en stopt bij de maximale HP. Een verslagen speler wordt niet hersteld.
+- Een groene melding bij kamer-clear toont de werkelijk herstelde HP. Je bestaande **Herstel +35 HP**-keuze op de upgrade-kaarten blijft behouden.
+- Het herstel wordt precies één keer toegekend wanneer een kamer voor het eerst wordt voltooid; wachten of opnieuw door een geopende deur lopen levert niets extra's op.
+
 ## Huidige fase
 
 Fase 8 – Progressie en economie:
