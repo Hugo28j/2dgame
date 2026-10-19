@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_SCENE_KEY, MENU_SCENE_KEY } from '../config/constants';
+import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
 import {
   HERO_IDS, HEROES, getHeroStats, heroUpgradeCost, MAX_HERO_LEVEL,
 } from '../heroes/heroConfig';
@@ -47,7 +48,7 @@ export class MainMenuScene extends Phaser.Scene {
     else this.drawSettings();
 
     this.button(195, 763, 340, 61, '▶   SPELEN', () => this.scene.start(GAME_SCENE_KEY), 'primary', false, 22);
-    this.text(195, 807, '20 KAMERS  ·  4 BOSSEN  ·  ELKE RUN IS ANDERS', 10, COLOR.faint, true);
+    this.text(195, 807, '50 KAMERS  ·  10 BOSSEN  ·  ELKE RUN IS ANDERS', 10, COLOR.faint, true);
 
     this.input.keyboard?.on('keydown', this.captureBinding);
     // Capture before Phaser delivers game-object clicks; the click that opens
@@ -94,7 +95,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.text(260, 135, 'GOUD', 10, COLOR.faint);
     this.text(260, 151, profile.gold.toLocaleString('nl-BE') + '  G', 17, '#fde68a', false, true);
     this.text(23, 189, 'KIES JE LOADOUT', 10, COLOR.faint);
-    this.text(367, 189, 'BESTE KAMER ' + profile.highestRoom + '/20', 10, COLOR.secondary, true);
+    this.text(367, 189, 'BESTE KAMER ' + profile.highestRoom + '/' + CHAPTER_ROOM_COUNT, 10, COLOR.secondary, true);
   }
 
   private drawNavigation(): void {
@@ -227,7 +228,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.plate(195, 348, 328, 76, COLOR.card, COLOR.border, 11);
     this.text(46, 322, 'AVONTURENPROFIEL', 10, COLOR.faint);
     this.text(46, 344, 'Hoogste kamer bereikt', 12, COLOR.secondary);
-    this.text(337, 344, profile.highestRoom + ' / 20', 16, '#7dd3fc', true, true);
+    this.text(337, 344, profile.highestRoom + ' / ' + CHAPTER_ROOM_COUNT, 16, '#7dd3fc', true, true);
     this.text(46, 365, 'Voortgang wordt lokaal opgeslagen', 10, COLOR.faint);
 
     this.button(195, 435, 328, 49,
