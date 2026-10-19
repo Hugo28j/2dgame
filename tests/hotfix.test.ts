@@ -47,7 +47,7 @@ describe('arcade group initialization regression', () => {
         events.push('add');
       },
     };
-    expect(addAndLaunch(group, shot, { x: 3, y: 4 }, 500)).toBe(shot);
+    expect(addAndLaunch(shot, () => group.add(shot), { x: 3, y: 4 }, 500)).toBe(shot);
     expect(events).toEqual(['add', 'velocity']);
     expect(shot.vx).toBeCloseTo(300);
     expect(shot.vy).toBeCloseTo(400);
@@ -56,9 +56,9 @@ describe('arcade group initialization regression', () => {
   it('does not produce NaN velocity for invalid or zero aim vectors', () => {
     const shot = { x: 1, y: 1, setVelocity(x: number, y: number) { this.x = x; this.y = y; } };
     const group = { add(_: typeof shot) { /* physics group registration */ } };
-    addAndLaunch(group, shot, { x: 0, y: 0 }, 200);
+    addAndLaunch(shot, () => group.add(shot), { x: 0, y: 0 }, 200);
     expect([shot.x, shot.y]).toEqual([0, 0]);
-    addAndLaunch(group, shot, { x: 1, y: 0 }, Infinity);
+    addAndLaunch(shot, () => group.add(shot), { x: 1, y: 0 }, Infinity);
     expect([shot.x, shot.y]).toEqual([0, 0]);
   });
 
@@ -71,7 +71,7 @@ describe('arcade group initialization regression', () => {
     const group = {
       add(sprite: typeof enemy) { sprite.bounded = false; events.push('add'); },
     };
-    expect(addBoundedEnemy(group, enemy)).toBe(enemy);
+    expect(addBoundedEnemy(enemy, () => group.add(enemy))).toBe(enemy);
     expect(events).toEqual(['add', 'bounds']);
     expect(enemy.bounded).toBe(true);
   });
