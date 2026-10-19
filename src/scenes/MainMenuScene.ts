@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_SCENE_KEY, MENU_SCENE_KEY } from '../config/constants';
 import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
+import { WORLDS, isWorldUnlocked, getWorld } from '../worlds/worldConfig';
 import {
   HERO_IDS, HEROES, getHeroStats, heroUpgradeCost, MAX_HERO_LEVEL,
 } from '../heroes/heroConfig';
@@ -16,7 +17,7 @@ import {
   WEAPON_IDS, WEAPONS, getWeaponStats, weaponUpgradeCost, MAX_WEAPON_LEVEL,
 } from '../weapons/weaponConfig';
 
-type MenuTab = 'heroes' | 'weapons' | 'upgrades' | 'settings';
+type MenuTab = 'worlds' | 'heroes' | 'weapons' | 'upgrades' | 'settings';
 type ButtonStyle = 'normal' | 'selected' | 'primary' | 'danger' | 'quiet';
 const FONT = 'system-ui, sans-serif';
 const COLOR = {
@@ -26,7 +27,7 @@ const COLOR = {
 } as const;
 
 export class MainMenuScene extends Phaser.Scene {
-  private tab: MenuTab = 'heroes';
+  private tab: MenuTab = 'worlds';
   private upgradeCategory: 'equipment' | 'permanent' = 'permanent';
   private settingsView: 'general' | 'controls' = 'general';
   private resetRequested = false;
@@ -42,14 +43,16 @@ export class MainMenuScene extends Phaser.Scene {
     this.drawNavigation();
     this.plate(195, 478, 354, 474, COLOR.panel, COLOR.border, 17);
 
-    if (this.tab === 'heroes') this.drawHeroes();
+    if (this.tab === 'worlds') this.drawWorlds();
+    else if (this.tab === 'heroes') this.drawHeroes();
     else if (this.tab === 'weapons') this.drawWeapons();
     else if (this.tab === 'upgrades') this.drawUpgrades();
     else if (this.settingsView === 'controls') this.drawControls();
     else this.drawSettings();
 
-    this.button(195, 763, 340, 61, '▶   SPELEN', () => this.scene.start(GAME_SCENE_KEY), 'primary', false, 22);
-    this.text(195, 807, '50 KAMERS  ·  10 BOSSEN  ·  ELKE RUN IS ANDERS', 10, COLOR.faint, true);
+    this.button(195, 763, 340, 61, '▶   SPEEL ' + getWorld(progressStore.current.selectedWorld).name.toUpperCase(),
+      () => this.scene.start(GAME_SCENE_KEY), 'primary', false, 14);
+    this.text(195, 807, '5 WERELDEN  ·  50 KAMERS  ·  10 BOSSEN PER WERELD', 10, COLOR.faint, true);
 
     this.input.keyboard?.on('keydown', this.captureBinding);
     // Capture before Phaser delivers game-object clicks; the click that opens
@@ -95,18 +98,20 @@ export class MainMenuScene extends Phaser.Scene {
     this.add.rectangle(234, 148, 1, 36, 0x415772, 0.85);
     this.text(260, 135, 'GOUD', 10, COLOR.faint);
     this.text(260, 151, profile.gold.toLocaleString('nl-BE') + '  G', 17, '#fde68a', false, true);
-    this.text(23, 189, 'KIES JE LOADOUT', 10, COLOR.faint);
-    this.text(367, 189, 'BESTE KAMER ' + profile.highestRoom + '/' + CHAPTER_ROOM_COUNT, 10, COLOR.secondary, true);
+    this.text(23, 189, 'WERELD ' + profile.selectedWorld + '/5', 10, COLOR.faint);
+    this.text(367, 189, 'RECORD ' + profile.worldBestRooms[profile.selectedWorld - 1] +
+      '/' + CHAPTER_ROOM_COUNT, 10, COLOR.secondary, true);
   }
 
   private drawNavigation(): void {
     const tabs: Array<[MenuTab, string]> = [
-      ['heroes', 'HELDEN'], ['weapons', 'WAPENS'], ['upgrades', 'UPGRADES'], ['settings', 'OPTIES'],
+      ['worlds', 'WERELDEN'], ['heroes', 'HELDEN'], ['weapons', 'WAPENS'],
+      ['upgrades', 'UPGR.'], ['settings', 'OPTIES'],
     ];
     tabs.forEach(([tab, label], i) => {
-      const x = 59 + i * 91;
-      this.button(x, 221, 84, 38, label, () => this.chooseTab(tab),
-        this.tab === tab ? 'selected' : 'quiet', false, 10);
+      const x = 41 + i * 77;
+      this.button(x, 221, 72, 38, label, () => this.chooseTab(tab),
+        this.tab === tab ? 'selected' : 'quiet', false, 9);
     });
   }
 
@@ -122,6 +127,32 @@ export class MainMenuScene extends Phaser.Scene {
   private runAction(action: ProfileAction): void {
     progressStore.dispatch(action);
     this.scene.restart();
+  }
+
+  private drawWorlds(): void {
+    this.section('KIES JE WERELD', 'Voltooi kamer 50 om de volgende wereld te openen');
+    const profile = progressStore.current;
+    WORLDS.forEach(world => {
+      const y = 329 + (world.id - 1) * 77;
+      const unlocked = isWorldUnlocked(world.id, profile.completedWorlds);
+      const selected = world.id === profile.selectedWorld;
+      this.plate(195, y, 328, 70, selected ? 0x21374a : COLOR.card,
+        selected ? world.accent : COLOR.border, 11);
+      this.add.circle(50, y - 10, 12, world.accent, unlocked ? 0.9 : 0.25);
+      this.text(72, y - 21, world.id + '. ' + world.name.toUpperCase(), 12,
+        unlocked ? COLOR.white : COLOR.faint, false, true);
+      this.text(72, y - 2, world.subtitle, 9, COLOR.secondary);
+      this.text(72, y + 19, unlocked ?
+        ('RECORD ' + profile.worldBestRooms[world.id - 1] + '/50  ·  ' +
+          (world.id <= profile.completedWorlds ? 'VOLTOOID' : 'NOG TE VERSLAAN')) :
+        'VERGRENDELD  ·  SPEEL VORIGE WERELD UIT', 9,
+        unlocked ? '#86efac' : COLOR.faint);
+      this.button(311, y - 1, 62, 32, selected ? 'ACTIEF' : unlocked ? 'KIES' : '🔒',
+        () => this.runAction({ type: 'selectWorld', id: world.id }),
+        selected ? 'selected' : 'normal', selected || !unlocked, 10);
+    });
+    this.text(195, 695, 'TOTAAL VERDIEND: ' + profile.totalGoldEarned.toLocaleString('nl-BE') + ' G',
+      11, '#fde68a', true, true);
   }
 
   private drawHeroes(): void {
@@ -230,7 +261,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.text(46, 322, 'AVONTURENPROFIEL', 10, COLOR.faint);
     this.text(46, 344, 'Hoogste kamer bereikt', 12, COLOR.secondary);
     this.text(337, 344, profile.highestRoom + ' / ' + CHAPTER_ROOM_COUNT, 16, '#7dd3fc', true, true);
-    this.text(46, 365, 'Voortgang wordt lokaal opgeslagen', 10, COLOR.faint);
+    this.text(46, 365, 'Totaal verdiend: ' + profile.totalGoldEarned + ' G · lokaal opgeslagen', 10, COLOR.faint);
 
     this.button(195, 435, 328, 49,
       'MUZIEK   ·   ' + (profile.settings.musicEnabled ? 'AAN' : 'UIT'), () => this.runAction({
