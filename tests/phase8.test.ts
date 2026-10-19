@@ -15,12 +15,16 @@ describe('phase 8 run rewards', () => {
     expect(run.defeatEnemy('boss-2', 'boss')).toBe(true);
     expect(run.clearRoom(5)).toBe(true);
     expect(run.clearRoom(5)).toBe(false);
+    // Kills and cleared rooms no longer give free gold.
+    expect(run.runGold).toBe(0);
+    expect(run.collectGold(2)).toBe(true);
+    expect(run.collectGold(5)).toBe(true);
     run.recordDamage(27);
     run.recordDamage(-12);
     expect(run.report(true)).toEqual({
       runId: 'test-run', reachedRoom: 5, roomsCleared: 1,
       enemiesDefeated: 2, bossesDefeated: 1, totalDamage: 27,
-      earnedGold: 5 + 90 + 20 + 15 + 70, victory: true,
+      earnedGold: 7, victory: true,
     });
   });
 
