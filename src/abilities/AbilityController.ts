@@ -117,6 +117,7 @@ export class AbilityController {
     if (this.blocked()) return false;
     const ability = ABILITIES[id];
 
+    if (!this.cooldowns.ready(id, now)) return false;
     // Establish a meaningful direction before spending the dash cooldown.
     const move = this.inputs.getMovement();
     const aim = this.inputs.getAim(this.player.x, this.player.y);
