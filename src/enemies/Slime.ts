@@ -21,6 +21,8 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
   private avoidanceUntil = 0;
   private avoidanceVelocity = { x: 0, y: 0 };
   private currentHp: number;
+  private slowedUntil = 0;
+  private slowFactor = 1;
   private readonly healthBar: Phaser.GameObjects.Graphics;
 
   public constructor(
@@ -67,6 +69,12 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
       return;
     }
 
+    const now = this.scene.time.now;
+    if (this.slowFactor !== 1 && now >= this.slowedUntil) {
+      this.slowFactor = 1;
+      this.clearTint();
+    }
+    const currentSpeed = this.movementSpeed * this.slowFactor;
     const body = this.body;
     const blockedHorizontally =
       body instanceof Phaser.Physics.Arcade.Body && (body.blocked.left || body.blocked.right);
@@ -78,7 +86,7 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
         blockedHorizontally,
         targetX - this.x,
         targetY - this.y,
-        this.movementSpeed,
+        currentSpeed,
         this.avoidanceSign,
       );
       this.avoidanceUntil = this.scene.time.now + 420;
@@ -91,11 +99,21 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
           this.y,
           targetX,
           targetY,
-          this.movementSpeed,
+          currentSpeed,
         );
     this.setVelocity(velocity.x, velocity.y);
     this.setFlipX(velocity.x < 0);
     this.drawHealthBar();
+  }
+
+  /** A timed, refreshable slow that never affects defeated enemies. */
+  public applySlow(now: number, durationMs: number, factor: number): void {
+    if (this.aiState === 'defeated' || durationMs <= 0) return;
+    if (this.slowedUntil <= now) this.slowFactor = 1;
+    this.slowFactor = Math.min(this.slowFactor, Math.max(0.1, Math.min(1, factor)));
+    this.slowedUntil = Math.max(this.slowedUntil, now + durationMs);
+    this.avoidanceUntil = 0;
+    this.setTint(0x67e8f9);
   }
 
   public receiveDamage(amount: number): boolean {
@@ -112,7 +130,8 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
     this.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
     this.scene.time.delayedCall(70, () => {
       if (this.active && this.aiState === 'chasing') {
-        this.clearTint();
+        if (this.scene.time.now < this.slowedUntil) this.setTint(0x67e8f9);
+        else this.clearTint();
       }
     });
   }

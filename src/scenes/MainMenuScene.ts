@@ -43,7 +43,7 @@ export class MainMenuScene extends Phaser.Scene {
     else this.drawUpgrades();
 
     this.button(195, 758, 300, 62, '▶  PLAY', () => this.scene.start(GAME_SCENE_KEY), true);
-    this.add.text(195, 808, 'Fase 5 · Je voortgang wordt lokaal bewaard', {
+    this.add.text(195, 808, 'Fase 6 · Abilities: 1 / 2 / 3', {
       fontFamily: FONT, fontSize: '11px', color: '#64748b',
     }).setOrigin(0.5);
   }

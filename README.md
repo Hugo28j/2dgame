@@ -4,20 +4,20 @@ Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de br
 
 ## Huidige fase
 
-Fase 5 – Heroes en wapensysteem:
+Fase 6 – Active abilities:
 
-- selecteer Ranger, Mage of Guardian in een nieuw hoofdmenu;
-- drie visueel verschillende heroes met eigen stats en passieve kenmerken;
-- Bow, Crossbow, Magic Staff, Daggers en Lightning Wand met eigen aanvalspatronen;
-- sneller/meervoudig vuur, piercing, korte afstand, magische damage en chain lightning;
-- afzonderlijke hero- en wapenupgrades (maximaal level 20);
-- ontgrendelen, selecteren en upgraden via het hoofdmenu;
-- basale goudbeloning bij het voltooien van kamers om de aankopen te testen;
-- lokale opslag van keuzes en upgrades via een gevalideerd versieerbaar profiel;
-- fase-4-kamers, Slimes en joysticks blijven bestaan.
+- **Dash (1)**: korte, gerichte versnelling in de beweegrichting (of laatste aim), met 140 ms contactbescherming. Botsingen met muren en obstakels blijven actief.
+- **Fire Nova (2)**: directe cirkelvormige aanval rond de speler, met schade via het centrale damage-systeem.
+- **Ice Blast (3)**: cirkelvormige aanval die Slimes schade geeft en de overlevenden tijdelijk vertraagt.
+- Drie touchknoppen boven de rechter joystick, tegelijk te gebruiken met beide joysticks (Phaser multitouch).
+- Desktopbediening met toetsen 1, 2, 3; de bestaande WASD/muisbesturing blijft behouden.
+- Per ability een eigen cooldown, aangepast aan de geselecteerde hero; blokkering tijdens cooldown of bij game over.
+- Zichtbare countdowns en gekleurde cooldown-ringen, bijbehorende visuele effecten.
+- Cooldowns lopen op Phaser-speltijd door tussen kamers en worden niet gepasseerd bij een nieuw vertrek uit een kamer.
+- Unit tests voor cooldowns, dash-vectoren en area-of-effect targeting.
 
-De volwaardige run-economie, beloningsschermen en uitgebreid savebeleid volgen in fase 8.
-Abilities volgen in fase 6; extra vijanden en bosses in fase 7.
+**Dit is fase 6;** extra vijandtypes en de echte boss volgen in fase 7.
+De volledige goud/run-economie en uitgebreide savevoorzieningen volgen in fase 8.
 
 ## Lokaal starten
 
@@ -51,6 +51,7 @@ De productiebuild gebruikt het basispad `/2dgame/`, passend bij:
 
 ```text
 src/
+├── abilities/  # actieve vaardigheden, cooldowns en HUD
 ├── config/     # spelconfiguratie en constanten
 ├── combat/     # centrale schaderekening
 ├── enemies/    # vijandconfiguratie, spawning en AI-modules

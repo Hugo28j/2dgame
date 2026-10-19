@@ -23,5 +23,5 @@
 
 ## Huidige status
 
-- Actieve ontwikkelfase: **fase 5 – Heroes en wapensysteem**.
-- Volgende fase na afzonderlijke goedkeuring: **fase 6 – Active abilities**.
+- Actieve ontwikkelfase: **fase 6 – Active abilities**.
+- Volgende fase na afzonderlijke goedkeuring: **fase 7 – Geavanceerde vijanden en boss**.

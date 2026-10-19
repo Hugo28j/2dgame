@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { AbilityController } from '../abilities/AbilityController';
 
 import { DamageSystem, type DamageResult } from '../combat/damage';
 import { GAME_SCENE_KEY, GAME_TITLE, MENU_SCENE_KEY } from '../config/constants';
@@ -37,6 +38,7 @@ export class GameScene extends Phaser.Scene {
   private player?: Player;
   private controls?: InputController;
   private weapon?: WeaponController;
+  private abilities?: AbilityController;
   private goldHudText?: Phaser.GameObjects.Text;
   private projectiles?: Phaser.Physics.Arcade.Group;
   private enemies?: Phaser.Physics.Arcade.Group;
@@ -103,6 +105,11 @@ export class GameScene extends Phaser.Scene {
     this.createCollisions();
     this.loadRoom(firstRoom, false);
     this.drawPlayerHealth();
+    this.abilities = new AbilityController(
+      this, this.player, this.enemies, this.controls, this.damageSystem,
+      (x, y, result) => this.showDamageNumber(x, y, result),
+      () => this.gameOver || this.transitioning || this.chapterComplete,
+    );
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
@@ -126,6 +133,7 @@ export class GameScene extends Phaser.Scene {
     this.player.move(this.controls.getMovement());
     const aim = this.controls.getAim(this.player.x, this.player.y);
     this.player.face(aim);
+    this.abilities?.update(this.time.now);
     this.weapon.update(this.time.now, this.controls.isShooting(), aim);
 
     for (const child of this.enemies.getChildren()) {
@@ -211,7 +219,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.add
-      .text(195, 658, 'WASD · muis + linksklik', {
+      .text(107, 660, 'WASD + muis', {
         color: '#64748b',
         fontFamily: 'system-ui, sans-serif',
         fontSize: '12px',
@@ -230,7 +238,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(10);
 
-    this.goldHudText = this.add.text(195, 687, '', {
+    this.goldHudText = this.add.text(107, 692, '', {
       color: '#fbbf24', fontFamily: 'system-ui, sans-serif',
       fontSize: '12px', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(10);
@@ -302,6 +310,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    this.abilities?.cancelMotion();
     this.enemies.clear(true, true);
     this.projectiles.clear(true, true);
     this.obstacles.clear(true, true);
@@ -610,6 +619,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private finishChapterRooms(): void {
+    this.abilities?.cancelMotion();
     this.chapterComplete = true;
     this.transitioning = false;
     this.add
@@ -644,6 +654,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.gameOver = true;
+    this.abilities?.cancelMotion();
     this.player.setVelocity(0, 0);
     this.player.setTint(0x7f1d1d).setTintMode(Phaser.TintModes.FILL);
     for (const child of this.enemies?.getChildren() ?? []) {
@@ -679,6 +690,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private shutdown(): void {
+    this.abilities?.destroy();
+    this.abilities = undefined;
     this.controls?.destroy();
     this.projectiles?.clear(true, true);
     this.enemies?.clear(true, true);
