@@ -15,6 +15,8 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
   public readonly contactAttack: Readonly<AttackData>;
   public readonly attackIntervalMs: number;
   public aiState: SlimeAiState = 'chasing';
+  public get healthRatio(): number { return this.currentHp / this.maxHp; }
+  public get slowMultiplier(): number { return this.slowFactor; }
   private readonly maxHp: number;
   private readonly movementSpeed: number;
   private readonly avoidanceSign: -1 | 1;

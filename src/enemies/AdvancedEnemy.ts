@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { getEnemyStatsForRoom, type EnemyKind, type SlimeRuntimeStats } from './enemyConfig';
-import { bossPhase, rangedVelocity, withinRadius } from './enemyMovement';
+import { bossPhase, rangedVelocity } from './enemyMovement';
 import { Slime } from './Slime';
 
 export type BulletPattern = 'single' | 'double' | 'fan' | 'radial';
@@ -62,7 +62,7 @@ export class AdvancedEnemy extends Slime {
         // Slow, hard-hitting chaser: super.chase already includes obstacle avoidance.
         break;
       case 'charger':
-        this.chargeLogic(targetX, targetY, now, distance, speed, 2300);
+        this.chargeLogic(targetX, targetY, now, distance, 2300);
         break;
       case 'bomber':
         if (this.windupEndsAt > 0) {
@@ -88,7 +88,7 @@ export class AdvancedEnemy extends Slime {
           fire(this, phase === 1 ? 'fan' : 'radial');
           this.nextShotAt = now + this.stats.attackIntervalMs * (phase === 2 ? 0.7 : 1);
         }
-        this.chargeLogic(targetX, targetY, now, distance, speed,
+        this.chargeLogic(targetX, targetY, now, distance,
           phase === 2 ? 3200 : 4900);
         break;
       }
@@ -96,7 +96,7 @@ export class AdvancedEnemy extends Slime {
   }
 
   private chargeLogic(targetX: number, targetY: number, now: number,
-    distance: number, speed: number, rechargeMs: number): void {
+    distance: number, rechargeMs: number): void {
     if (this.dashEndsAt > 0) {
       if (now < this.dashEndsAt) {
         this.setVelocity(this.dashX * (this.isBoss ? 360 : 430) * this.slowMultiplier,
@@ -124,11 +124,6 @@ export class AdvancedEnemy extends Slime {
       this.windupEndsAt = now + (this.isBoss ? 770 : 540);
       this.setVelocity(0, 0);
       this.drawWarning(70, 0xef4444);
-    } else if (this.kind === 'charger') {
-      // Chase until charge can start.
-      this.setVelocity(this.body instanceof Phaser.Physics.Arcade.Body ?
-        this.body.velocity.x : 0, this.body instanceof Phaser.Physics.Arcade.Body ?
-        this.body.velocity.y : speed);
     }
   }
 
