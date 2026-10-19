@@ -44,6 +44,14 @@ Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de br
 - Een groene melding bij kamer-clear toont de werkelijk herstelde HP. Je bestaande **Herstel +35 HP**-keuze op de upgrade-kaarten blijft behouden.
 - Het herstel wordt precies één keer toegekend wanneer een kamer voor het eerst wordt voltooid; wachten of opnieuw door een geopende deur lopen levert niets extra's op.
 
+## Spawn-golven en onmiddellijke Game Over
+
+- Het aantal vijanden groeit van 3 aan het begin tot **31 in kamer 49**. Bosskamers bevatten nog altijd één unieke boss.
+- Vijanden starten vanaf latere kamers steeds verder van de oorspronkelijke speler-spawn (tot minimaal 340 gamepixels); locaties liggen buiten obstakels en zijn verspreid over de grote arena.
+- Vanaf kamer 11 verschijnen ze in **gespreide golven**: de eerste groep is kleiner; extra groepen verschijnen op afstand van de **actuele positie van de speler**. De maximale hoeveelheid tegelijk actieve vijanden wordt begrensd, zodat late kamers uitdagender worden zonder alle vijanden op één frame te maken.
+- Wanneer HP nul wordt, wordt de vorige spelscene meteen in slaap gezet en het **Game Over-scherm direct gestart**. De zware cleanup van vijanden, projectielen en timers volgt pas nadat het eerste resultatenframe kan worden weergegeven. Het hoofdmenu en Opnieuw spelen blijven beschikbaar.
+- Goud/voortgang wordt bij het einde van de run nog steeds maar één keer opgeslagen.
+
 ## Huidige fase
 
 Fase 8 – Progressie en economie:
