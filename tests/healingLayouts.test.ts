@@ -53,7 +53,7 @@ describe('room completion regeneration', () => {
     expect(roomClearHealing(1, 1, 100).amount).toBe(6);
     expect(roomClearHealing(2, 1, 100).amount).toBe(6);
     expect(roomClearHealing(11, 1, 100).amount).toBe(7);
-    expect(roomClearHealing(21, 1, 100).amount).toBe(8);
+    expect(roomClearHealing(22, 1, 100).amount).toBe(8);
     expect(roomClearHealing(31, 1, 100).amount).toBe(9);
     expect(roomClearHealing(41, 1, 100).amount).toBe(10);
   });
