@@ -4,21 +4,20 @@ Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de br
 
 ## Huidige fase
 
-Fase 4 – Kamersysteem en deuren:
+Fase 5 – Heroes en wapensysteem:
 
-- twintig opeenvolgende kamers per hoofdstuk;
-- vier herbruikbare kamerindelingen met muren en obstakels;
-- veilige, vooraf gedefinieerde speler- en vijandspawns;
-- meerdere Slimes per kamer;
-- een gesloten deur die alleen na alle geplande kills opent;
-- laden van de volgende kamer wanneer de speler de geopende deur bereikt;
-- behoud van huidige speler-HP tussen kamers;
-- configureerbare scaling van vijandaantal, HP en damage;
-- ieder vijfde kamernummer is gereserveerd als bosskamer-slot;
-- eenvoudige obstacle avoidance voor Slimes;
-- projectielen verdwijnen bij een obstakel.
+- selecteer Ranger, Mage of Guardian in een nieuw hoofdmenu;
+- drie visueel verschillende heroes met eigen stats en passieve kenmerken;
+- Bow, Crossbow, Magic Staff, Daggers en Lightning Wand met eigen aanvalspatronen;
+- sneller/meervoudig vuur, piercing, korte afstand, magische damage en chain lightning;
+- afzonderlijke hero- en wapenupgrades (maximaal level 20);
+- ontgrendelen, selecteren en upgraden via het hoofdmenu;
+- basale goudbeloning bij het voltooien van kamers om de aankopen te testen;
+- lokale opslag van keuzes en upgrades via een gevalideerd versieerbaar profiel;
+- fase-4-kamers, Slimes en joysticks blijven bestaan.
 
-Echte bosses, extra vijandtypes, abilities, hero-selectie, permanente upgrades en saves horen bij latere fasen.
+De volwaardige run-economie, beloningsschermen en uitgebreid savebeleid volgen in fase 8.
+Abilities volgen in fase 6; extra vijanden en bosses in fase 7.
 
 ## Lokaal starten
 
@@ -56,6 +55,8 @@ src/
 ├── combat/     # centrale schaderekening
 ├── enemies/    # vijandconfiguratie, spawning en AI-modules
 ├── entities/   # Phaser-gameobjecten zoals de speler
+├── heroes/     # hero-definities, stats en passieve eigenschappen
+├── progression/# voortgang, aankopen en lokale opslag
 ├── input/      # joysticks, pointer ownership en invoerlogica
 ├── rooms/      # layouts, difficulty scaling en kamerprogressie
 ├── scenes/     # Phaser-scenes
