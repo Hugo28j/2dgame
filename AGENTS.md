@@ -23,5 +23,5 @@
 
 ## Huidige status
 
-- Actieve ontwikkelfase: **fase 4 – Kamersysteem en deuren**.
-- Volgende fase na afzonderlijke goedkeuring: **fase 5 – Heroes en wapensysteem**.
+- Actieve ontwikkelfase: **fase 5 – Heroes en wapensysteem**.
+- Volgende fase na afzonderlijke goedkeuring: **fase 6 – Active abilities**.

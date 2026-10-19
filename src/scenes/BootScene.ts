@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
+import { HERO_IDS, HEROES } from '../heroes/heroConfig';
 
 import {
   ARROW_TEXTURE_KEY,
   BOOT_SCENE_KEY,
-  GAME_SCENE_KEY,
+  MENU_SCENE_KEY,
   PLAYER_TEXTURE_KEY,
   SLIME_TEXTURE_KEY,
   TARGET_TEXTURE_KEY,
@@ -19,7 +20,9 @@ export class BootScene extends Phaser.Scene {
     this.createArrowTexture();
     this.createTargetTexture();
     this.createSlimeTexture();
-    this.scene.start(GAME_SCENE_KEY);
+    this.createHeroTextures();
+    this.createWeaponTextures();
+    this.scene.start(MENU_SCENE_KEY);
   }
 
   private createPlayerTexture(): void {
@@ -87,4 +90,44 @@ export class BootScene extends Phaser.Scene {
     graphics.generateTexture(SLIME_TEXTURE_KEY, 40, 40);
     graphics.destroy();
   }
+  private createHeroTextures(): void {
+    HERO_IDS.forEach(id => {
+      const hero = HEROES[id];
+      if (this.textures.exists(hero.textureKey)) return;
+      const graphics = this.make.graphics({ x: 0, y: 0 }, false);
+      graphics.fillStyle(0x0f172a); graphics.fillCircle(24, 24, 21);
+      graphics.fillStyle(hero.color); graphics.fillCircle(24, 24, 16);
+      graphics.fillStyle(0xf8fafc); graphics.fillTriangle(24, 14, 46, 24, 24, 34);
+      graphics.lineStyle(3, 0xe2e8f0); graphics.strokeCircle(24, 24, 16);
+      graphics.generateTexture(hero.textureKey, 48, 48);
+      graphics.destroy();
+    });
+  }
+
+  private createWeaponTextures(): void {
+    const colors: Record<string, number> = {
+      'bolt-projectile': 0xfca5a5,
+      'magic-projectile': 0xc084fc,
+      'dagger-projectile': 0xe2e8f0,
+      'lightning-projectile': 0x67e8f9,
+    };
+    Object.entries(colors).forEach(([key, color]) => {
+      if (this.textures.exists(key)) return;
+      const graphics = this.make.graphics({ x: 0, y: 0 }, false);
+      graphics.fillStyle(color);
+      if (key === 'magic-projectile') {
+        graphics.fillCircle(12, 12, 9);
+        graphics.fillStyle(0xffffff); graphics.fillCircle(12, 12, 3);
+      } else if (key === 'lightning-projectile') {
+        graphics.fillTriangle(6, 3, 21, 10, 11, 21);
+        graphics.fillStyle(0xffffff); graphics.fillCircle(12, 12, 3);
+      } else {
+        graphics.fillRect(2, 9, 20, 6);
+        graphics.fillTriangle(14, 3, 24, 12, 14, 21);
+      }
+      graphics.generateTexture(key, 24, 24);
+      graphics.destroy();
+    });
+  }
+
 }

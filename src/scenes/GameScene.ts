@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 
 import { DamageSystem, type DamageResult } from '../combat/damage';
-import { GAME_SCENE_KEY, GAME_TITLE } from '../config/constants';
+import { GAME_SCENE_KEY, GAME_TITLE, MENU_SCENE_KEY } from '../config/constants';
 import { ARENA_BOUNDS } from '../config/gameplay';
 import { EnemySpawner } from '../enemies/EnemySpawner';
 import { getSlimeStatsForRoom } from '../enemies/enemyConfig';
@@ -19,8 +19,10 @@ import {
   type RoomDefinition,
 } from '../rooms/roomConfig';
 import { RoomProgress } from '../rooms/RoomProgress';
-import { BowWeapon } from '../weapons/BowWeapon';
-import { BOW_CONFIG } from '../weapons/weaponConfig';
+import { WeaponController } from '../weapons/WeaponController';
+import { WEAPONS } from '../weapons/weaponConfig';
+import { progressStore } from '../progression/ProgressStore';
+import { findChainTargets } from '../weapons/chainLightning';
 
 type ArcadeCollisionObject =
   | Phaser.Types.Physics.Arcade.GameObjectWithBody
@@ -34,7 +36,8 @@ const DOOR_Y = ARENA_BOUNDS.y + 16;
 export class GameScene extends Phaser.Scene {
   private player?: Player;
   private controls?: InputController;
-  private weapon?: BowWeapon;
+  private weapon?: WeaponController;
+  private goldHudText?: Phaser.GameObjects.Text;
   private projectiles?: Phaser.Physics.Arcade.Group;
   private enemies?: Phaser.Physics.Arcade.Group;
   private obstacles?: Phaser.Physics.Arcade.StaticGroup;
@@ -76,16 +79,22 @@ export class GameScene extends Phaser.Scene {
     );
 
     const firstRoom = getRoomDefinition(1);
+    const profile = progressStore.current;
     this.player = new Player(
       this,
       firstRoom.layout.playerSpawn.x,
       firstRoom.layout.playerSpawn.y,
+      profile.selectedHero,
+      profile.heroLevels[profile.selectedHero],
     );
     this.controls = new InputController(this);
     this.projectiles = this.physics.add.group({ allowGravity: false });
     this.enemies = this.physics.add.group({ allowGravity: false });
     this.obstacles = this.physics.add.staticGroup();
-    this.weapon = new BowWeapon(this, this.player, this.projectiles);
+    this.weapon = new WeaponController(
+      this, this.player, this.projectiles,
+      profile.selectedWeapon, profile.weaponLevels[profile.selectedWeapon],
+    );
     this.enemySpawner = new EnemySpawner(this, this.enemies);
 
     this.events.on(ENEMY_SPAWNED_EVENT, this.handleEnemySpawned);
@@ -210,8 +219,9 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(10);
 
+    const profile = progressStore.current;
     this.add
-      .text(195, 62, `${BOW_CONFIG.name} · LV.${BOW_CONFIG.upgradeLevel}`, {
+      .text(195, 62, `${WEAPONS[profile.selectedWeapon].name} · LV.${profile.weaponLevels[profile.selectedWeapon]}`, {
         color: '#fbbf24',
         fontFamily: 'system-ui, sans-serif',
         fontSize: '12px',
@@ -219,6 +229,12 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(10);
+
+    this.goldHudText = this.add.text(195, 687, '', {
+      color: '#fbbf24', fontFamily: 'system-ui, sans-serif',
+      fontSize: '12px', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(10);
+    this.updateGoldHud();
   }
 
   private createDoor(): void {
@@ -437,7 +453,37 @@ export class GameScene extends Phaser.Scene {
     } else {
       targetObject.showHit();
     }
+    if (projectileObject.effect === 'chain-lightning') {
+      this.applyChainLightning(targetObject, projectileObject.attack);
+    }
   };
+
+  private applyChainLightning(primary: Slime, attack: Readonly<Projectile['attack']>): void {
+    if (!this.enemies) return;
+    const candidates = this.enemies.getChildren()
+      .filter((child): child is Slime => child instanceof Slime && child.aiState !== 'defeated')
+      .map(enemy => ({ enemyId: enemy.enemyId, x: enemy.x, y: enemy.y }));
+    const jumps = findChainTargets(primary, candidates);
+    let fromX = primary.x;
+    let fromY = primary.y;
+    for (const target of jumps) {
+      const enemy = this.enemies.getChildren()
+        .find((child): child is Slime => child instanceof Slime && child.enemyId === target.enemyId);
+      if (!enemy || enemy.aiState === 'defeated') continue;
+      const reduced = { ...attack, damage: attack.damage * 0.55, criticalChance: 0 };
+      const result = this.damageSystem.apply(enemy, reduced);
+      this.showDamageNumber(enemy.x, enemy.y, result);
+      const bolt = this.add.graphics().setDepth(26);
+      bolt.lineStyle(3, 0x67e8f9, 1);
+      bolt.lineBetween(fromX, fromY, enemy.x, enemy.y);
+      this.tweens.add({ targets: bolt, alpha: 0, duration: 170,
+        onComplete: () => bolt.destroy() });
+      if (result.defeated) enemy.playDefeat();
+      else enemy.showHit();
+      fromX = enemy.x;
+      fromY = enemy.y;
+    }
+  }
 
   private readonly handleProjectileObstacle = (
     projectileObject: ArcadeCollisionObject,
@@ -480,6 +526,9 @@ export class GameScene extends Phaser.Scene {
     this.updateEnemyCount();
     if (this.roomProgress.registerEnemyDefeated() && !this.gameOver) {
       this.openDoor();
+      // One payment per cleared room. Full run rewards follow in phase 8.
+      progressStore.dispatch({ type: 'awardGold', amount: 20 + this.roomProgress.roomNumber * 3 });
+      this.updateGoldHud();
     }
   };
 
@@ -556,6 +605,10 @@ export class GameScene extends Phaser.Scene {
     this.enemyCountText?.setText(`SLIMES ${this.aliveEnemies}`);
   }
 
+  private updateGoldHud(): void {
+    this.goldHudText?.setText(`GOUD: ${progressStore.current.gold}`);
+  }
+
   private finishChapterRooms(): void {
     this.chapterComplete = true;
     this.transitioning = false;
@@ -573,13 +626,16 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(71);
     this.add
-      .text(195, 382, 'Echte bosses volgen in fase 7', {
+      .text(195, 382, 'Tik voor hoofdmenu · Bosses in fase 7', {
         color: '#cbd5e1',
         fontFamily: 'system-ui, sans-serif',
         fontSize: '13px',
       })
       .setOrigin(0.5)
       .setDepth(71);
+    this.time.delayedCall(350, () => {
+      this.input.once(Phaser.Input.Events.POINTER_DOWN, () => this.scene.start(MENU_SCENE_KEY));
+    });
   }
 
   private endRun(): void {
@@ -610,7 +666,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(71);
     this.add
-      .text(195, 383, 'Tik om opnieuw te proberen', {
+      .text(195, 383, 'Tik om naar hoofdmenu te gaan', {
         color: '#cbd5e1',
         fontFamily: 'system-ui, sans-serif',
         fontSize: '14px',
@@ -618,7 +674,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(71);
     this.time.delayedCall(400, () => {
-      this.input.once(Phaser.Input.Events.POINTER_DOWN, () => this.scene.restart());
+      this.input.once(Phaser.Input.Events.POINTER_DOWN, () => this.scene.start(MENU_SCENE_KEY));
     });
   }
 
@@ -637,6 +693,7 @@ export class GameScene extends Phaser.Scene {
     this.enemySpawner = undefined;
     this.door = undefined;
     this.healthBar = undefined;
+    this.goldHudText = undefined;
     this.healthText = undefined;
     this.enemyCountText = undefined;
     this.roomNumberText = undefined;
