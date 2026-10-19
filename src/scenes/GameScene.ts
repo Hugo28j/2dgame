@@ -557,7 +557,7 @@ export class GameScene extends Phaser.Scene {
         Math.cos(direction), Math.sin(direction),
         speed, enemy.stats.damage, color,
       );
-      addAndLaunch(this.enemyProjectiles, bullet,
+      addAndLaunch(bullet, () => this.enemyProjectiles!.add(bullet),
         { x: Math.cos(direction), y: Math.sin(direction) }, speed);
     }
   };
