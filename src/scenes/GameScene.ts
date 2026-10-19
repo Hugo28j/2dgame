@@ -4,7 +4,6 @@ import { AbilityController } from '../abilities/AbilityController';
 import { DamageSystem, type DamageResult } from '../combat/damage';
 import { addAndLaunch } from '../combat/launchProjectile';
 import { GAME_SCENE_KEY, GAME_TITLE, GAME_OVER_SCENE_KEY } from '../config/constants';
-import { ARENA_BOUNDS } from '../config/gameplay';
 import { EnemySpawner } from '../enemies/EnemySpawner';
 import { getBossName } from '../enemies/enemyConfig';
 import { getBossProfile, getBossTier } from '../enemies/bossProfiles';
@@ -26,6 +25,7 @@ import {
   type RoomDefinition,
 } from '../rooms/roomConfig';
 import { RoomProgress } from '../rooms/RoomProgress';
+import { targetArenaScroll } from '../rooms/cameraFollow';
 import { WeaponController } from '../weapons/WeaponController';
 import { WEAPONS } from '../weapons/weaponConfig';
 import { progressStore } from '../progression/ProgressStore';
@@ -39,9 +39,6 @@ type ArcadeCollisionObject =
   | Phaser.Physics.Arcade.Body
   | Phaser.Physics.Arcade.StaticBody
   | Phaser.Tilemaps.Tile;
-
-const DOOR_X = ARENA_BOUNDS.x + ARENA_BOUNDS.width / 2;
-const DOOR_Y = ARENA_BOUNDS.y + 16;
 
 export class GameScene extends Phaser.Scene {
   private player?: Player;
@@ -60,6 +57,8 @@ export class GameScene extends Phaser.Scene {
   private obstacles?: Phaser.Physics.Arcade.StaticGroup;
   private enemySpawner?: EnemySpawner;
   private door?: Phaser.GameObjects.Rectangle;
+  private arenaArt?: Phaser.GameObjects.Container;
+  private currentRoom?: RoomDefinition;
   private healthBar?: Phaser.GameObjects.Graphics;
   private healthText?: Phaser.GameObjects.Text;
   private enemyCountText?: Phaser.GameObjects.Text;
@@ -91,16 +90,6 @@ export class GameScene extends Phaser.Scene {
     this.run = new RunLedger();
     this.upgrades = new RunUpgradeDeck();
     this.drawBackdrop();
-    this.physics.world.setBounds(
-      ARENA_BOUNDS.x,
-      ARENA_BOUNDS.y,
-      ARENA_BOUNDS.width,
-      ARENA_BOUNDS.height,
-      true,
-      true,
-      true,
-      true,
-    );
 
     const firstRoom = getRoomDefinition(1);
     const profile = progressStore.current;
@@ -157,6 +146,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.player.move(this.controls.getMovement());
+    this.updateCamera();
     const aim = this.controls.getAim(this.player.x, this.player.y);
     this.player.face(aim);
     this.abilities?.update(this.time.now);
@@ -183,7 +173,8 @@ export class GameScene extends Phaser.Scene {
 
     if (
       this.roomProgress.doorOpen &&
-      Phaser.Math.Distance.Between(this.player.x, this.player.y, DOOR_X, DOOR_Y) < 38
+      this.door && Phaser.Math.Distance.Between(this.player.x, this.player.y,
+        this.door.x, this.door.y) < 38
     ) {
       this.enterOpenDoor();
     }
@@ -199,7 +190,7 @@ export class GameScene extends Phaser.Scene {
         fontSize: '21px',
         fontStyle: 'bold',
       })
-      .setDepth(10);
+      .setDepth(10).setScrollFactor(0);
 
     this.roomNumberText = this.add
       .text(372, 14, 'KAMER 1/' + CHAPTER_ROOM_COUNT, {
@@ -232,26 +223,6 @@ export class GameScene extends Phaser.Scene {
       .setDepth(10);
 
     this.add
-      .rectangle(
-        ARENA_BOUNDS.x + ARENA_BOUNDS.width / 2,
-        ARENA_BOUNDS.y + ARENA_BOUNDS.height / 2,
-        ARENA_BOUNDS.width,
-        ARENA_BOUNDS.height,
-        0x142033,
-      )
-      .setStrokeStyle(6, 0x334155)
-      .setDepth(0);
-
-    const grid = this.add.graphics().setDepth(1);
-    grid.lineStyle(1, 0x26364c, 0.55);
-    for (let x = ARENA_BOUNDS.x + 30; x < ARENA_BOUNDS.x + ARENA_BOUNDS.width; x += 30) {
-      grid.lineBetween(x, ARENA_BOUNDS.y, x, ARENA_BOUNDS.y + ARENA_BOUNDS.height);
-    }
-    for (let y = ARENA_BOUNDS.y + 30; y < ARENA_BOUNDS.y + ARENA_BOUNDS.height; y += 30) {
-      grid.lineBetween(ARENA_BOUNDS.x, y, ARENA_BOUNDS.x + ARENA_BOUNDS.width, y);
-    }
-
-    this.add
       .text(107, 660, 'BESTURING: zie opties in menu', {
         color: '#64748b',
         fontFamily: 'system-ui, sans-serif',
@@ -274,13 +245,48 @@ export class GameScene extends Phaser.Scene {
     this.goldHudText = this.add.text(107, 692, '', {
       color: '#fbbf24', fontFamily: 'system-ui, sans-serif',
       fontSize: '12px', fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(10);
+    }).setOrigin(0.5).setDepth(10).setScrollFactor(0);
     this.updateGoldHud();
-    this.bossHealthBar = this.add.graphics().setDepth(41).setVisible(false);
+    this.bossHealthBar = this.add.graphics().setDepth(41).setScrollFactor(0).setVisible(false);
     this.bossNameText = this.add.text(195, 137, '', {
       color: '#fde68a', fontFamily: 'system-ui, sans-serif',
       fontSize: '13px', fontStyle: 'bold', stroke: '#020617', strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(42).setVisible(false);
+    }).setOrigin(0.5).setDepth(42).setScrollFactor(0).setVisible(false);
+  }
+
+  private updateCamera(): void {
+    if (!this.player || !this.currentRoom) return;
+    const target = targetArenaScroll(this.player.x, this.player.y, this.currentRoom.layout.bounds);
+    const camera = this.cameras.main;
+    camera.setScroll(Phaser.Math.Linear(camera.scrollX, target.x, 0.16),
+      Phaser.Math.Linear(camera.scrollY, target.y, 0.16));
+  }
+
+  /** Same established art direction, but nine different layouts and room-size
+   * dependent floor markings. Art is recycled at every room transition. */
+  private drawArena(room: RoomDefinition): void {
+    this.arenaArt?.destroy(true);
+    const { bounds, accent } = room.layout;
+    const plate = this.add.rectangle(
+      bounds.x + bounds.width / 2, bounds.y + bounds.height / 2,
+      bounds.width, bounds.height, 0x142033,
+    ).setStrokeStyle(6, accent, 0.65);
+    const floor = this.add.graphics();
+    floor.lineStyle(1, 0x26364c, 0.65);
+    for (let x = bounds.x + 30; x < bounds.x + bounds.width; x += 30) {
+      floor.lineBetween(x, bounds.y, x, bounds.y + bounds.height);
+    }
+    for (let y = bounds.y + 30; y < bounds.y + bounds.height; y += 30) {
+      floor.lineBetween(bounds.x, y, bounds.x + bounds.width, y);
+    }
+    floor.lineStyle(2, accent, 0.18);
+    for (let i = 0; i < 8; i++) {
+      const x = bounds.x + 44 + ((i * 157 + room.number * 37) % Math.max(50, bounds.width - 88));
+      const y = bounds.y + 48 + ((i * 231 + room.number * 53) % Math.max(55, bounds.height - 110));
+      floor.strokeCircle(x, y, 12 + (i % 3) * 9);
+      floor.lineBetween(x - 9, y, x + 9, y);
+    }
+    this.arenaArt = this.add.container(0, 0, [plate, floor]).setDepth(0);
   }
 
   private createDoor(): void {
@@ -289,14 +295,14 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.door = this.add
-      .rectangle(DOOR_X, DOOR_Y, 72, 22, 0x7f1d1d)
+      .rectangle(195, 98, 72, 22, 0x7f1d1d)
       .setStrokeStyle(3, 0xfca5a5)
       .setDepth(8);
     this.physics.add.existing(this.door, true);
     this.physics.add.collider(this.player, this.door);
 
     this.doorStatusText = this.add
-      .text(DOOR_X, DOOR_Y + 18, 'VERSLA ALLE VIJANDEN', {
+      .text(195, 116, 'VERSLA ALLE VIJANDEN', {
         color: '#fca5a5',
         fontFamily: 'system-ui, sans-serif',
         fontSize: '9px',
@@ -364,8 +370,19 @@ export class GameScene extends Phaser.Scene {
     this.projectiles.clear(true, true);
     this.obstacles.clear(true, true);
     this.aliveEnemies = 0;
+    this.currentRoom = room;
+    const bounds = room.layout.bounds;
+    this.physics.world.setBounds(bounds.x, bounds.y, bounds.width, bounds.height,
+      true, true, true, true);
+    this.cameras.main.setBounds(0, 0, bounds.x + bounds.width + 18,
+      bounds.y + bounds.height + 204);
+    this.drawArena(room);
     this.roomProgress.startRoom(room.enemyCount);
     this.run.enterRoom(room.number);
+    if (this.door) {
+      this.door.setPosition(bounds.x + bounds.width / 2, bounds.y + 16);
+      this.doorStatusText?.setPosition(this.door.x, this.door.y + 18);
+    }
     this.closeDoor();
     this.createObstacles(room);
 
@@ -375,6 +392,9 @@ export class GameScene extends Phaser.Scene {
     if (playerBody instanceof Phaser.Physics.Arcade.Body) {
       playerBody.reset(room.layout.playerSpawn.x, room.layout.playerSpawn.y);
     }
+
+    const initial = targetArenaScroll(this.player.x, this.player.y, bounds);
+    this.cameras.main.setScroll(initial.x, initial.y);
 
     const spawned = this.enemySpawner.spawnRoom(room);
     this.activeBoss = spawned.find(
@@ -480,7 +500,7 @@ export class GameScene extends Phaser.Scene {
         },
       )
       .setOrigin(0.5)
-      .setDepth(60);
+      .setDepth(60).setScrollFactor(0);
 
     this.tweens.add({
       targets: banner,
@@ -573,13 +593,15 @@ export class GameScene extends Phaser.Scene {
   private readonly dropBossBombs = (enemy: AdvancedEnemy, targetX: number, targetY: number,
     count: number, radius: number, windupMs: number): void => {
     if (!this.player || this.gameOver || this.transitioning || this.roomProgress.doorOpen) return;
+    const bounds = this.currentRoom?.layout.bounds;
+    if (!bounds) return;
     for (let i = 0; i < count; i++) {
       const angle = (i - 1) * Math.PI * 2 / Math.max(1, count - 1) + this.time.now / 1300;
       const distance = i === 0 ? 0 : 86;
       const x = Phaser.Math.Clamp(targetX + Math.cos(angle) * distance,
-        ARENA_BOUNDS.x + radius + 6, ARENA_BOUNDS.x + ARENA_BOUNDS.width - radius - 6);
+        bounds.x + radius + 6, bounds.x + bounds.width - radius - 6);
       const y = Phaser.Math.Clamp(targetY + Math.sin(angle) * distance,
-        ARENA_BOUNDS.y + radius + 6, ARENA_BOUNDS.y + ARENA_BOUNDS.height - radius - 6);
+        bounds.y + radius + 6, bounds.y + bounds.height - radius - 6);
       const warning = this.add.circle(x, y, radius, 0xfb923c, 0.14)
         .setStrokeStyle(3, 0xfbbf24, 0.92).setDepth(24);
       this.bombWarnings.add(warning);
@@ -741,7 +763,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     const ratio = this.player.currentHp / this.player.maxHp;
-    this.healthBar ??= this.add.graphics().setDepth(20);
+    this.healthBar ??= this.add.graphics().setDepth(120).setScrollFactor(0);
     this.healthBar.clear();
     this.healthBar.fillStyle(0x020617, 0.95);
     this.healthBar.fillRoundedRect(18, 47, 122, 12, 4);
@@ -756,7 +778,7 @@ export class GameScene extends Phaser.Scene {
         fontStyle: 'bold',
       })
       .setOrigin(0.5)
-      .setDepth(21);
+      .setDepth(121).setScrollFactor(0);
     this.healthText.setText(`${this.player.currentHp} / ${this.player.maxHp}`);
   }
 
@@ -798,7 +820,7 @@ export class GameScene extends Phaser.Scene {
     this.player.setVelocity(0, 0);
     this.controls?.cancelTouches();
     this.physics.world.pause();
-    const overlay = this.add.container(0, 0).setDepth(170);
+    const overlay = this.add.container(0, 0).setDepth(170).setScrollFactor(0);
     this.upgradeOverlay = overlay;
     const shade = this.add.rectangle(195, 422, 390, 844, 0x020617, 0.93)
       .setInteractive();
@@ -880,6 +902,9 @@ export class GameScene extends Phaser.Scene {
     this.enemies?.clear(true, true);
     this.enemyProjectiles?.clear(true, true);
     this.obstacles?.clear(true, true);
+    this.arenaArt?.destroy(true);
+    this.arenaArt = undefined;
+    this.currentRoom = undefined;
     this.events.off(ENEMY_SPAWNED_EVENT, this.handleEnemySpawned);
     this.events.off(ENEMY_DEFEATED_EVENT, this.handleEnemyDefeated);
     this.controls = undefined;
