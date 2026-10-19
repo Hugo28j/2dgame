@@ -20,8 +20,11 @@ export function defaultKeyBindings(): KeyBindings {
 }
 
 export function mouseButtonKey(button: number): string | null {
-  return Number.isInteger(button) && button >= 0 && button <= 4
-    ? 'MOUSE' + (button + 1) : null;
+  // Browser: 0=left, 1=middle, 2=right, 3=back, 4=forward.
+  // Game UI: mouse 1=left, 2=right, 3=middle, 4=back, 5=forward.
+  const names = ['MOUSE1', 'MOUSE3', 'MOUSE2', 'MOUSE4', 'MOUSE5'];
+  return Number.isInteger(button) && button >= 0 && button < names.length
+    ? names[button]! : null;
 }
 
 /** Canonical, supported input tokens. Escape cancels capture and is never bound. */
