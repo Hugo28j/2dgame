@@ -1,4 +1,5 @@
-import { getWorld, type WorldId } from '../worlds/worldConfig';
+import type { WorldId } from '../worlds/worldConfig';
+import { getWorldCharacter } from './worldCharacters';
 import Phaser from 'phaser';
 import { getEnemyStatsForRoom, type EnemyKind, type SlimeRuntimeStats } from './enemyConfig';
 import { bossPhase, rangedVelocity } from './enemyMovement';
@@ -12,13 +13,6 @@ export type EnemyFire = (enemy: AdvancedEnemy, pattern: BulletPattern, volley?: 
 export type EnemyExplosion = (enemy: AdvancedEnemy, radius: number) => void;
 export type EnemyBomb = (enemy: AdvancedEnemy, targetX: number, targetY: number,
   count: number, radius: number, windupMs: number) => void;
-
-/** Retain each boss's distinct color while shifting it toward its world's palette. */
-function blendColors(a: number, b: number): number {
-  const channel = (shift: number): number =>
-    Math.round(((a >> shift) & 255) * 0.5 + ((b >> shift) & 255) * 0.5);
-  return (channel(16) << 16) | (channel(8) << 8) | channel(0);
-}
 
 /** Reuses the phase-3 shared HP, damage, slow and death events for all enemy types. */
 export class AdvancedEnemy extends Slime {
@@ -44,10 +38,10 @@ export class AdvancedEnemy extends Slime {
     this.kind = kind;
     this.roomNumber = roomNumber;
     this.stats = stats;
-    const originalTint = getBossProfile(roomNumber).color;
-    this.bossTint = worldId === 1 ? originalTint : blendColors(originalTint, getWorld(worldId).bossColor);
+    // Sprite palette is baked into the world-specific texture; white tint preserves detail.
+    this.bossTint = 0xffffff;
     this.orbitSign = id.length % 2 === 0 ? 1 : -1;
-    this.setTexture('enemy-' + kind);
+    this.setTexture(getWorldCharacter(worldId, kind, roomNumber).textureKey);
     if (kind === 'boss') {
       this.setScale(1.75);
       this.setTint(this.bossTint);
