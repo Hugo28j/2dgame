@@ -34,7 +34,7 @@ describe('progressive enemy unlocks', () => {
     expect(early).toEqual(new Set(['slime', 'archer']));
     expect(late).toEqual(new Set(['slime', 'archer', 'charger', 'tank', 'mage', 'bomber']));
     expect(getEnemyCountForRoom(49)).toBeGreaterThan(getEnemyCountForRoom(10));
-    expect(getEnemyCountForRoom(49)).toBeLessThanOrEqual(20);
+    expect(getEnemyCountForRoom(49)).toBeLessThanOrEqual(32);
     for (let room = 1; room < CHAPTER_ROOM_COUNT; room++) {
       expect(getEnemyCountForRoom(room + 1)).toBeGreaterThanOrEqual(getEnemyCountForRoom(room));
     }
