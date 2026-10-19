@@ -104,7 +104,7 @@ export class GameScene extends Phaser.Scene {
     this.upgrades = new RunUpgradeDeck();
     this.drawBackdrop();
 
-    const firstRoom = getRoomDefinition(1);
+    const firstRoom = getRoomDefinition(1, this.worldId);
     const profile = progressStore.current;
     this.player = new Player(
       this,
@@ -581,7 +581,7 @@ export class GameScene extends Phaser.Scene {
 
     this.cameras.main.fadeOut(180, 2, 6, 23);
     this.time.delayedCall(190, () => {
-      this.loadRoom(getRoomDefinition(nextRoomNumber), true);
+      this.loadRoom(getRoomDefinition(nextRoomNumber, this.worldId), true);
       this.cameras.main.fadeIn(180, 2, 6, 23);
       this.transitioning = false;
     });
