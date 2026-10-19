@@ -35,6 +35,24 @@ describe('five unique playable worlds', () => {
     expect(bossNames.size).toBe(50);
   });
 
+  it('uses different floor patterns in the five maps without unsafe spawn positions', () => {
+    const firstPatterns = WORLDS.map(world => getRoomDefinition(1, world.id).layout.id);
+    expect(new Set(firstPatterns).size).toBe(5);
+    for (const world of WORLDS) {
+      const patterns = new Set<string>();
+      for (let room = 1; room <= 50; room++) {
+        const definition = getRoomDefinition(room, world.id);
+        expect(definition.enemySpawns).toHaveLength(definition.enemyCount);
+        if (!definition.isBossRoom) patterns.add(definition.layout.id);
+        for (const point of definition.enemySpawns) {
+          expect(point.x).toBeGreaterThan(definition.layout.bounds.x);
+          expect(point.y).toBeGreaterThan(definition.layout.bounds.y);
+        }
+      }
+      expect(patterns.size).toBe(21);
+    }
+  });
+
   it('progressively scales all enemy stats between worlds at the same room', () => {
     for (const kind of ['slime', 'archer', 'charger', 'mage', 'tank', 'bomber', 'boss'] as const) {
       for (let world = 2; world <= WORLD_COUNT; world++) {
