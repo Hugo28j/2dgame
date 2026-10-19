@@ -1,3 +1,4 @@
+import type { WorldId } from '../worlds/worldConfig';
 import Phaser from 'phaser';
 import { getEnemyStatsForRoom, type EnemyKind, type SlimeRuntimeStats } from './enemyConfig';
 import { bossPhase, rangedVelocity } from './enemyMovement';
@@ -28,8 +29,9 @@ export class AdvancedEnemy extends Slime {
   private readonly orbitSign: -1 | 1;
 
   public constructor(scene: Phaser.Scene, id: string, x: number, y: number,
-    kind: Exclude<EnemyKind, 'slime'>, roomNumber: number) {
-    const stats = getEnemyStatsForRoom(kind, roomNumber);
+    kind: Exclude<EnemyKind, 'slime'>, roomNumber: number,
+    worldId: WorldId = 1) {
+    const stats = getEnemyStatsForRoom(kind, roomNumber, worldId);
     super(scene, id, x, y, stats);
     this.kind = kind;
     this.roomNumber = roomNumber;
