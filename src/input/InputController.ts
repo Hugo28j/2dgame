@@ -2,8 +2,8 @@ import Phaser from 'phaser';
 
 import { JOYSTICK_CONFIG } from '../config/gameplay';
 import { VirtualJoystick } from './VirtualJoystick';
+import { keyboardMovement, type MovementKeys } from './keyboardMovement';
 import {
-  clampVector,
   normalizeVector,
   type Vector2Value,
 } from './vectorMath';
@@ -11,7 +11,7 @@ import {
 export class InputController {
   private readonly movementJoystick: VirtualJoystick;
   private readonly aimJoystick: VirtualJoystick;
-  private readonly keys: Record<'up' | 'left' | 'down' | 'right', Phaser.Input.Keyboard.Key>;
+  private readonly keys: Record<keyof MovementKeys, Phaser.Input.Keyboard.Key>;
   private lastAim: Vector2Value = { x: 1, y: 0 };
 
   private readonly reset = (): void => {
@@ -27,10 +27,12 @@ export class InputController {
     }
 
     this.keys = {
-      up: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-      left: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-      down: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-      right: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+      w: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+      z: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z),
+      a: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+      q: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q),
+      s: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+      d: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     };
 
     this.movementJoystick = new VirtualJoystick(scene, {
@@ -66,9 +68,11 @@ export class InputController {
       return { ...this.movementJoystick.vector };
     }
 
-    const horizontal = Number(this.keys.right.isDown) - Number(this.keys.left.isDown);
-    const vertical = Number(this.keys.down.isDown) - Number(this.keys.up.isDown);
-    return clampVector(horizontal, vertical);
+    return keyboardMovement({
+      w: this.keys.w.isDown, z: this.keys.z.isDown,
+      a: this.keys.a.isDown, q: this.keys.q.isDown,
+      s: this.keys.s.isDown, d: this.keys.d.isDown,
+    });
   }
 
   public getAim(playerX: number, playerY: number): Vector2Value {
