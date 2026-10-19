@@ -52,12 +52,20 @@ Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de br
 - Wanneer HP nul wordt, wordt de vorige spelscene meteen in slaap gezet en het **Game Over-scherm direct gestart**. De zware cleanup van vijanden, projectielen en timers volgt pas nadat het eerste resultatenframe kan worden weergegeven. Het hoofdmenu en Opnieuw spelen blijven beschikbaar.
 - Goud/voortgang wordt bij het einde van de run nog steeds maar één keer opgeslagen.
 
+## Munten oprapen met magnetische aantrekking
+
+- **Elke vijand laat gouden munten vallen op zijn sterfplek.** Gewone vijanden droppen één munt (Slime/Archer = 2 goud, Charger/Mage/Bomber = 3 goud, Tank = 4 goud); een boss laat vijf munten van 5 goud vallen (= 25 goud).
+- Munten bewegen naar je toe wanneer je binnen **180 wereldpixels** komt, en worden verzameld als ze dichtbij genoeg zijn. Loop dus langs de verslagen vijanden om ze op te rapen.
+- Alleen **opgeraapte** munten tellen mee voor de run en het resultaat na overlijden of winnen. Kills en het voltooien van een kamer geven geen automatische gold rewards meer.
+- Niet-opgeraapte munten worden bij het verlaten van de kamer weggehaald en tellen niet mee. De run-HUD toont hoeveel munten nog in de huidige kamer liggen.
+- Goudwaarden zijn bewust lager dan de vorige 5/9/90 goud per kill, en de extra beloning van 20 + 3 × kamernummer (+ bossbonus) per kamer is verwijderd. Bestaande profielen/goudsaldo blijven ongewijzigd.
+
 ## Huidige fase
 
 Fase 8 – Progressie en economie:
 
 - Alle fase-7-vijanden, vier bosskamers, boss-fases, eerlijke dash-waarschuwingen en originele projectile patterns.
-- Goud voor vijanden, kamers en bosses wordt tijdens een run bijgehouden. Bij overlijden of winnen wordt het precies eenmaal aan je permanente balans toegevoegd.
+- Alleen opgeraapte munten van verslagen vijanden tellen mee als run-goud; bij overlijden of winnen wordt dat bedrag precies eenmaal aan je permanente balans toegevoegd.
 - Een apart Game Over / Chapter Complete scherm toont kamer, kills, damage, beloningen, blijvende goudbalans en je tijdelijke upgrades.
 - Je bestaande hero- en wapenniveaus blijven bestaan. Vijf globale permanente upgrade-tracks (HP, damage, defense, wapenschade en aanvalssnelheid) komen erbij.
 - Na kamer 2, 4, 7, 10, 13, 16 en 19 kies je één van drie tijdelijke run-upgrades. Bij een volgende run begin je zonder tijdelijke bonussen.
