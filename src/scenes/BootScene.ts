@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { EnemyKind } from '../enemies/enemyConfig';
 import { createWorldCharacterTextures } from '../enemies/worldCharacterArt';
-import { HERO_IDS, HEROES } from '../heroes/heroConfig';
+import { createHeroArt } from '../heroes/heroArt';
 
 import {
   ARROW_TEXTURE_KEY,
@@ -24,7 +24,7 @@ export class BootScene extends Phaser.Scene {
     this.createSlimeTexture();
     this.createEnemyTextures();
     createWorldCharacterTextures(this);
-    this.createHeroTextures();
+    createHeroArt(this);
     this.createWeaponTextures();
     this.scene.start(MENU_SCENE_KEY);
   }
@@ -94,20 +94,6 @@ export class BootScene extends Phaser.Scene {
     graphics.generateTexture(SLIME_TEXTURE_KEY, 40, 40);
     graphics.destroy();
   }
-  private createHeroTextures(): void {
-    HERO_IDS.forEach(id => {
-      const hero = HEROES[id];
-      if (this.textures.exists(hero.textureKey)) return;
-      const graphics = this.make.graphics({ x: 0, y: 0 }, false);
-      graphics.fillStyle(0x0f172a); graphics.fillCircle(24, 24, 21);
-      graphics.fillStyle(hero.color); graphics.fillCircle(24, 24, 16);
-      graphics.fillStyle(0xf8fafc); graphics.fillTriangle(24, 14, 46, 24, 24, 34);
-      graphics.lineStyle(3, 0xe2e8f0); graphics.strokeCircle(24, 24, 16);
-      graphics.generateTexture(hero.textureKey, 48, 48);
-      graphics.destroy();
-    });
-  }
-
   private createWeaponTextures(): void {
     const colors: Record<string, number> = {
       'bolt-projectile': 0xfca5a5,
