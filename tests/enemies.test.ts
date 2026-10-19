@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { InvulnerabilityWindow } from '../src/combat/InvulnerabilityWindow';
-import { ARENA_BOUNDS } from '../src/config/gameplay';
-import { SLIME_CONFIG, SLIME_SPAWN_POINTS } from '../src/enemies/enemyConfig';
-import { getChaseVelocity } from '../src/enemies/slimeMovement';
+import { SLIME_CONFIG } from '../src/enemies/enemyConfig';
+import {
+  getChaseVelocity,
+  getObstacleAvoidanceVelocity,
+} from '../src/enemies/slimeMovement';
+import { SAFE_SPAWN_DISTANCE, getRoomDefinition } from '../src/rooms/roomConfig';
 
 describe('phase 3 slime movement', () => {
   it('chases at the configured speed without a diagonal speed bonus', () => {
@@ -13,13 +16,20 @@ describe('phase 3 slime movement', () => {
     expect(velocity.x).toBeCloseTo(velocity.y);
   });
 
-  it('keeps all initial spawns inside the arena', () => {
-    for (const point of SLIME_SPAWN_POINTS) {
-      expect(point.x).toBeGreaterThan(ARENA_BOUNDS.x);
-      expect(point.x).toBeLessThan(ARENA_BOUNDS.x + ARENA_BOUNDS.width);
-      expect(point.y).toBeGreaterThan(ARENA_BOUNDS.y);
-      expect(point.y).toBeLessThan(ARENA_BOUNDS.y + ARENA_BOUNDS.height);
+  it('keeps initial spawns a safe distance from the player', () => {
+    const room = getRoomDefinition(1);
+    for (const point of room.enemySpawns) {
+      const distance = Math.hypot(
+        point.x - room.layout.playerSpawn.x,
+        point.y - room.layout.playerSpawn.y,
+      );
+      expect(distance).toBeGreaterThanOrEqual(SAFE_SPAWN_DISTANCE);
     }
+  });
+
+  it('sidesteps at full speed when an obstacle blocks the chase line', () => {
+    expect(getObstacleAvoidanceVelocity(true, 0, 50, 60, -1)).toEqual({ x: 0, y: 60 });
+    expect(getObstacleAvoidanceVelocity(false, -50, 0, 60, 1)).toEqual({ x: -60, y: 0 });
   });
 });
 

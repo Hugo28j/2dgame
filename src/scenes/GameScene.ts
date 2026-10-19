@@ -4,7 +4,7 @@ import { DamageSystem, type DamageResult } from '../combat/damage';
 import { GAME_SCENE_KEY, GAME_TITLE } from '../config/constants';
 import { ARENA_BOUNDS } from '../config/gameplay';
 import { EnemySpawner } from '../enemies/EnemySpawner';
-import { SLIME_CONFIG, SLIME_SPAWN_POINTS } from '../enemies/enemyConfig';
+import { getSlimeStatsForRoom } from '../enemies/enemyConfig';
 import {
   ENEMY_DEFEATED_EVENT,
   ENEMY_SPAWNED_EVENT,
@@ -13,8 +13,23 @@ import {
 import { Player } from '../entities/Player';
 import { Projectile } from '../entities/Projectile';
 import { InputController } from '../input/InputController';
+import {
+  CHAPTER_ROOM_COUNT,
+  getRoomDefinition,
+  type RoomDefinition,
+} from '../rooms/roomConfig';
+import { RoomProgress } from '../rooms/RoomProgress';
 import { BowWeapon } from '../weapons/BowWeapon';
 import { BOW_CONFIG } from '../weapons/weaponConfig';
+
+type ArcadeCollisionObject =
+  | Phaser.Types.Physics.Arcade.GameObjectWithBody
+  | Phaser.Physics.Arcade.Body
+  | Phaser.Physics.Arcade.StaticBody
+  | Phaser.Tilemaps.Tile;
+
+const DOOR_X = ARENA_BOUNDS.x + ARENA_BOUNDS.width / 2;
+const DOOR_Y = ARENA_BOUNDS.y + 16;
 
 export class GameScene extends Phaser.Scene {
   private player?: Player;
@@ -22,19 +37,32 @@ export class GameScene extends Phaser.Scene {
   private weapon?: BowWeapon;
   private projectiles?: Phaser.Physics.Arcade.Group;
   private enemies?: Phaser.Physics.Arcade.Group;
+  private obstacles?: Phaser.Physics.Arcade.StaticGroup;
   private enemySpawner?: EnemySpawner;
+  private door?: Phaser.GameObjects.Rectangle;
   private healthBar?: Phaser.GameObjects.Graphics;
   private healthText?: Phaser.GameObjects.Text;
   private enemyCountText?: Phaser.GameObjects.Text;
+  private roomNumberText?: Phaser.GameObjects.Text;
+  private roomTypeText?: Phaser.GameObjects.Text;
+  private doorStatusText?: Phaser.GameObjects.Text;
   private aliveEnemies = 0;
   private gameOver = false;
+  private transitioning = false;
+  private chapterComplete = false;
   private readonly damageSystem = new DamageSystem();
+  private readonly roomProgress = new RoomProgress(CHAPTER_ROOM_COUNT);
 
   public constructor() {
     super(GAME_SCENE_KEY);
   }
 
   public create(): void {
+    this.roomProgress.reset();
+    this.aliveEnemies = 0;
+    this.gameOver = false;
+    this.transitioning = false;
+    this.chapterComplete = false;
     this.drawBackdrop();
     this.physics.world.setBounds(
       ARENA_BOUNDS.x,
@@ -47,28 +75,24 @@ export class GameScene extends Phaser.Scene {
       true,
     );
 
+    const firstRoom = getRoomDefinition(1);
     this.player = new Player(
       this,
-      ARENA_BOUNDS.x + ARENA_BOUNDS.width / 2,
-      ARENA_BOUNDS.y + ARENA_BOUNDS.height / 2,
+      firstRoom.layout.playerSpawn.x,
+      firstRoom.layout.playerSpawn.y,
     );
     this.controls = new InputController(this);
     this.projectiles = this.physics.add.group({ allowGravity: false });
     this.enemies = this.physics.add.group({ allowGravity: false });
+    this.obstacles = this.physics.add.staticGroup();
     this.weapon = new BowWeapon(this, this.player, this.projectiles);
     this.enemySpawner = new EnemySpawner(this, this.enemies);
+
     this.events.on(ENEMY_SPAWNED_EVENT, this.handleEnemySpawned);
     this.events.on(ENEMY_DEFEATED_EVENT, this.handleEnemyDefeated);
-    this.enemySpawner.spawnSlimes(SLIME_SPAWN_POINTS);
-    this.physics.add.overlap(
-      this.projectiles,
-      this.enemies,
-      this.handleProjectileHit,
-      undefined,
-      this,
-    );
-    this.physics.add.overlap(this.player, this.enemies, this.handlePlayerContact, undefined, this);
-    this.physics.add.collider(this.enemies, this.enemies);
+    this.createDoor();
+    this.createCollisions();
+    this.loadRoom(firstRoom, false);
     this.drawPlayerHealth();
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
@@ -85,7 +109,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    if (this.gameOver) {
+    if (this.gameOver || this.transitioning || this.chapterComplete) {
       this.player.setVelocity(0, 0);
       return;
     }
@@ -106,22 +130,29 @@ export class GameScene extends Phaser.Scene {
         child.destroy();
       }
     }
+
+    if (
+      this.roomProgress.doorOpen &&
+      Phaser.Math.Distance.Between(this.player.x, this.player.y, DOOR_X, DOOR_Y) < 38
+    ) {
+      this.enterOpenDoor();
+    }
   }
 
   private drawBackdrop(): void {
     this.cameras.main.setBackgroundColor('#08111f');
 
     this.add
-      .text(18, 24, GAME_TITLE, {
+      .text(18, 17, GAME_TITLE, {
         color: '#f8fafc',
         fontFamily: 'system-ui, sans-serif',
-        fontSize: '22px',
+        fontSize: '21px',
         fontStyle: 'bold',
       })
       .setDepth(10);
 
-    this.add
-      .text(372, 18, 'KAMER 1', {
+    this.roomNumberText = this.add
+      .text(372, 14, 'KAMER 1/20', {
         color: '#7dd3fc',
         fontFamily: 'system-ui, sans-serif',
         fontSize: '14px',
@@ -130,11 +161,21 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(1, 0)
       .setDepth(10);
 
+    this.roomTypeText = this.add
+      .text(372, 34, '', {
+        color: '#f59e0b',
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '10px',
+        fontStyle: 'bold',
+      })
+      .setOrigin(1, 0)
+      .setDepth(10);
+
     this.enemyCountText = this.add
-      .text(372, 42, 'SLIMES 0', {
+      .text(372, 51, 'SLIMES 0', {
         color: '#bef264',
         fontFamily: 'system-ui, sans-serif',
-        fontSize: '12px',
+        fontSize: '11px',
         fontStyle: 'bold',
       })
       .setOrigin(1, 0)
@@ -153,11 +194,9 @@ export class GameScene extends Phaser.Scene {
 
     const grid = this.add.graphics().setDepth(1);
     grid.lineStyle(1, 0x26364c, 0.55);
-
     for (let x = ARENA_BOUNDS.x + 30; x < ARENA_BOUNDS.x + ARENA_BOUNDS.width; x += 30) {
       grid.lineBetween(x, ARENA_BOUNDS.y, x, ARENA_BOUNDS.y + ARENA_BOUNDS.height);
     }
-
     for (let y = ARENA_BOUNDS.y + 30; y < ARENA_BOUNDS.y + ARENA_BOUNDS.height; y += 30) {
       grid.lineBetween(ARENA_BOUNDS.x, y, ARENA_BOUNDS.x + ARENA_BOUNDS.width, y);
     }
@@ -182,29 +221,217 @@ export class GameScene extends Phaser.Scene {
       .setDepth(10);
   }
 
+  private createDoor(): void {
+    if (!this.player) {
+      return;
+    }
+
+    this.door = this.add
+      .rectangle(DOOR_X, DOOR_Y, 72, 22, 0x7f1d1d)
+      .setStrokeStyle(3, 0xfca5a5)
+      .setDepth(8);
+    this.physics.add.existing(this.door, true);
+    this.physics.add.collider(this.player, this.door);
+
+    this.doorStatusText = this.add
+      .text(DOOR_X, DOOR_Y + 18, 'VERSLA ALLE SLIMES', {
+        color: '#fca5a5',
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '9px',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(9);
+  }
+
+  private createCollisions(): void {
+    if (!this.player || !this.projectiles || !this.enemies || !this.obstacles) {
+      return;
+    }
+
+    this.physics.add.overlap(
+      this.projectiles,
+      this.enemies,
+      this.handleProjectileHit,
+      undefined,
+      this,
+    );
+    this.physics.add.overlap(
+      this.player,
+      this.enemies,
+      this.handlePlayerContact,
+      undefined,
+      this,
+    );
+    this.physics.add.collider(this.enemies, this.enemies);
+    this.physics.add.collider(this.player, this.obstacles);
+    this.physics.add.collider(this.enemies, this.obstacles);
+    this.physics.add.collider(
+      this.projectiles,
+      this.obstacles,
+      this.handleProjectileObstacle,
+      undefined,
+      this,
+    );
+  }
+
+  private loadRoom(room: RoomDefinition, showBanner: boolean): void {
+    if (
+      !this.player ||
+      !this.enemies ||
+      !this.projectiles ||
+      !this.obstacles ||
+      !this.enemySpawner
+    ) {
+      return;
+    }
+
+    this.enemies.clear(true, true);
+    this.projectiles.clear(true, true);
+    this.obstacles.clear(true, true);
+    this.aliveEnemies = 0;
+    this.roomProgress.startRoom(room.enemyCount);
+    this.closeDoor();
+    this.createObstacles(room);
+
+    const playerBody = this.player.body;
+    this.player.setPosition(room.layout.playerSpawn.x, room.layout.playerSpawn.y);
+    this.player.setVelocity(0, 0);
+    if (playerBody instanceof Phaser.Physics.Arcade.Body) {
+      playerBody.reset(room.layout.playerSpawn.x, room.layout.playerSpawn.y);
+    }
+
+    const slimeStats = getSlimeStatsForRoom(room.number);
+    this.enemySpawner.spawnSlimes(room.enemySpawns, slimeStats);
+    this.updateRoomHud(room);
+    this.updateEnemyCount();
+
+    if (showBanner) {
+      this.showRoomBanner(room);
+    }
+  }
+
+  private createObstacles(room: RoomDefinition): void {
+    if (!this.obstacles) {
+      return;
+    }
+
+    for (const definition of room.layout.obstacles) {
+      const obstacle = this.add
+        .rectangle(
+          definition.x,
+          definition.y,
+          definition.width,
+          definition.height,
+          0x27364b,
+        )
+        .setStrokeStyle(3, 0x475569)
+        .setDepth(6);
+      this.physics.add.existing(obstacle, true);
+      this.obstacles.add(obstacle);
+    }
+  }
+
+  private closeDoor(): void {
+    if (!this.door) {
+      return;
+    }
+
+    this.door.setFillStyle(0x7f1d1d).setStrokeStyle(3, 0xfca5a5);
+    this.doorStatusText?.setText('VERSLA ALLE SLIMES').setColor('#fca5a5');
+    const body = this.door.body;
+    if (body instanceof Phaser.Physics.Arcade.StaticBody) {
+      body.enable = true;
+      body.updateFromGameObject();
+    }
+  }
+
+  private openDoor(): void {
+    if (!this.door) {
+      return;
+    }
+
+    this.door.setFillStyle(0x166534).setStrokeStyle(3, 0x86efac);
+    this.doorStatusText?.setText('DEUR OPEN ↑').setColor('#86efac');
+    const body = this.door.body;
+    if (body instanceof Phaser.Physics.Arcade.StaticBody) {
+      body.enable = false;
+    }
+  }
+
+  private enterOpenDoor(): void {
+    if (this.transitioning || !this.roomProgress.doorOpen || !this.player) {
+      return;
+    }
+
+    this.transitioning = true;
+    this.player.setVelocity(0, 0);
+
+    if (this.roomProgress.chapterComplete) {
+      this.finishChapterRooms();
+      return;
+    }
+
+    const nextRoomNumber = this.roomProgress.advance();
+    if (nextRoomNumber === null) {
+      this.transitioning = false;
+      return;
+    }
+
+    this.cameras.main.fadeOut(180, 2, 6, 23);
+    this.time.delayedCall(190, () => {
+      this.loadRoom(getRoomDefinition(nextRoomNumber), true);
+      this.cameras.main.fadeIn(180, 2, 6, 23);
+      this.transitioning = false;
+    });
+  }
+
+  private showRoomBanner(room: RoomDefinition): void {
+    const banner = this.add
+      .text(
+        195,
+        350,
+        room.isBossRoom ? `BOSSKAMER-SLOT ${room.number}` : `KAMER ${room.number}`,
+        {
+          color: room.isBossRoom ? '#fbbf24' : '#bae6fd',
+          fontFamily: 'system-ui, sans-serif',
+          fontSize: '24px',
+          fontStyle: 'bold',
+          stroke: '#020617',
+          strokeThickness: 6,
+        },
+      )
+      .setOrigin(0.5)
+      .setDepth(60);
+
+    this.tweens.add({
+      targets: banner,
+      alpha: 0,
+      y: 325,
+      delay: 450,
+      duration: 350,
+      onComplete: () => banner.destroy(),
+    });
+  }
+
+  private updateRoomHud(room: RoomDefinition): void {
+    this.roomNumberText?.setText(`KAMER ${room.number}/${CHAPTER_ROOM_COUNT}`);
+    this.roomTypeText?.setText(room.isBossRoom ? 'BOSSKAMER-SLOT' : room.layout.id.toUpperCase());
+  }
+
   private readonly handleProjectileHit = (
-    projectileObject:
-      | Phaser.Types.Physics.Arcade.GameObjectWithBody
-      | Phaser.Physics.Arcade.Body
-      | Phaser.Physics.Arcade.StaticBody
-      | Phaser.Tilemaps.Tile,
-    targetObject:
-      | Phaser.Types.Physics.Arcade.GameObjectWithBody
-      | Phaser.Physics.Arcade.Body
-      | Phaser.Physics.Arcade.StaticBody
-      | Phaser.Tilemaps.Tile,
+    projectileObject: ArcadeCollisionObject,
+    targetObject: ArcadeCollisionObject,
   ): void => {
     if (!(projectileObject instanceof Projectile) || !(targetObject instanceof Slime)) {
       return;
     }
-
     if (!projectileObject.registerHit(targetObject.enemyId)) {
       return;
     }
 
     const result = this.damageSystem.apply(targetObject, projectileObject.attack);
     this.showDamageNumber(targetObject.x, targetObject.y, result);
-
     if (result.defeated) {
       targetObject.playDefeat();
     } else {
@@ -212,17 +439,17 @@ export class GameScene extends Phaser.Scene {
     }
   };
 
+  private readonly handleProjectileObstacle = (
+    projectileObject: ArcadeCollisionObject,
+  ): void => {
+    if (projectileObject instanceof Projectile) {
+      projectileObject.destroy();
+    }
+  };
+
   private readonly handlePlayerContact = (
-    playerObject:
-      | Phaser.Types.Physics.Arcade.GameObjectWithBody
-      | Phaser.Physics.Arcade.Body
-      | Phaser.Physics.Arcade.StaticBody
-      | Phaser.Tilemaps.Tile,
-    enemyObject:
-      | Phaser.Types.Physics.Arcade.GameObjectWithBody
-      | Phaser.Physics.Arcade.Body
-      | Phaser.Physics.Arcade.StaticBody
-      | Phaser.Tilemaps.Tile,
+    playerObject: ArcadeCollisionObject,
+    enemyObject: ArcadeCollisionObject,
   ): void => {
     if (!(playerObject instanceof Player) || !(enemyObject instanceof Slime)) {
       return;
@@ -234,9 +461,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     const result = this.damageSystem.apply(playerObject, enemyObject.contactAttack);
-    playerObject.beginInvulnerability(now, SLIME_CONFIG.attackIntervalMs);
+    playerObject.beginInvulnerability(now, enemyObject.attackIntervalMs);
     this.drawPlayerHealth();
-
     if (result.defeated) {
       this.endRun();
     } else {
@@ -252,19 +478,8 @@ export class GameScene extends Phaser.Scene {
   private readonly handleEnemyDefeated = (): void => {
     this.aliveEnemies = Math.max(0, this.aliveEnemies - 1);
     this.updateEnemyCount();
-
-    if (this.aliveEnemies === 0 && !this.gameOver) {
-      this.add
-        .text(195, 350, 'ARENA VEILIG', {
-          color: '#bef264',
-          fontFamily: 'system-ui, sans-serif',
-          fontSize: '26px',
-          fontStyle: 'bold',
-          stroke: '#020617',
-          strokeThickness: 6,
-        })
-        .setOrigin(0.5)
-        .setDepth(60);
+    if (this.roomProgress.registerEnemyDefeated() && !this.gameOver) {
+      this.openDoor();
     }
   };
 
@@ -341,6 +556,32 @@ export class GameScene extends Phaser.Scene {
     this.enemyCountText?.setText(`SLIMES ${this.aliveEnemies}`);
   }
 
+  private finishChapterRooms(): void {
+    this.chapterComplete = true;
+    this.transitioning = false;
+    this.add
+      .rectangle(195, 361, 318, 150, 0x020617, 0.92)
+      .setStrokeStyle(2, 0x38bdf8)
+      .setDepth(70);
+    this.add
+      .text(195, 338, '20 KAMERS VOLTOOID', {
+        color: '#7dd3fc',
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '24px',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setDepth(71);
+    this.add
+      .text(195, 382, 'Echte bosses volgen in fase 7', {
+        color: '#cbd5e1',
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '13px',
+      })
+      .setOrigin(0.5)
+      .setDepth(71);
+  }
+
   private endRun(): void {
     if (!this.player || this.gameOver) {
       return;
@@ -349,7 +590,6 @@ export class GameScene extends Phaser.Scene {
     this.gameOver = true;
     this.player.setVelocity(0, 0);
     this.player.setTint(0x7f1d1d).setTintMode(Phaser.TintModes.FILL);
-
     for (const child of this.enemies?.getChildren() ?? []) {
       if (child instanceof Slime) {
         child.setVelocity(0, 0);
@@ -377,7 +617,6 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(71);
-
     this.time.delayedCall(400, () => {
       this.input.once(Phaser.Input.Events.POINTER_DOWN, () => this.scene.restart());
     });
@@ -387,16 +626,22 @@ export class GameScene extends Phaser.Scene {
     this.controls?.destroy();
     this.projectiles?.clear(true, true);
     this.enemies?.clear(true, true);
+    this.obstacles?.clear(true, true);
     this.events.off(ENEMY_SPAWNED_EVENT, this.handleEnemySpawned);
     this.events.off(ENEMY_DEFEATED_EVENT, this.handleEnemyDefeated);
     this.controls = undefined;
     this.weapon = undefined;
     this.projectiles = undefined;
     this.enemies = undefined;
+    this.obstacles = undefined;
     this.enemySpawner = undefined;
+    this.door = undefined;
     this.healthBar = undefined;
     this.healthText = undefined;
     this.enemyCountText = undefined;
+    this.roomNumberText = undefined;
+    this.roomTypeText = undefined;
+    this.doorStatusText = undefined;
     this.player = undefined;
   }
 }

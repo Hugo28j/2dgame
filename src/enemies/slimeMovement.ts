@@ -15,3 +15,19 @@ export const getChaseVelocity = (
     y: direction.y * speed,
   };
 };
+
+export const getObstacleAvoidanceVelocity = (
+  blockedHorizontally: boolean,
+  targetDeltaX: number,
+  targetDeltaY: number,
+  speed: number,
+  fallbackSign: -1 | 1,
+): Vector2Value => {
+  if (blockedHorizontally) {
+    const direction = Math.sign(targetDeltaY) || fallbackSign;
+    return { x: 0, y: direction * speed };
+  }
+
+  const direction = Math.sign(targetDeltaX) || fallbackSign;
+  return { x: direction * speed, y: 0 };
+};

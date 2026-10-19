@@ -1,5 +1,3 @@
-import { ARENA_BOUNDS } from '../config/gameplay';
-
 export interface EnemyConfig {
   id: string;
   name: string;
@@ -9,6 +7,10 @@ export interface EnemyConfig {
   movementSpeed: number;
   attackRange: number;
   attackIntervalMs: number;
+}
+
+export interface SlimeRuntimeStats extends EnemyConfig {
+  roomNumber: number;
 }
 
 export const SLIME_CONFIG: Readonly<EnemyConfig> = Object.freeze({
@@ -22,9 +24,21 @@ export const SLIME_CONFIG: Readonly<EnemyConfig> = Object.freeze({
   attackIntervalMs: 700,
 });
 
-export const SLIME_SPAWN_POINTS = [
-  { x: ARENA_BOUNDS.x + 68, y: ARENA_BOUNDS.y + 82 },
-  { x: ARENA_BOUNDS.x + ARENA_BOUNDS.width - 68, y: ARENA_BOUNDS.y + 82 },
-  { x: ARENA_BOUNDS.x + 68, y: ARENA_BOUNDS.y + ARENA_BOUNDS.height - 72 },
-  { x: ARENA_BOUNDS.x + ARENA_BOUNDS.width - 68, y: ARENA_BOUNDS.y + ARENA_BOUNDS.height - 72 },
-] as const;
+export const SLIME_DIFFICULTY = Object.freeze({
+  hpPerRoom: 0.08,
+  damagePerRoom: 0.05,
+});
+
+export const getSlimeStatsForRoom = (roomNumber: number): SlimeRuntimeStats => {
+  const normalizedRoom = Math.max(1, Math.floor(roomNumber));
+  const completedRooms = normalizedRoom - 1;
+
+  return {
+    ...SLIME_CONFIG,
+    roomNumber: normalizedRoom,
+    maxHp: Math.round(SLIME_CONFIG.maxHp * (1 + completedRooms * SLIME_DIFFICULTY.hpPerRoom)),
+    damage: Math.round(
+      SLIME_CONFIG.damage * (1 + completedRooms * SLIME_DIFFICULTY.damagePerRoom),
+    ),
+  };
+};

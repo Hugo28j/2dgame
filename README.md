@@ -4,19 +4,21 @@ Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de br
 
 ## Huidige fase
 
-Fase 3 – Eerste vijand:
+Fase 4 – Kamersysteem en deuren:
 
-- alle speler-, bedienings- en basiscombatfuncties uit eerdere fasen;
-- de eerste echte vijand: **Moss Slime**;
-- directe chase-AI met genormaliseerde beweging;
-- contactschade via het centrale damage-systeem;
-- speler-HP, defense en invulnerability frames;
-- vijand-HP, defense, health bar, hit- en death-feedback;
-- configureerbaar, eenvoudig spawnsysteem;
-- expliciete spawn- en death-events;
-- game-over en herstart van de oefenarena.
+- twintig opeenvolgende kamers per hoofdstuk;
+- vier herbruikbare kamerindelingen met muren en obstakels;
+- veilige, vooraf gedefinieerde speler- en vijandspawns;
+- meerdere Slimes per kamer;
+- een gesloten deur die alleen na alle geplande kills opent;
+- laden van de volgende kamer wanneer de speler de geopende deur bereikt;
+- behoud van huidige speler-HP tussen kamers;
+- configureerbare scaling van vijandaantal, HP en damage;
+- ieder vijfde kamernummer is gereserveerd als bosskamer-slot;
+- eenvoudige obstacle avoidance voor Slimes;
+- projectielen verdwijnen bij een obstakel.
 
-Kamers, deuren, obstakels, extra vijandtypes, abilities en permanente upgrades horen bij latere fasen.
+Echte bosses, extra vijandtypes, abilities, hero-selectie, permanente upgrades en saves horen bij latere fasen.
 
 ## Lokaal starten
 
@@ -55,6 +57,7 @@ src/
 ├── enemies/    # vijandconfiguratie, spawning en AI-modules
 ├── entities/   # Phaser-gameobjecten zoals de speler
 ├── input/      # joysticks, pointer ownership en invoerlogica
+├── rooms/      # layouts, difficulty scaling en kamerprogressie
 ├── scenes/     # Phaser-scenes
 ├── weapons/    # wapenconfiguratie en aanvalmodules
 ├── main.ts     # applicatie-entrypoint
