@@ -1,7 +1,9 @@
+import { GAME_WIDTH } from './constants';
+
 export const ARENA_BOUNDS = {
   x: 18,
   y: 82,
-  width: 354,
+  width: GAME_WIDTH - 36,
   height: 558,
 } as const;
 
@@ -14,7 +16,7 @@ export const JOYSTICK_CONFIG = {
   deadZone: 0.16,
   y: 754,
   movementX: 92,
-  aimX: 298,
+  aimX: GAME_WIDTH - 92,
 } as const;
 
 export const TRAINING_TARGETS = [
