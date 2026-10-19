@@ -162,7 +162,8 @@ export class GameScene extends Phaser.Scene {
 
     this.player.move(this.controls.getMovement());
     this.collectNearbyCoins(delta);
-    // No scheduled reinforcements: every enemy is spawned when the room loads.
+    // All room enemies are spawned up front, leaving no reinforcement indices.
+    this.updateEnemyWaves();
     this.updateCamera();
     const aim = this.controls.getAim(this.player.x, this.player.y);
     this.player.face(aim);
