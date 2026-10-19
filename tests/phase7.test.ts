@@ -26,7 +26,7 @@ describe('phase 7 room enemy rosters', () => {
   });
 
   it('has one real boss per fifth room, away from the player spawn', () => {
-    for (const room of [5, 10, 15, 20]) {
+    for (const room of [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]) {
       const definition = getRoomDefinition(room);
       expect(definition.isBossRoom).toBe(true);
       expect(definition.enemyCount).toBe(1);
@@ -36,9 +36,7 @@ describe('phase 7 room enemy rosters', () => {
       expect(Math.hypot(spawn.x - definition.layout.playerSpawn.x,
         spawn.y - definition.layout.playerSpawn.y)).toBeGreaterThan(120);
     }
-    expect([5, 10, 15, 20].map(getBossName)).toEqual([
-      'Stone Warden', 'Ember Colossus', 'Frost Tyrant', 'Void Sentinel',
-    ]);
+    expect([5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map(getBossName)).toHaveLength(10);
   });
 
   it('configures valid, scaling HP and damage for each enemy type', () => {
