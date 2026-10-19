@@ -53,6 +53,11 @@ export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number): Ene
   if (roomNumber >= 6) pool.push('mage');
   if (roomNumber >= 7) pool.push('bomber');
   const index = Math.max(0, Math.floor(spawnIndex));
+  // Always showcase a newly introduced enemy in its first available room.
+  const debut: Partial<Record<number, EnemyKind>> = {
+    2: 'archer', 3: 'charger', 4: 'tank', 6: 'mage', 7: 'bomber',
+  };
+  if (index === 0 && debut[roomNumber]) return debut[roomNumber];
   return pool[(index + roomNumber - 1) % pool.length] ?? 'slime';
 };
 export const getBossName = (roomNumber: number): string =>
