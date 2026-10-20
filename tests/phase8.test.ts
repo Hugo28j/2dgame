@@ -62,7 +62,7 @@ describe('phase 8 save migration and permanent shop', () => {
     const item = rollArmor(true, 0, 0, 0, 'old-test')!;
     profile = { ...profile, armorInventory: [item] };
     profile = applyProfileAction(profile, { type: 'equipArmor', id: item.id });
-    const oldBonus = armorBonuses(profile.armorInventory, profile.equippedArmor).hp;
+    const oldBonus = armorBonuses(profile.armorInventory, profile.equippedArmor.guardian, 'guardian').hp;
     const cost = armorUpgradeCost(item);
     profile = applyProfileAction(profile, { type: 'upgradeArmor', id: item.id });
     expect(profile.gold).toBe(100000 - cost);
@@ -92,7 +92,7 @@ describe('phase 8 save migration and permanent shop', () => {
     const item = second.current.armorInventory[0]!;
     expect(second.dispatch({ type: 'equipArmor', id: item.id })).toBe(true);
     const third = new SaveManager(local);
-    expect(third.current.equippedArmor.helm).toBe(item.id);
+    expect(third.current.equippedArmor.guardian.helm).toBe(item.id);
     second.reset();
     expect(new SaveManager(local).current).toEqual(defaultProfile());
   });
