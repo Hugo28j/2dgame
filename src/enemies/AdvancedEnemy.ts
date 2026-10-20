@@ -7,7 +7,7 @@ import { Slime } from './Slime';
 import { getChaseVelocity, getObstacleAvoidanceVelocity } from './slimeMovement';
 import { coverIsClose, rangedCoverSpot, shieldEndpoints, type ShieldSurface } from './treantShield';
 import { getBossPlan, getBossProfile } from './bossProfiles';
-import { CHARGER_DASH } from './enemyBalance';
+import { CHARGER_DASH, WORLD1_BEETLE_DASH } from './enemyBalance';
 import { MOSS_DASH, ROOT_BRANCH, SPORE_THROW_INTERVAL_MS } from './worldOneBossBalance';
 import { FROZEN_EARLY } from './frozenEarlyGame';
 import type { BulletPattern } from './projectilePatterns';
@@ -347,7 +347,8 @@ export class AdvancedEnemy extends Slime {
       if (now < this.dashEndsAt) {
         const chargeSpeed = this.isMossWarden ?
           (bossPhase(this.healthRatio) === 1 ? MOSS_DASH.phaseOneSpeed : MOSS_DASH.phaseTwoSpeed) :
-          this.isBoss ? 360 : CHARGER_DASH.speed;
+          this.isBoss ? 360 : CHARGER_DASH.speed *
+            (this.worldId === 1 && this.kind === 'charger' ? WORLD1_BEETLE_DASH.speedMultiplier : 1);
         this.setVelocity(this.dashX * chargeSpeed * this.slowMultiplier,
           this.dashY * chargeSpeed * this.slowMultiplier);
         return;
@@ -364,7 +365,8 @@ export class AdvancedEnemy extends Slime {
         this.clearWarning();
         this.dashEndsAt = now + (this.isMossWarden ?
           (bossPhase(this.healthRatio) === 1 ? MOSS_DASH.phaseOneDurationMs : MOSS_DASH.phaseTwoDurationMs) :
-          this.kind === 'charger' ? CHARGER_DASH.durationMs : 360);
+          this.kind === 'charger' ? CHARGER_DASH.durationMs *
+            (this.worldId === 1 ? WORLD1_BEETLE_DASH.durationMultiplier : 1) : 360);
       }
       return;
     }
@@ -393,7 +395,9 @@ export class AdvancedEnemy extends Slime {
     const reach = this.isMossWarden ?
       (bossPhase(this.healthRatio) === 1 ? MOSS_DASH.phaseOneSpeed * MOSS_DASH.phaseOneDurationMs :
         MOSS_DASH.phaseTwoSpeed * MOSS_DASH.phaseTwoDurationMs) / 1000 :
-      this.kind === 'charger' ? CHARGER_DASH.distance : 360 * 0.36;
+      this.kind === 'charger' ? CHARGER_DASH.distance *
+        (this.worldId === 1 ? WORLD1_BEETLE_DASH.speedMultiplier *
+          WORLD1_BEETLE_DASH.durationMultiplier : 1) : 360 * 0.36;
     const halfWidth = this.isBoss ? 32 : 24;
     const normalX = -this.dashY * halfWidth;
     const normalY = this.dashX * halfWidth;
