@@ -8,6 +8,7 @@ import { getChaseVelocity, getObstacleAvoidanceVelocity } from './slimeMovement'
 import { coverIsClose, rangedCoverSpot, shieldEndpoints, type ShieldSurface } from './treantShield';
 import { getBossPlan, getBossProfile } from './bossProfiles';
 import { CHARGER_DASH } from './enemyBalance';
+import { MOSS_DASH, ROOT_BRANCH, SPORE_THROW_INTERVAL_MS } from './worldOneBossBalance';
 import { FROZEN_EARLY } from './frozenEarlyGame';
 import type { BulletPattern } from './projectilePatterns';
 export type { BulletPattern } from './projectilePatterns';
@@ -15,6 +16,8 @@ export type { BulletPattern } from './projectilePatterns';
 export type EnemyFire = (enemy: AdvancedEnemy, pattern: BulletPattern, volley?: number, speed?: number) => void;
 export type EnemyExplosion = (enemy: AdvancedEnemy, radius: number) => void;
 export type EnemySummon = (enemy: AdvancedEnemy) => void;
+export type EnemyRoot = (enemy: AdvancedEnemy, attack: 'line' | 'burst', targetX: number, targetY: number, rotated: boolean) => void;
+export type EnemyTrail = (enemy: AdvancedEnemy, x: number, y: number) => void;
 export type EnemyBomb = (enemy: AdvancedEnemy, targetX: number, targetY: number,
   count: number, radius: number, windupMs: number) => void;
 
@@ -23,6 +26,8 @@ export class AdvancedEnemy extends Slime {
   public readonly kind: Exclude<EnemyKind, 'slime'>;
   public readonly stats: Readonly<SlimeRuntimeStats>;
   private nextShotAt = 0;
+  private nextTrailAt = 0;
+  private rootStage: 'line' | 'burst1' | 'burst2' | 'rest' = 'line';
   public fasterTwin = false;
   /** Index of the two split Void Sentinels (0 spins clockwise, 1 counterclockwise). */
   public splitTwinIndex: 0 | 1 = 0;
@@ -83,13 +88,17 @@ export class AdvancedEnemy extends Slime {
   public get isPoisonAlchemist(): boolean {
     return this.isBoss && this.worldId === 1 && this.roomNumber === 20;
   }
+  public get isRootTyrant(): boolean {
+    return this.isBoss && this.worldId === 1 && this.roomNumber === 10;
+  }
   public get isMossWarden(): boolean {
     return this.isBoss && this.worldId === 1 && this.roomNumber === 5;
   }
 
   public updateAI(targetX: number, targetY: number, now: number,
     fire: EnemyFire, explode: EnemyExplosion, dropBombs?: EnemyBomb,
-    coverTank?: Readonly<ShieldSurface>, summon?: EnemySummon): void {
+    coverTank?: Readonly<ShieldSurface>, summon?: EnemySummon,
+    rootAttack?: EnemyRoot, trailBomb?: EnemyTrail): void {
     if (this.aiState === 'defeated') return;
     super.chase(targetX, targetY);
     if (this.isStunned(now)) return;
@@ -170,6 +179,41 @@ export class AdvancedEnemy extends Slime {
         const mode = getBossPlan(this.roomNumber, phase, this.bossVolleys, this.bossSlot);
         const move = rangedVelocity(this.x, this.y, targetX, targetY, speed,
           profile.preferredRange, this.orbitSign);
+        if (this.isRootTyrant) {
+          this.setVelocity(move.x * 0.55, move.y * 0.55);
+          if (now >= this.nextShotAt) {
+            if (phase === 1) {
+              rootAttack?.(this, 'line', targetX, targetY, false);
+              this.nextShotAt = now + ROOT_BRANCH.lineRecoveryMs + ROOT_BRANCH.lineWarningMs;
+            } else if (this.rootStage === 'line') {
+              rootAttack?.(this, 'burst', targetX, targetY, false);
+              this.rootStage = 'burst1';
+              this.nextShotAt = now + ROOT_BRANCH.burstStaggerMs;
+            } else if (this.rootStage === 'burst1') {
+              rootAttack?.(this, 'burst', targetX, targetY, true);
+              this.rootStage = 'burst2';
+              this.nextShotAt = now + ROOT_BRANCH.pauseAfterBurstMs;
+            } else if (this.rootStage === 'burst2') {
+              rootAttack?.(this, 'line', targetX, targetY, false);
+              this.rootStage = 'rest';
+              this.nextShotAt = now + ROOT_BRANCH.lineWarningMs + ROOT_BRANCH.lineRecoveryMs;
+            } else {
+              this.rootStage = 'line';
+              this.nextShotAt = now;
+            }
+          }
+          break;
+        }
+        if (this.isMossWarden) {
+          // Moss Warden only dashes; phase two also leaves explosive bomb trails.
+          this.chargeLogic(targetX, targetY, now, distance,
+            phase === 1 ? MOSS_DASH.phaseOneRechargeMs : MOSS_DASH.phaseTwoRechargeMs);
+          if (phase === 2 && this.dashEndsAt > now && now >= this.nextTrailAt) {
+            trailBomb?.(this, this.x, this.y);
+            this.nextTrailAt = now + MOSS_DASH.trailSpacingMs;
+          }
+          break;
+        }
         if (this.worldId === 1 && this.roomNumber === 15 && this.fasterTwin) {
           const sibling = this.scene.children.list.find(child =>
             child instanceof AdvancedEnemy && child !== this && child.active &&
@@ -203,7 +247,9 @@ export class AdvancedEnemy extends Slime {
           }
           this.bossVolleys++;
           const scaledInterval = this.stats.attackIntervalMs * mode.tempo;
-          this.nextShotAt = now + Math.max(100, scaledInterval / (this.fasterTwin ? 1.5 : 1));
+          this.nextShotAt = now + (this.isPoisonAlchemist ? SPORE_THROW_INTERVAL_MS :
+            Math.max(100, scaledInterval / (this.fasterTwin ? 1.5 :
+              this.worldId === 1 && this.roomNumber === 25 ? 1.5 : 1)));
         }
         // Only explicitly charging bosses use dash logic; other nine archetypes
         // are NOT automatically assigned the old common charge attack.
@@ -299,7 +345,9 @@ export class AdvancedEnemy extends Slime {
     distance: number, rechargeMs: number): void {
     if (this.dashEndsAt > 0) {
       if (now < this.dashEndsAt) {
-        const chargeSpeed = this.isBoss ? 360 : CHARGER_DASH.speed;
+        const chargeSpeed = this.isMossWarden ?
+          (bossPhase(this.healthRatio) === 1 ? MOSS_DASH.phaseOneSpeed : MOSS_DASH.phaseTwoSpeed) :
+          this.isBoss ? 360 : CHARGER_DASH.speed;
         this.setVelocity(this.dashX * chargeSpeed * this.slowMultiplier,
           this.dashY * chargeSpeed * this.slowMultiplier);
         return;
@@ -314,7 +362,8 @@ export class AdvancedEnemy extends Slime {
       this.drawWarning(70, 0xef4444);
       if (now >= this.windupEndsAt) {
         this.clearWarning();
-        this.dashEndsAt = now + (this.isMossWarden ? 1080 :
+        this.dashEndsAt = now + (this.isMossWarden ?
+          (bossPhase(this.healthRatio) === 1 ? MOSS_DASH.phaseOneDurationMs : MOSS_DASH.phaseTwoDurationMs) :
           this.kind === 'charger' ? CHARGER_DASH.durationMs : 360);
       }
       return;
@@ -323,7 +372,7 @@ export class AdvancedEnemy extends Slime {
       const direction = new Phaser.Math.Vector2(targetX - this.x, targetY - this.y).normalize();
       this.dashX = direction.x;
       this.dashY = direction.y;
-      this.windupEndsAt = now + (this.isMossWarden ? 330 : this.isBoss ? 770 :
+      this.windupEndsAt = now + (this.isMossWarden ? MOSS_DASH.warningMs : this.isBoss ? 770 :
         CHARGER_DASH.telegraphMs);
       this.setVelocity(0, 0);
       this.drawWarning(70, 0xef4444);
@@ -341,7 +390,9 @@ export class AdvancedEnemy extends Slime {
       return;
     }
     // Warn about the full dash corridor, not an unrelated circle.
-    const reach = this.isMossWarden ? 360 * 1.08 :
+    const reach = this.isMossWarden ?
+      (bossPhase(this.healthRatio) === 1 ? MOSS_DASH.phaseOneSpeed * MOSS_DASH.phaseOneDurationMs :
+        MOSS_DASH.phaseTwoSpeed * MOSS_DASH.phaseTwoDurationMs) / 1000 :
       this.kind === 'charger' ? CHARGER_DASH.distance : 360 * 0.36;
     const halfWidth = this.isBoss ? 32 : 24;
     const normalX = -this.dashY * halfWidth;
