@@ -327,7 +327,8 @@ export class AbilityController {
         this.spawnCompanion(stats, now);
         break;
       case 'wind':
-        this.castWind(stats, now, direction);
+        if (id === 'guardian-slam') this.castGuardianPull(stats, now);
+        else this.castWind(stats, now, direction);
         break;
       case 'shotgun':
         this.castShotgun(stats, direction);
@@ -336,7 +337,8 @@ export class AbilityController {
         this.throwBomb(stats, direction);
         break;
       default:
-        this.areaEffect(stats, now);
+        if (id === 'guardian-aegis') this.castGuardianShockwave(stats, now);
+        else this.areaEffect(stats, now);
     }
 
     this.refresh(now);
@@ -414,6 +416,44 @@ export class AbilityController {
       this.refreshHealth();
     }
     this.pulse(this.player.x, this.player.y, stats.radius, stats.color, stats.durationMs);
+  }
+
+  private castGuardianPull(stats: Readonly<AbilityStats>, now: number): void {
+    const x = this.player.x, y = this.player.y;
+    const victims = targetsInRadius(x, y, stats.radius, this.liveEnemies());
+    const struck = new Set<string>();
+    for (const enemy of victims) {
+      const receiver = this.hitEnemy(enemy, stats, 1, this.player, struck);
+      if (!receiver || receiver.aiState === 'defeated') continue;
+      const dx = x - receiver.x, dy = y - receiver.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance > 1) receiver.applyKnockback(now, 330, dx / distance, dy / distance, 420);
+      receiver.applyStun(now, 1000);
+    }
+    const ring = this.scene.add.circle(x, y, stats.radius, stats.color, 0.06)
+      .setStrokeStyle(5, stats.color, 0.9).setDepth(27).setScale(1.1);
+    this.scene.tweens.add({ targets: ring, scaleX: 0.15, scaleY: 0.15, alpha: 0,
+      duration: 340, ease: 'Cubic.easeIn', onComplete: () => ring.destroy() });
+  }
+
+  private castGuardianShockwave(stats: Readonly<AbilityStats>, now: number): void {
+    const x = this.player.x, y = this.player.y;
+    const struck = new Set<string>();
+    for (const enemy of targetsInRadius(x, y, stats.radius, this.liveEnemies())) {
+      const receiver = this.hitEnemy(enemy, stats, 1.55, this.player, struck);
+      if (!receiver || receiver.aiState === 'defeated') continue;
+      const dx = receiver.x - x, dy = receiver.y - y;
+      const distance = Math.hypot(dx, dy);
+      if (distance > 0.1) receiver.applyKnockback(now, 530, dx / distance, dy / distance, 570);
+    }
+    const ring = this.scene.add.circle(x, y, stats.radius, stats.color, 0.24)
+      .setStrokeStyle(9, 0xffffff, 0.95).setDepth(28).setScale(0.04);
+    const glow = this.scene.add.circle(x, y, stats.radius, stats.color, 0.18)
+      .setStrokeStyle(4, stats.color, 0.8).setDepth(27).setScale(0.04);
+    this.scene.tweens.add({ targets: ring, scaleX: 1, scaleY: 1, alpha: 0,
+      duration: 610, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
+    this.scene.tweens.add({ targets: glow, scaleX: 1.2, scaleY: 1.2, alpha: 0,
+      duration: 740, ease: 'Quad.easeOut', onComplete: () => glow.destroy() });
   }
 
   private castWind(stats: Readonly<AbilityStats>, now: number,

@@ -179,9 +179,11 @@ export class AdvancedEnemy extends Slime {
           this.setVelocity(velocity.x, velocity.y);
         }
         if (now >= this.nextShotAt && this.windupEndsAt === 0 && this.dashEndsAt === 0) {
-          fire(this, mode.pattern, this.bossVolleys, mode.speed);
+          if (!this.isPoisonAlchemist) fire(this, mode.pattern, this.bossVolleys, mode.speed);
           if (mode.bombs > 0 && dropBombs && !(this.worldId === 2 && this.roomNumber === 10)) {
-            dropBombs(this, targetX, targetY, mode.bombs, mode.radius, mode.windupMs);
+            dropBombs(this, targetX, targetY,
+              this.isPoisonAlchemist ? (phase === 1 ? 4 : 8) : mode.bombs,
+              mode.radius, mode.windupMs);
           }
           this.bossVolleys++;
           const scaledInterval = this.stats.attackIntervalMs * mode.tempo;

@@ -1022,7 +1022,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (enemy.isPoisonAlchemist) {
-      this.throwPoisonBottles(enemy, targetX, targetY, count, radius);
+      this.throwPoisonBottles(enemy, count, radius);
       return;
     }
     const bounds = this.currentRoom?.layout.bounds;
@@ -1113,17 +1113,25 @@ export class GameScene extends Phaser.Scene {
   /** Each green bottle visibly arcs from the alchemist to its target before
    * breaking. Impact creates a five-second damaging poison circle.
    */
-  private throwPoisonBottles(enemy: AdvancedEnemy, targetX: number,
-    targetY: number, count: number, radius: number): void {
+  private throwPoisonBottles(enemy: AdvancedEnemy, count: number, radius: number): void {
     const bounds = this.currentRoom?.layout.bounds;
     if (!bounds) return;
     for (let i = 0; i < count; i++) {
-      const theta = i * Math.PI * 2 / Math.max(1, count);
-      const offset = i === 0 ? 0 : 90;
-      const x = Phaser.Math.Clamp(targetX + Math.cos(theta) * offset,
-        bounds.x + radius + 8, bounds.x + bounds.width - radius - 8);
-      const y = Phaser.Math.Clamp(targetY + Math.sin(theta) * offset,
-        bounds.y + radius + 8, bounds.y + bounds.height - radius - 8);
+      // Uniform independent landing sites across the arena, not aimed at the player.
+      const x = Phaser.Math.Between(
+        Math.ceil(bounds.x + radius + 8),
+        Math.floor(bounds.x + bounds.width - radius - 8));
+      const y = Phaser.Math.Between(
+        Math.ceil(bounds.y + radius + 8),
+        Math.floor(bounds.y + bounds.height - radius - 8));
+      const marker = this.add.circle(x, y, radius, 0x4ade80, 0.14)
+        .setStrokeStyle(2, 0xa3e635, 0.85).setDepth(25);
+      this.bombWarnings.add(marker);
+      // Half-second landing warning before the flask breaks.
+      const warningTween = this.tweens.add({
+        targets: marker, alpha: { from: 0.9, to: 0.4 }, scale: { from: 0.86, to: 1 },
+        duration: SPORE_POISON.bottleFlightMs + i * 55, ease: 'Sine.easeInOut',
+      });
       const glass = this.add.ellipse(0, 4, 17, 23, 0x4ade80)
         .setStrokeStyle(2, 0xd9f99d);
       const neck = this.add.rectangle(0, -10, 8, 10, 0x14532d)
@@ -1149,6 +1157,9 @@ export class GameScene extends Phaser.Scene {
         onComplete: () => {
           if (!bottle.active) return;
           this.poisonBottles.delete(bottle);
+          this.bombWarnings.delete(marker);
+          warningTween.stop();
+          marker.destroy();
           bottle.destroy();
           if (this.gameOver || this.transitioning || this.chapterComplete ||
               this.roomProgress.doorOpen || !enemy.active || enemy.aiState === 'defeated') return;
