@@ -260,14 +260,14 @@ export class MainMenuScene extends Phaser.Scene {
           const unlocked = isAbilityUnlocked(id, profile.heroLevels[profile.selectedHero]);
           const stats = getAbilityStats(id, profile.abilityLevels[id]);
           const effect = ability.kind === 'dash'
-            ? stats.dashSpeed + ' SNELHEID · ' + (stats.cooldownMs / 1000).toFixed(1) + 'S CD'
+            ? 'SNELH. ' + stats.dashSpeed + ' · CD ' + (stats.cooldownMs / 1000).toFixed(1) + 'S'
             : ability.kind === 'heal'
-            ? stats.heal + ' HP · ' + (stats.invulnerabilityMs / 1000).toFixed(1) + 'S SCHILD'
+            ? stats.heal + ' HP · SCHILD ' + (stats.invulnerabilityMs / 1000).toFixed(1) + 'S'
             : ability.kind === 'drain'
-            ? stats.damage + ' DMG · +' + stats.heal + ' HP'
+            ? stats.damage + ' DMG · ' + stats.heal + ' HP'
             : ability.kind === 'slow'
             ? stats.damage + ' DMG · ' + Math.round((1 - stats.slowFactor) * 100) + '% TRAAG'
-            : stats.damage + ' DMG · ' + stats.radius + ' BEREIK';
+            : stats.damage + ' DMG · R' + stats.radius;
           return {
             label: ability.name,
             description: unlocked ? ability.description + ' · ' + effect :
