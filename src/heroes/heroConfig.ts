@@ -85,7 +85,7 @@ export const HEROES: Readonly<Record<HeroId, HeroConfig>> = {
       abilityCooldownModifier: 0.83, abilityDamageMultiplier: 1.22 },
   },
 };
-export const HERO_IDS = Object.keys(HEROES) as HeroId[];
+export const HERO_IDS: HeroId[] = ['guardian', 'ranger', 'mage', 'frostblade', 'pyromancer', 'stormstrider', 'voidwalker'];
 export const MAX_HERO_LEVEL = 50;
 export function heroUpgradeCost(level: number): number {
   return 35 + Math.max(0, level - 1) * 30;
