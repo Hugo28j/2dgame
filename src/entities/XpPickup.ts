@@ -13,13 +13,13 @@ export class XpPickup extends Phaser.GameObjects.Image {
       gfx.fillStyle(0x0c4a6e, 0.7);
       gfx.fillCircle(12, 12, 12);
       gfx.fillStyle(0x38bdf8);
-      gfx.fillPoints([{ x: 12, y: 1 }, { x: 21, y: 11 },
-        { x: 12, y: 23 }, { x: 3, y: 11 }], true);
+      gfx.fillPoints([new Phaser.Math.Vector2(12, 1), new Phaser.Math.Vector2(21, 11),
+        new Phaser.Math.Vector2(12, 23), new Phaser.Math.Vector2(3, 11)], true);
       gfx.fillStyle(0xbae6fd);
       gfx.fillTriangle(12, 3, 12, 20, 5, 11);
       gfx.lineStyle(1, 0xe0f2fe);
-      gfx.strokePoints([{ x: 12, y: 1 }, { x: 21, y: 11 },
-        { x: 12, y: 23 }, { x: 3, y: 11 }], true);
+      gfx.strokePoints([new Phaser.Math.Vector2(12, 1), new Phaser.Math.Vector2(21, 11),
+        new Phaser.Math.Vector2(12, 23), new Phaser.Math.Vector2(3, 11)], true);
       gfx.generateTexture(TEXTURE, 24, 24);
       gfx.destroy();
     }
