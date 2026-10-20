@@ -21,6 +21,8 @@ export interface HeroConfig {
   textureKey: string;
   color: number;
   unlockCost: number;
+  /** Chance to block an eligible incoming hit completely. */
+  parryChance?: number;
   /** Unlocking this character requires access to its associated world. */
   requiredWorld: WorldId;
   stats: Readonly<HeroStats>;
@@ -44,8 +46,8 @@ export const HEROES: Readonly<Record<HeroId, HeroConfig>> = {
   },
   guardian: {
     id: 'guardian', name: 'Guardian', description: 'Melee-startheld met zwaard en schild',
-    passive: 'Extra HP en verdediging', textureKey: 'hero-guardian',
-    color: 0xfbbf24, unlockCost: 0, requiredWorld: 1,
+    passive: '20% kans om een inkomende hit volledig te pareren', textureKey: 'hero-guardian',
+    color: 0xfbbf24, unlockCost: 0, parryChance: 0.2, requiredWorld: 1,
     stats: { maxHp: 145, damage: 2, attackSpeed: 0.92, movementSpeed: 165,
       criticalChance: 0.08, criticalMultiplier: 1.65, defense: 22,
       abilityCooldownModifier: 1.05, abilityDamageMultiplier: 1 },

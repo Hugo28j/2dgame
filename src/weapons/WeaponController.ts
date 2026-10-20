@@ -59,15 +59,69 @@ export class WeaponController {
       if (!target.active || target.aiState === 'defeated' ||
         !isInsideMeleeSwing(this.owner, direction, target, config.meleeRange, config.meleeArc)) continue;
       this.onMeleeHit?.(target, attack);
+      if (config.specialEffects.includes('knockback') &&
+        target.active && target.healthRatio > 0) {
+        // Enemy AI respects the timed knockback, so the next chase frame
+        // cannot immediately cancel the push.
+        target.applyKnockback(this.scene.time.now, 240,
+          direction.x, direction.y, 285);
+      }
     }
 
     const angle = Math.atan2(direction.y, direction.x);
+    if (this.weaponId === 'sunblade') {
+      this.animateDawnbladeWhoosh(angle, config.meleeArc, config.meleeRange, config.color);
+      return;
+    }
     const arc = this.scene.add.arc(this.owner.x, this.owner.y, config.meleeRange,
       Phaser.Math.RadToDeg(angle - config.meleeArc / 2),
       Phaser.Math.RadToDeg(angle + config.meleeArc / 2), false, config.color, 0.2)
       .setStrokeStyle(5, config.color, 0.95).setDepth(24);
     this.scene.tweens.add({ targets: arc, alpha: 0, scale: 1.08, duration: 150,
       onComplete: () => arc.destroy() });
+  }
+
+  /** A short, travelling crescent rather than a static sector that lingers. */
+  private animateDawnbladeWhoosh(
+    angle: number, arcWidth: number, radius: number, color: number,
+  ): void {
+    const slash = this.scene.add.graphics().setDepth(26);
+    const start = angle - arcWidth / 2;
+    this.scene.tweens.addCounter({
+      from: 0, to: 1, duration: 105, ease: 'Cubic.easeOut',
+      onUpdate: tween => {
+        const progress = tween.getValue() ?? 0;
+        const head = start + arcWidth * progress;
+        const tail = Math.max(start, head - arcWidth * 0.42);
+        const alpha = Math.min(1, (1 - progress) * 1.65);
+        slash.clear();
+
+        // Layered, tapered curved streaks with a bright sweeping blade edge.
+        slash.lineStyle(17, color, 0.25 * alpha);
+        slash.beginPath();
+        slash.arc(this.owner.x, this.owner.y, radius - 7, tail, head);
+        slash.strokePath();
+
+        slash.lineStyle(7, 0xfff3c4, 0.82 * alpha);
+        slash.beginPath();
+        slash.arc(this.owner.x, this.owner.y, radius - 2,
+          Math.max(tail, head - arcWidth * 0.29), head);
+        slash.strokePath();
+
+        slash.lineStyle(3, 0xffffff, 0.95 * alpha);
+        slash.beginPath();
+        slash.arc(this.owner.x, this.owner.y, radius,
+          Math.max(tail, head - arcWidth * 0.16), head);
+        slash.strokePath();
+
+        // The small glint at the moving tip reinforces the whoosh direction.
+        slash.fillStyle(0xffffff, 0.8 * alpha);
+        slash.fillCircle(
+          this.owner.x + Math.cos(head) * radius,
+          this.owner.y + Math.sin(head) * radius, 3);
+      },
+      onComplete: () => slash.destroy(),
+    });
   }
 
   private createAttack(): AttackData {
