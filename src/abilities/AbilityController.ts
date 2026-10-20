@@ -692,7 +692,7 @@ export class AbilityController {
 
   /** Shield Bubble has exactly a 30-second base cooldown for the Guardian. */
   private cooldownModifier(id: AbilityId): number {
-    return id === 'guardian-charge' ? 1 : this.player.abilityCooldownModifier;
+    return this.player.abilityCooldownModifier;
   }
 
   private stats(id: AbilityId): AbilityStats {

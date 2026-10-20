@@ -36,12 +36,21 @@ export class RunUpgradeDeck {
       (attackMode === 'melee'
         ? upgrade.id !== 'projectile' && upgrade.id !== 'piercing'
         : upgrade.id !== 'meleeRange' && upgrade.id !== 'meleeStun'));
-    // Fisher-Yates avoids repeated cards, biased sorts and unbounded retries.
-    for (let i = pool.length - 1; i > 0; i -= 1) {
-      const j = Math.min(i, Math.max(0, Math.floor(this.random() * (i + 1))));
-      [pool[i], pool[j]] = [pool[j]!, pool[i]!];
+    // Weighted sampling without replacement: common 75%, rare 20%, epic 5%
+    // when each tier is represented by one eligible card.
+    const weights = { common: 15, rare: 4, epic: 1 } as const;
+    const options: RunUpgrade[] = [];
+    while (options.length < 3 && pool.length > 0) {
+      const total = pool.reduce((sum, upgrade) => sum + weights[upgrade.rarity], 0);
+      let roll = Math.min(0.999999999, Math.max(0, this.random())) * total;
+      let chosen = pool.length - 1;
+      for (let i = 0; i < pool.length; i++) {
+        roll -= weights[pool[i]!.rarity];
+        if (roll < 0) { chosen = i; break; }
+      }
+      options.push(pool.splice(chosen, 1)[0]!);
     }
-    return pool.slice(0, 3);
+    return options;
   }
   public choose(id: RunUpgradeId): boolean {
     const upgrade = RUN_UPGRADES.find(item => item.id === id);

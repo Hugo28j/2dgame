@@ -42,6 +42,17 @@ export class EnemySpawner {
     });
   }
 
+  /** Second phase of World 1 chamber 15: two separate Sentinel bosses. */
+  public spawnSplitBosses(points: readonly SpawnPoint[], room: number): AdvancedEnemy[] {
+    return points.map(point => {
+      const boss = new AdvancedEnemy(this.scene, `split-boss-${this.nextEnemyNumber++}`,
+        point.x, point.y, 'boss', room, 1, 1);
+      boss.fasterTwin = true;
+      addBoundedEnemy(boss, () => this.enemyGroup.add(boss));
+      return boss;
+    });
+  }
+
   /** Summoned Snow Puffs use their own unique IDs, correct world-2 art and
    * are tracked by GameScene so active waves cannot grow without a cap. */
   public summonSnowPuffs(points: readonly SpawnPoint[], room: number): readonly Slime[] {

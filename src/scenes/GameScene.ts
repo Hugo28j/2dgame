@@ -865,7 +865,8 @@ export class GameScene extends Phaser.Scene {
     if (!this.player || !this.enemyProjectiles || this.gameOver || this.transitioning) return;
     const angle = Math.atan2(this.player.y - enemy.y, this.player.x - enemy.x);
     const angles = shotAngles(pattern, angle, volley);
-    const speed = (enemy.kind === 'boss' ? 220 + getBossTier(enemy.stats.roomNumber) * 8 :
+    const speed = (enemy.kind === 'boss' ? (220 + getBossTier(enemy.stats.roomNumber) * 8) *
+      (enemy.stats.roomNumber === 30 ? 1.25 : 1) :
       enemy.kind === 'mage' ? 220 : 320) * speedFactor;
     const frostArcher = this.worldId === 2 && enemy.kind === 'archer' &&
       enemy.stats.roomNumber <= FROZEN_EARLY.lastRoom;
@@ -1038,7 +1039,7 @@ export class GameScene extends Phaser.Scene {
         .setStrokeStyle(3, 0xfbbf24, 0.92).setDepth(24);
       this.bombWarnings.add(warning);
       let timer: Phaser.Time.TimerEvent;
-      timer = this.time.delayedCall(windupMs, () => {
+      timer = this.time.delayedCall(windupMs + (enemy.isBoss && enemy.stats.roomNumber === 30 ? 200 : 0), () => {
         this.bombTimers.delete(timer);
         this.bombWarnings.delete(warning);
         if (!warning.active) return;

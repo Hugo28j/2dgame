@@ -30,7 +30,7 @@ export class GameOverScene extends Phaser.Scene {
     const profile = progressStore.current;
     const world = getWorld(report.worldId);
     const fontFamily = 'system-ui, sans-serif';
-    this.cameras.main.setScroll((390 - GAME_WIDTH) / 2, 0);
+    this.cameras.main.setScroll(0, 0);
     this.cameras.main.setBackgroundColor('#081525');
     const panel = this.add.rectangle(195, 422, 364, 760, 0x101d30)
       .setStrokeStyle(3, report.victory ? 0x38bdf8 : 0xef4444);
@@ -96,7 +96,12 @@ export class GameOverScene extends Phaser.Scene {
       }).setOrigin(0.5).setDepth(21);
       const hit = this.add.zone(195, y, 300, 60).setDepth(30)
         .setScrollFactor(0).setInteractive({ useHandCursor: true });
-      const activate = (): void => { if (!this.scene.isActive()) return; callback(); };
+      let activated = false;
+      const activate = (): void => {
+        if (activated || !this.scene.isActive()) return;
+        activated = true;
+        callback();
+      };
       hit.on('pointerdown', activate);
       caption.setInteractive({ useHandCursor: true }).on('pointerdown', activate);
       this.tweens.add({ targets: [plate, caption], alpha: { from: 0, to: 1 },
@@ -109,6 +114,12 @@ export class GameOverScene extends Phaser.Scene {
     };
     button(686, 'OPNIEUW SPELEN', () => navigate(GAME_SCENE_KEY), true);
     button(755, 'HOOFDMENU', () => navigate(MENU_SCENE_KEY));
+    // Fallback for canvas input/camera hit-zone inconsistencies on touch & desktop.
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
+      if (pointer.x < 42 || pointer.x > GAME_WIDTH - 42) return;
+      if (Math.abs(pointer.y - 686) <= 32) navigate(GAME_SCENE_KEY);
+      else if (Math.abs(pointer.y - 755) <= 32) navigate(MENU_SCENE_KEY);
+    });
     this.add.text(195, 811, 'Alleen opgeraapt goud telt mee — eenmaal opgeslagen', {
       fontFamily, fontSize: '10px', color: '#94a3b8',
     }).setOrigin(0.5);
