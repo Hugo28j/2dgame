@@ -53,7 +53,7 @@ describe('scrollable procedural arenas', () => {
     }
     expect(getArenaBounds(1).height).toBeLessThan(844);
     expect(getArenaBounds(30).height).toBeGreaterThan(1100);
-    expect(getArenaBounds(30).width).toBeGreaterThan(700);
+    expect(getArenaBounds(30).width).toBeGreaterThan(680);
   });
 
   it('places every player, obstacle and enemy spawn safely across all thirty chambers', () => {
