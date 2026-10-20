@@ -1,6 +1,6 @@
 import { getWorld, getWorldBossName, type WorldId } from '../worlds/worldConfig';
 import type { EnemyKind } from './enemyConfig';
-import { getBossTier } from './bossProfiles';
+import { getBossArchetypeIndex } from './bossProfiles';
 
 export type MinionKind = Exclude<EnemyKind, 'boss'>;
 export interface CharacterLook {
@@ -47,13 +47,13 @@ const primaryColors: Readonly<Record<WorldId, readonly [number, number, number, 
 
 const minionOrder: readonly MinionKind[] = ['slime', 'archer', 'charger', 'mage', 'tank', 'bomber'];
 
-export function getWorldCharacter(worldId: WorldId, kind: EnemyKind, roomNumber = 1): CharacterLook {
+export function getWorldCharacter(worldId: WorldId, kind: EnemyKind, roomNumber = 1, bossSlot = 0): CharacterLook {
   const world = getWorld(worldId);
   if (kind === 'boss') {
-    const tier = getBossTier(roomNumber);
-    // Every one of the 50 boss fights has a distinct texture key/name.
+    const tier = getBossArchetypeIndex(roomNumber, bossSlot) + 1;
+    // Each archetype retains its unique texture when moving to 30-room worlds.
     return {
-      name: getWorldBossName(worldId, roomNumber),
+      name: getWorldBossName(worldId, roomNumber, bossSlot),
       textureKey: `world-${worldId}-boss-${tier}`,
       primary: world.bossColor,
       secondary: primaryColors[worldId][(tier - 1) % 6]!,
