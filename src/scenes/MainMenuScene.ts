@@ -195,7 +195,7 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   private drawHeroes(): void {
-    this.section('KIES JE HELD', 'Bekijk vaardigheden en kies met wie je speelt');
+    this.section('KIES JE HELD', 'Guardian eerst · Ranger W1-10 · Mage W1-20');
     const profile = progressStore.current;
     const pageSize = 4;
     const pages = Math.ceil(HERO_IDS.length / pageSize);
@@ -205,6 +205,7 @@ export class MainMenuScene extends Phaser.Scene {
       const y = 347 + index * 91;
       const unlocked = profile.unlockedHeroes.includes(id);
       const available = isWorldUnlocked(hero.requiredWorld, profile.completedWorlds);
+      const milestone = id === 'ranger' ? 10 : id === 'mage' ? 20 : 0;
       const selected = profile.selectedHero === id;
       this.plate(195, y, 328, 85,
         selected ? 0x1b3844 : COLOR.card, selected ? hero.color : COLOR.border, 11);
@@ -220,11 +221,11 @@ export class MainMenuScene extends Phaser.Scene {
         '   ·   SCHADE ' + stats.damage + '   ·   DEF ' + stats.defense,
         10, COLOR.secondary, 302);
       const label = selected ? 'ACTIEF' : unlocked ? 'KIES' :
-        !available ? 'WERELD ' + hero.requiredWorld : hero.unlockCost + ' G';
+        milestone ? 'W1 · ' + milestone : !available ? 'WERELD ' + hero.requiredWorld : hero.unlockCost + ' G';
       this.button(313, y - 10, 86, 34, label, () => this.runAction(
         unlocked ? { type: 'selectHero', id } : { type: 'unlockHero', id },
       ), selected ? 'selected' : 'normal',
-      selected || (!unlocked && (!available || profile.gold < hero.unlockCost)), 10);
+      selected || (!unlocked && (milestone > 0 || !available || profile.gold < hero.unlockCost)), 10);
     });
     if (pages > 1) {
       this.button(100, 700, 107, 34, '‹ VORIGE', () => {
