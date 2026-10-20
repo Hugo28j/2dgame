@@ -84,6 +84,7 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponConfig>> = {
 };
 
 export const WEAPON_IDS = Object.keys(WEAPONS) as WeaponId[];
+export const SECOND_WEAPON_UNLOCK_LEVEL = 10;
 export const BOW_CONFIG = WEAPONS.bow;
 export const HERO_WEAPONS: Readonly<Record<HeroId, readonly WeaponId[]>> = {
   ranger: ['bow', 'crossbow'], mage: ['staff', 'spellbook'], guardian: ['sunblade', 'warhammer'],
@@ -94,6 +95,11 @@ export const HERO_STARTER_WEAPON: Readonly<Record<HeroId, WeaponId>> = {
   ranger: 'bow', mage: 'staff', guardian: 'sunblade', frostblade: 'iceblade',
   pyromancer: 'emberstaff', stormstrider: 'lightning', voidwalker: 'voidorb',
 };
+/** The signature weapon is available immediately, the alternate at hero level 10. */
+export function isWeaponUnlockedForHero(weaponId: WeaponId, heroId: HeroId, heroLevel: number): boolean {
+  const weapons = HERO_WEAPONS[heroId];
+  return weaponId === weapons[0] || (weaponId === weapons[1] && heroLevel >= SECOND_WEAPON_UNLOCK_LEVEL);
+}
 export function weaponBelongsToHero(weaponId: WeaponId, heroId: HeroId): boolean {
   return WEAPONS[weaponId].heroId === heroId;
 }
