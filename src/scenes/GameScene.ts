@@ -11,6 +11,7 @@ import { SPORE_POISON, poisonActive, poisonCovers, poisonTickDue } from '../enem
 import { AdvancedEnemy, type BulletPattern } from '../enemies/AdvancedEnemy';
 import { EnemyProjectile } from '../enemies/EnemyProjectile';
 import { HomingEnemyProjectile } from '../enemies/HomingEnemyProjectile';
+import { coverIsClose, firstShieldOnPath, type ShieldPoint } from '../enemies/treantShield';
 import { ICE_WALL, HOMING_ORB, wallGapCenter, wallHitsCircle, wallXAt } from '../enemies/frozenBossAttacks';
 import { withinRadius } from '../enemies/enemyMovement';
 import { shotAngles } from '../enemies/projectilePatterns';
@@ -160,6 +161,7 @@ export class GameScene extends Phaser.Scene {
       () => this.gameOver || this.transitioning || this.chapterComplete || this.choosingUpgrade,
       this.enemyProjectiles,
       () => this.currentRoom?.layout,
+      (origin, target) => this.findProtectingTreant(origin, target),
     );
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
@@ -193,10 +195,18 @@ export class GameScene extends Phaser.Scene {
     this.updateFrozenWalls(this.time.now);
     this.weapon.update(this.time.now, this.controls.isShooting(), aim);
 
+    // Ranged world-1 mobs use nearby Ancient Treants as moving cover.
+    const treants = this.liveTreantShields();
     for (const child of this.enemies.getChildren()) {
       if (child instanceof AdvancedEnemy) {
+        const nearestCover = this.worldId === 1 && (child.kind === 'archer' || child.kind === 'mage')
+          ? treants.filter(tank => coverIsClose(child, tank))
+              .sort((a, b) => Phaser.Math.Distance.Between(child.x, child.y, a.x, a.y) -
+                Phaser.Math.Distance.Between(child.x, child.y, b.x, b.y))[0]
+          : undefined;
         child.updateAI(this.player.x, this.player.y, this.time.now,
-          this.fireEnemyProjectiles, this.explodeEnemy, this.dropBossBombs);
+          this.fireEnemyProjectiles, this.explodeEnemy, this.dropBossBombs,
+          nearestCover?.shieldSurface);
       } else if (child instanceof Slime) {
         child.chase(this.player.x, this.player.y);
       }
@@ -214,7 +224,12 @@ export class GameScene extends Phaser.Scene {
     this.updateBossHud();
 
     for (const child of this.projectiles.getChildren()) {
-      if (child instanceof Projectile && child.isOutsideArena()) {
+      if (!(child instanceof Projectile) || !child.active) continue;
+      const flight = child.consumeFlightSegment();
+      const blocker = this.findProtectingTreant(flight.from, flight.to);
+      if (blocker) {
+        this.hitTreantShield(child, blocker);
+      } else if (child.isOutsideArena()) {
         child.destroy();
       }
     }
@@ -665,12 +680,45 @@ export class GameScene extends Phaser.Scene {
     this.roomTypeText?.setColor('#' + getWorld(this.worldId).accent.toString(16).padStart(6, '0'));
   }
 
+  private liveTreantShields(): AdvancedEnemy[] {
+    if (this.worldId !== 1 || !this.enemies) return [];
+    return this.enemies.getChildren().filter(
+      (enemy): enemy is AdvancedEnemy => enemy instanceof AdvancedEnemy &&
+        enemy.isTreantShield && enemy.active && enemy.aiState !== 'defeated',
+    );
+  }
+
+  /** Match the rendered panel, not the Treant's much smaller body collider. */
+  private findProtectingTreant(origin: Readonly<ShieldPoint>,
+    target: Readonly<ShieldPoint>): AdvancedEnemy | undefined {
+    const panels = this.liveTreantShields().map(tank => ({ ...tank.shieldSurface, tank }));
+    return firstShieldOnPath(origin, target, panels)?.tank;
+  }
+
+  private hitTreantShield(projectile: Projectile, tank: AdvancedEnemy): void {
+    if (!projectile.active || !tank.active || tank.aiState === 'defeated') return;
+    // Always consumes the projectile, including piercing projectiles.
+    if (!projectile.registerHit(tank.enemyId)) return;
+    projectile.destroy();
+    const result = this.damageSystem.apply(tank, projectile.attack);
+    this.showDamageNumber(tank.x, tank.y, result);
+    if (result.defeated) tank.playDefeat();
+    else tank.showHit();
+  }
+
   private readonly handleProjectileHit = (
     projectileObject: ArcadeCollisionObject,
     targetObject: ArcadeCollisionObject,
   ): void => {
     if (!(projectileObject instanceof Projectile) || !(targetObject instanceof Slime) ||
       targetObject.aiState === 'defeated') {
+      return;
+    }
+    // The front shield is struck before any enemy standing behind it.
+    // This also prevents piercing shots from passing through the wood plate.
+    const blocker = this.findProtectingTreant(projectileObject.launchOrigin, targetObject);
+    if (blocker) {
+      this.hitTreantShield(projectileObject, blocker);
       return;
     }
     if (!projectileObject.registerHit(targetObject.enemyId)) {

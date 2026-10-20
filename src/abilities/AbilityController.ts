@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 import { DamageSystem, type DamageResult } from '../combat/damage';
 import { Slime } from '../enemies/Slime';
 import type { EnemyProjectile } from '../enemies/EnemyProjectile';
+import type { ShieldPoint } from '../enemies/treantShield';
 import type { Player } from '../entities/Player';
 import type { InputController } from '../input/InputController';
 import type { Vector2Value } from '../input/vectorMath';
@@ -91,6 +92,7 @@ export class AbilityController {
     private readonly blocked: () => boolean,
     private readonly enemyProjectiles?: Phaser.Physics.Arcade.Group,
     private readonly arenaLayout?: () => Pick<RoomLayout, 'bounds' | 'obstacles'> | undefined,
+    private readonly protectingShield?: (origin: Readonly<ShieldPoint>, target: Slime) => Slime | undefined,
   ) {
     this.scene = scene;
     this.slots = HERO_ABILITIES[player.heroId];
@@ -376,25 +378,36 @@ export class AbilityController {
     );
   }
 
-  private hitEnemy(enemy: Slime, stats: Readonly<AbilityStats>, power = 1): void {
-    if (!enemy.active || enemy.aiState === 'defeated') return;
+  private hitEnemy(enemy: Slime, stats: Readonly<AbilityStats>, power = 1,
+    origin: Readonly<ShieldPoint> = this.player,
+    struck?: Set<string>): Slime | undefined {
+    if (!enemy.active || enemy.aiState === 'defeated') return undefined;
+    // Wooden shields also stop blast pressure and magic in their shadow.
+    // All redirected hits use the Treant's actual health, not a second pool.
+    const receiver = this.protectingShield?.(origin, enemy) ?? enemy;
+    if (!receiver.active || receiver.aiState === 'defeated') return undefined;
+    if (struck?.has(receiver.enemyId)) return undefined;
+    struck?.add(receiver.enemyId);
     const attack = {
       damage: (stats.damage * this.player.abilityDamageMultiplier +
         this.player.damage * 0.35) * power,
       criticalChance: this.player.criticalChance,
       criticalMultiplier: this.player.criticalMultiplier,
     };
-    const result = this.damageSystem.apply(enemy, attack);
-    this.showDamage(enemy.x, enemy.y, result);
-    if (result.defeated) enemy.playDefeat();
-    else enemy.showHit();
+    const result = this.damageSystem.apply(receiver, attack);
+    this.showDamage(receiver.x, receiver.y, result);
+    if (result.defeated) receiver.playDefeat();
+    else receiver.showHit();
+    return receiver;
   }
 
   private areaEffect(stats: Readonly<AbilityStats>, now: number): void {
     const targets = targetsInRadius(this.player.x, this.player.y, stats.radius, this.liveEnemies());
+    const struck = new Set<string>();
     for (const enemy of targets) {
-      this.hitEnemy(enemy, stats);
-      if (stats.kind === 'slow') enemy.applySlow(now, stats.durationMs, stats.slowFactor);
+      const receiver = this.hitEnemy(enemy, stats, 1, this.player, struck);
+      if (receiver && stats.kind === 'slow')
+        receiver.applySlow(now, stats.durationMs, stats.slowFactor);
     }
     if (stats.kind === 'drain' && targets.length > 0) {
       this.player.heal(stats.heal);
@@ -407,10 +420,11 @@ export class AbilityController {
     direction: Readonly<Vector2Value>): void {
     const x = this.player.x, y = this.player.y;
     const halfWidth = 49;
+    const struck = new Set<string>();
     for (const enemy of this.liveEnemies()) {
       if (!inForwardRectangle(x, y, direction, enemy.x, enemy.y, stats.radius, halfWidth)) continue;
-      this.hitEnemy(enemy, stats);
-      enemy.applyKnockback(now, 420, direction.x, direction.y, 380);
+      const receiver = this.hitEnemy(enemy, stats, 1, this.player, struck);
+      receiver?.applyKnockback(now, 420, direction.x, direction.y, 380);
     }
     const normalX = -direction.y * halfWidth;
     const normalY = direction.x * halfWidth;
@@ -498,8 +512,9 @@ export class AbilityController {
       // Fizzle near walls instead of exploding next to the player.
       if (!armed) continue;
       this.pulse(x, y, bomb.stats.radius, bomb.stats.color, 380);
+      const struck = new Set<string>();
       for (const enemy of targetsInRadius(x, y, bomb.stats.radius, this.liveEnemies())) {
-        this.hitEnemy(enemy, bomb.stats);
+        this.hitEnemy(enemy, bomb.stats, 1, { x, y }, struck);
       }
     }
   }

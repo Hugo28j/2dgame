@@ -20,6 +20,8 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
   private readonly spawnX: number;
   private readonly spawnY: number;
   private readonly maxRange: number;
+  private checkedX: number;
+  private checkedY: number;
 
   public constructor(
     scene: Phaser.Scene,
@@ -37,6 +39,8 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     this.effect = options.effect ?? 'none';
     this.spawnX = x;
     this.spawnY = y;
+    this.checkedX = x;
+    this.checkedY = y;
     this.maxRange = options.range ?? 700;
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -48,6 +52,22 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
       body.setSize(14, 8, true);
       body.setAllowGravity(false);
     }
+  }
+
+  /** Where the fired bullet originated, for frontal shield / cover checks. */
+  public get launchOrigin(): { x: number; y: number } {
+    return { x: this.spawnX, y: this.spawnY };
+  }
+
+  /** Ray between consecutive sampled projectile positions catches fast shots
+   * that pass through a shield without overlapping a normal enemy body.
+   */
+  public consumeFlightSegment(): { from: { x: number; y: number }; to: { x: number; y: number } } {
+    const from = { x: this.checkedX, y: this.checkedY };
+    const to = { x: this.x, y: this.y };
+    this.checkedX = this.x;
+    this.checkedY = this.y;
+    return { from, to };
   }
 
   public registerHit(targetId: string): boolean {

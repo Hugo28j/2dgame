@@ -4,7 +4,8 @@ import Phaser from 'phaser';
 import { getEnemyStatsForRoom, type EnemyKind, type SlimeRuntimeStats } from './enemyConfig';
 import { bossPhase, rangedVelocity } from './enemyMovement';
 import { Slime } from './Slime';
-import { getObstacleAvoidanceVelocity } from './slimeMovement';
+import { getChaseVelocity, getObstacleAvoidanceVelocity } from './slimeMovement';
+import { coverIsClose, rangedCoverSpot, shieldEndpoints, type ShieldSurface } from './treantShield';
 import { getBossPlan, getBossProfile } from './bossProfiles';
 import { CHARGER_DASH } from './enemyBalance';
 import type { BulletPattern } from './projectilePatterns';
@@ -31,6 +32,9 @@ export class AdvancedEnemy extends Slime {
   private warning?: Phaser.GameObjects.Graphics;
   private readonly orbitSign: -1 | 1;
   private readonly bossTint: number;
+  private shieldGraphic?: Phaser.GameObjects.Graphics;
+  private shieldFacingX = 0;
+  private shieldFacingY = 1;
 
   public constructor(scene: Phaser.Scene, id: string, x: number, y: number,
     kind: Exclude<EnemyKind, 'slime'>, roomNumber: number,
@@ -52,11 +56,18 @@ export class AdvancedEnemy extends Slime {
       const body = this.body;
       if (body instanceof Phaser.Physics.Arcade.Body) body.setCircle(21, 3, 3);
     }
+    if (worldId === 1 && kind === 'tank') {
+      this.shieldGraphic = scene.add.graphics().setDepth(13);
+    }
     this.nextShotAt = scene.time.now + stats.attackIntervalMs;
     this.nextSpecialAt = scene.time.now + 1500;
   }
 
   public get isBoss(): boolean { return this.kind === 'boss'; }
+  public get isTreantShield(): boolean { return this.kind === 'tank' && this.worldId === 1; }
+  public get shieldSurface(): ShieldSurface {
+    return { x: this.x, y: this.y, facingX: this.shieldFacingX, facingY: this.shieldFacingY };
+  }
   public get isPoisonAlchemist(): boolean {
     return this.isBoss && this.worldId === 1 && this.roomNumber === 20;
   }
@@ -65,9 +76,19 @@ export class AdvancedEnemy extends Slime {
   }
 
   public updateAI(targetX: number, targetY: number, now: number,
-    fire: EnemyFire, explode: EnemyExplosion, dropBombs?: EnemyBomb): void {
+    fire: EnemyFire, explode: EnemyExplosion, dropBombs?: EnemyBomb,
+    coverTank?: Readonly<ShieldSurface>): void {
     if (this.aiState === 'defeated') return;
     super.chase(targetX, targetY);
+    if (this.isTreantShield) {
+      const dx = targetX - this.x, dy = targetY - this.y;
+      const length = Math.hypot(dx, dy);
+      if (length > 0.001) {
+        this.shieldFacingX = dx / length;
+        this.shieldFacingY = dy / length;
+      }
+      this.drawTreantShield();
+    }
     if (this.isKnockedBack(now)) return;
     const distance = Phaser.Math.Distance.Between(this.x, this.y, targetX, targetY);
     const speed = this.stats.movementSpeed * this.slowMultiplier;
@@ -75,8 +96,15 @@ export class AdvancedEnemy extends Slime {
     switch (this.kind) {
       case 'archer':
       case 'mage': {
-        const move = rangedVelocity(this.x, this.y, targetX, targetY, speed,
-          this.kind === 'archer' ? 210 : 155, this.orbitSign);
+        const move = coverTank && coverIsClose(this, coverTank)
+          ? (() => {
+              const behind = rangedCoverSpot(coverTank, this.orbitSign);
+              const distanceToCover = Math.hypot(behind.x - this.x, behind.y - this.y);
+              return distanceToCover < 19 ? { x: 0, y: 0 } :
+                getChaseVelocity(this.x, this.y, behind.x, behind.y, speed);
+            })()
+          : rangedVelocity(this.x, this.y, targetX, targetY, speed,
+              this.kind === 'archer' ? 210 : 155, this.orbitSign);
         const body = this.body;
         const horizontalBlock = body instanceof Phaser.Physics.Arcade.Body &&
           (body.blocked.left || body.blocked.right || body.touching.left || body.touching.right);
@@ -151,6 +179,41 @@ export class AdvancedEnemy extends Slime {
         }
         break;
       }
+    }
+  }
+
+  /** The drawn plate is the same actual line segment used in damage interception.
+   * The green bar above the enemy already represents its entire shield + body HP.
+   */
+  private drawTreantShield(): void {
+    const graphic = this.shieldGraphic;
+    if (!graphic || !graphic.active) return;
+    const [a, b] = shieldEndpoints(this.shieldSurface);
+    const centerX = (a.x + b.x) / 2;
+    const centerY = (a.y + b.y) / 2;
+    const nx = this.shieldFacingX, ny = this.shieldFacingY;
+    graphic.clear();
+    graphic.lineStyle(15, 0x243b24, 0.98);
+    graphic.lineBetween(a.x, a.y, b.x, b.y);
+    graphic.lineStyle(10, 0x826a3f, 1);
+    graphic.lineBetween(a.x, a.y, b.x, b.y);
+    graphic.lineStyle(6, 0xc6a86c, 0.98);
+    graphic.lineBetween(a.x + nx * 2, a.y + ny * 2, b.x + nx * 2, b.y + ny * 2);
+    graphic.lineStyle(2.8, 0xd9f99d, 0.85);
+    graphic.lineBetween(a.x + nx * 7, a.y + ny * 7, b.x + nx * 7, b.y + ny * 7);
+    // A central metal boss plate and two wooden cross-braces.
+    graphic.fillStyle(0x647744, 1);
+    graphic.fillCircle(centerX + nx * 6, centerY + ny * 6, 9);
+    graphic.lineStyle(2, 0xfef3c7, 0.9);
+    graphic.strokeCircle(centerX + nx * 6, centerY + ny * 6, 9);
+    const integrity = this.healthRatio;
+    if (integrity < 0.67) {
+      const dx = b.x - a.x, dy = b.y - a.y;
+      graphic.lineStyle(2.5, 0x20190d, 0.85);
+      graphic.lineBetween(a.x + dx * 0.22, a.y + dy * 0.22,
+        centerX - nx * 4, centerY - ny * 4);
+      if (integrity < 0.33) graphic.lineBetween(centerX + nx * 3, centerY + ny * 3,
+        b.x - dx * 0.14, b.y - dy * 0.14);
     }
   }
 
@@ -234,10 +297,13 @@ export class AdvancedEnemy extends Slime {
     this.warning = undefined;
   }
   public override playDefeat(): void {
+    this.shieldGraphic?.clear();
     this.clearWarning();
     super.playDefeat();
   }
   public override destroy(fromScene?: boolean): void {
+    this.shieldGraphic?.destroy();
+    this.shieldGraphic = undefined;
     this.warning?.destroy();
     this.warning = undefined;
     super.destroy(fromScene);
