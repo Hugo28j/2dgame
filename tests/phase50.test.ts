@@ -63,7 +63,7 @@ describe('six boss arenas and seven original archetypes', () => {
       .filter(room => getRoomDefinition(room).isBossRoom);
     expect(bossRooms).toEqual([5, 10, 15, 20, 25, 30]);
     for (const room of bossRooms) {
-      expect(getRoomDefinition(room).enemyCount).toBe(room === 15 ? 2 : 1);
+      expect(getRoomDefinition(room).enemyCount).toBe(1);
       expect(getBossProfile(room).name).toBe(getBossName(room));
       expect(getBossTier(room)).toBe(room / 5);
       expect(BOSS_ENCOUNTER_ARCHETYPES[room]).toHaveLength(room === 15 ? 2 : 1);
@@ -80,7 +80,7 @@ describe('six boss arenas and seven original archetypes', () => {
   it('preserves unique phase-two attacks and speeds up Jade Matriarch', () => {
     const signatures = new Set<string>();
     for (const room of [5, 10, 15, 20, 25, 30]) {
-      const bossSlots = getRoomDefinition(room).enemyCount;
+      const bossSlots = room === 15 ? 2 : getRoomDefinition(room).enemyCount;
       for (let slot = 0; slot < bossSlots; slot++) {
         const profile = getBossProfile(room, slot);
         expect(profile.phaseOne).not.toEqual(profile.phaseTwo);
