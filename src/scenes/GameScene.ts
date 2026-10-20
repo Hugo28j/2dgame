@@ -143,6 +143,7 @@ export class GameScene extends Phaser.Scene {
       (x, y, result) => this.showDamageNumber(x, y, result),
       () => this.drawPlayerHealth(),
       () => this.gameOver || this.transitioning || this.chapterComplete || this.choosingUpgrade,
+      this.enemyProjectiles,
     );
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
@@ -171,7 +172,7 @@ export class GameScene extends Phaser.Scene {
     this.updateCamera();
     const aim = this.controls.getAim(this.player.x, this.player.y);
     this.player.face(aim);
-    this.abilities?.update(this.time.now);
+    this.abilities?.update(this.time.now, delta);
     this.weapon.update(this.time.now, this.controls.isShooting(), aim);
 
     for (const child of this.enemies.getChildren()) {
@@ -183,7 +184,10 @@ export class GameScene extends Phaser.Scene {
       }
     }
     for (const child of this.enemyProjectiles?.getChildren() ?? []) {
-      if (child instanceof EnemyProjectile && child.isOutsideArena()) child.destroy();
+      if (child instanceof EnemyProjectile) {
+        child.setSlowMotion(this.abilities?.enemyProjectileFactor(this.time.now) ?? 1);
+        if (child.isOutsideArena()) child.destroy();
+      }
     }
     this.updateBossHud();
 
