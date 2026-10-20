@@ -61,7 +61,14 @@ describe('five unique playable worlds', () => {
         const newStats = getEnemyStatsForRoom(kind, 24, world as 1 | 2 | 3 | 4 | 5);
         expect(newStats.maxHp).toBeGreaterThan(oldStats.maxHp);
         expect(newStats.damage).toBeGreaterThan(oldStats.damage);
-        expect(newStats.movementSpeed).toBeGreaterThanOrEqual(oldStats.movementSpeed);
+        if (kind === 'slime' && world === 2) {
+          // World 1 Mosslings intentionally get +25% speed; Frozen Hollow
+          // slimes retain their pre-existing speed rather than being buffed too.
+          expect(oldStats.movementSpeed).toBe(140);
+          expect(newStats.movementSpeed).toBe(116);
+        } else {
+          expect(newStats.movementSpeed).toBeGreaterThanOrEqual(oldStats.movementSpeed);
+        }
         expect(newStats.attackIntervalMs).toBeLessThanOrEqual(oldStats.attackIntervalMs);
       }
     }

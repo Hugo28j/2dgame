@@ -6,6 +6,7 @@ import { bossPhase, rangedVelocity } from './enemyMovement';
 import { Slime } from './Slime';
 import { getObstacleAvoidanceVelocity } from './slimeMovement';
 import { getBossPlan, getBossProfile } from './bossProfiles';
+import { CHARGER_DASH } from './enemyBalance';
 import type { BulletPattern } from './projectilePatterns';
 export type { BulletPattern } from './projectilePatterns';
 
@@ -35,7 +36,7 @@ export class AdvancedEnemy extends Slime {
     kind: Exclude<EnemyKind, 'slime'>, roomNumber: number,
     worldId: WorldId = 1,
     public readonly bossSlot = 0) {
-    const stats = getEnemyStatsForRoom(kind, roomNumber, worldId);
+    const stats = getEnemyStatsForRoom(kind, roomNumber, worldId, bossSlot);
     super(scene, id, x, y, stats);
     this.kind = kind;
     this.roomNumber = roomNumber;
@@ -96,7 +97,7 @@ export class AdvancedEnemy extends Slime {
         // Slow, hard-hitting chaser: super.chase already includes obstacle avoidance.
         break;
       case 'charger':
-        this.chargeLogic(targetX, targetY, now, distance, 2300);
+        this.chargeLogic(targetX, targetY, now, distance, CHARGER_DASH.rechargeMs);
         break;
       case 'bomber':
         if (this.windupEndsAt > 0) {
@@ -168,8 +169,9 @@ export class AdvancedEnemy extends Slime {
     distance: number, rechargeMs: number): void {
     if (this.dashEndsAt > 0) {
       if (now < this.dashEndsAt) {
-        this.setVelocity(this.dashX * (this.isBoss ? 360 : 430) * this.slowMultiplier,
-          this.dashY * (this.isBoss ? 360 : 430) * this.slowMultiplier);
+        const chargeSpeed = this.isBoss ? 360 : CHARGER_DASH.speed;
+        this.setVelocity(this.dashX * chargeSpeed * this.slowMultiplier,
+          this.dashY * chargeSpeed * this.slowMultiplier);
         return;
       }
       this.dashEndsAt = 0;
@@ -182,7 +184,8 @@ export class AdvancedEnemy extends Slime {
       this.drawWarning(70, 0xef4444);
       if (now >= this.windupEndsAt) {
         this.clearWarning();
-        this.dashEndsAt = now + (this.isMossWarden ? 1080 : 360);
+        this.dashEndsAt = now + (this.isMossWarden ? 1080 :
+          this.kind === 'charger' ? CHARGER_DASH.durationMs : 360);
       }
       return;
     }
@@ -190,7 +193,8 @@ export class AdvancedEnemy extends Slime {
       const direction = new Phaser.Math.Vector2(targetX - this.x, targetY - this.y).normalize();
       this.dashX = direction.x;
       this.dashY = direction.y;
-      this.windupEndsAt = now + (this.isMossWarden ? 330 : this.isBoss ? 770 : 540);
+      this.windupEndsAt = now + (this.isMossWarden ? 330 : this.isBoss ? 770 :
+        CHARGER_DASH.telegraphMs);
       this.setVelocity(0, 0);
       this.drawWarning(70, 0xef4444);
     }
@@ -207,7 +211,8 @@ export class AdvancedEnemy extends Slime {
       return;
     }
     // Warn about the full dash corridor, not an unrelated circle.
-    const reach = this.isMossWarden ? 360 * 1.08 : (this.isBoss ? 360 : 430) * 0.36;
+    const reach = this.isMossWarden ? 360 * 1.08 :
+      this.kind === 'charger' ? CHARGER_DASH.distance : 360 * 0.36;
     const halfWidth = this.isBoss ? 32 : 24;
     const normalX = -this.dashY * halfWidth;
     const normalY = this.dashX * halfWidth;
