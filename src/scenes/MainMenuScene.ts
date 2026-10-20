@@ -269,96 +269,97 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   private drawUpgrades(): void {
-    this.button(72, 276, 105, 34, 'PERMANENT', () => this.setUpgradeCategory('permanent'),
-      this.upgradeCategory === 'permanent' ? 'selected' : 'quiet', false, 11);
-    this.button(195, 276, 132, 34, 'HELD & WAPEN', () => this.setUpgradeCategory('equipment'),
-      this.upgradeCategory === 'equipment' ? 'selected' : 'quiet', false, 11);
-    this.button(320, 276, 108, 34, 'ABILITIES', () => this.setUpgradeCategory('abilities'),
-      this.upgradeCategory === 'abilities' ? 'selected' : 'quiet', false, 11);
+    this.section('VERBETER JE UITRUSTING', 'Besteed goud aan blijvende verbeteringen');
+    const choices: Array<['permanent' | 'equipment' | 'abilities', string]> = [
+      ['permanent', 'PERMANENT'], ['equipment', 'HELD & WAPEN'], ['abilities', 'ABILITIES'],
+    ];
+    choices.forEach(([category, label], index) => {
+      const widths = [104, 126, 102];
+      const positions = [73, 198, 320];
+      this.button(positions[index]!, 316, widths[index]!, 35,
+        label, () => this.setUpgradeCategory(category),
+        this.upgradeCategory === category ? 'selected' : 'quiet', false, 10);
+    });
 
     const profile = progressStore.current;
-    const rows: Array<{ label: string; description: string; level: number; unlocked: boolean;
-      max: number; cost: number; action: ProfileAction }> = this.upgradeCategory === 'permanent'
+    const equipment = equipmentForHero(profile.selectedHero);
+    const rows: Array<{
+      label: string; description: string; summary: string; level: number;
+      unlocked: boolean; max: number; cost: number; action: ProfileAction;
+    }> = this.upgradeCategory === 'permanent'
       ? PERMANENT_UPGRADE_IDS.map(id => ({
-          label: PERMANENT_UPGRADES[id].name, description: PERMANENT_UPGRADES[id].description,
+          label: PERMANENT_UPGRADES[id].name,
+          description: PERMANENT_UPGRADES[id].description, summary: '',
           level: profile.permanentLevels[id], unlocked: true, max: MAX_PERMANENT_LEVEL,
           cost: permanentUpgradeCost(id, profile.permanentLevels[id]),
           action: { type: 'upgradePermanent', id } as const,
         }))
       : this.upgradeCategory === 'abilities'
-      ? HERO_ABILITIES[profile.selectedHero].map(id => {
-          const ability = ABILITIES[id];
-          const unlocked = isAbilityUnlocked(id, profile.heroLevels[profile.selectedHero]);
-          const stats = getAbilityStats(id, profile.abilityLevels[id]);
-          const effect = ability.kind === 'dash'
-            ? 'SNELH. ' + stats.dashSpeed + ' · CD ' + (stats.cooldownMs / 1000).toFixed(1) + 'S'
-            : ability.kind === 'heal'
-            ? stats.heal + ' HP · SCHILD ' + (stats.invulnerabilityMs / 1000).toFixed(1) + 'S'
-            : ability.kind === 'drain'
-            ? stats.damage + ' DMG · ' + stats.heal + ' HP'
-            : ability.kind === 'slow'
-            ? stats.damage + ' DMG · ' + Math.round((1 - stats.slowFactor) * 100) + '% TRAAG'
-            : stats.damage + ' DMG · R' + stats.radius;
-          return {
-            label: ability.name,
-            description: unlocked ? ability.description + ' · ' + effect :
-              'Ontgrendelt op heldlevel ' + ability.unlockLevel,
-            level: profile.abilityLevels[id], unlocked, max: MAX_ABILITY_LEVEL,
-            cost: abilityUpgradeCost(profile.abilityLevels[id]),
-            action: { type: 'upgradeAbility', id } as const,
-          };
-        })
-      : [
-          ...HERO_IDS.map(id => ({
-            label: HEROES[id].name, description: 'Held verbeteren', level: profile.heroLevels[id],
-            unlocked: profile.unlockedHeroes.includes(id), max: MAX_HERO_LEVEL,
-            cost: heroUpgradeCost(profile.heroLevels[id]),
-            action: { type: 'upgradeHero', id } as const,
-          })),
-          ...WEAPON_IDS.map(id => ({
-            label: WEAPONS[id].name, description: HEROES[WEAPONS[id].heroId].name + ' · wapen verbeteren', level: profile.weaponLevels[id],
-            unlocked: profile.unlockedWeapons.includes(id) &&
-              profile.unlockedHeroes.includes(WEAPONS[id].heroId), max: MAX_WEAPON_LEVEL,
-            cost: weaponUpgradeCost(profile.weaponLevels[id]),
-            action: { type: 'upgradeWeapon', id } as const,
-          })),
-        ];
+        ? HERO_ABILITIES[profile.selectedHero].map(id => {
+            const ability = ABILITIES[id];
+            const unlocked = isAbilityUnlocked(id, profile.heroLevels[profile.selectedHero]);
+            return {
+              label: ability.name,
+              description: unlocked ? ability.description :
+                'Ontgrendelt bij heldlevel ' + ability.unlockLevel,
+              summary: unlocked ? abilityMenuSummary(
+                getAbilityStats(id, profile.abilityLevels[id])) : 'NOG VERGRENDELD',
+              level: profile.abilityLevels[id], unlocked, max: MAX_ABILITY_LEVEL,
+              cost: abilityUpgradeCost(profile.abilityLevels[id]),
+              action: { type: 'upgradeAbility', id } as const,
+            };
+          })
+        : [
+            {
+              label: HEROES[equipment.heroId].name,
+              description: 'HP, schade en verdediging van je huidige held',
+              summary: 'HELD  ·  ' + HEROES[equipment.heroId].name.toUpperCase(),
+              level: profile.heroLevels[equipment.heroId],
+              unlocked: profile.unlockedHeroes.includes(equipment.heroId),
+              max: MAX_HERO_LEVEL, cost: heroUpgradeCost(profile.heroLevels[equipment.heroId]),
+              action: { type: 'upgradeHero', id: equipment.heroId } as const,
+            },
+            ...equipment.weaponIds.map(id => ({
+              label: WEAPONS[id].name, description: WEAPONS[id].description,
+              summary: 'WAPEN  ·  ' + getWeaponStats(id, profile.weaponLevels[id]).damage + ' SCHADE',
+              level: profile.weaponLevels[id],
+              unlocked: profile.unlockedWeapons.includes(id),
+              max: MAX_WEAPON_LEVEL,
+              cost: weaponUpgradeCost(profile.weaponLevels[id]),
+              action: { type: 'upgradeWeapon', id } as const,
+            })),
+          ];
 
-    const compact = this.upgradeCategory === 'equipment';
-    const pageSize = 8;
-    const pages = compact ? Math.ceil(rows.length / pageSize) : 1;
-    this.upgradePage = Math.max(0, Math.min(this.upgradePage, pages - 1));
-    const visibleRows = compact ? rows.slice(this.upgradePage * pageSize,
-      (this.upgradePage + 1) * pageSize) : rows;
-    visibleRows.forEach((row, index) => {
-      const y = compact ? 330 + index * 45 : 347 + index * 67;
-      const height = compact ? 41 : 61;
-      this.plate(195, y, 330, height, COLOR.card, COLOR.border, 9);
-      this.text(43, y - (compact ? 14 : 21), row.label.toUpperCase(),
-        compact ? 11 : 13, COLOR.white, false, true);
-      if (!compact) this.text(43, y - 2, row.description, 10, COLOR.secondary);
-      this.text(43, y + (compact ? 6 : 16), 'NIVEAU ' + row.level + '/' + row.max,
+    const roomy = this.upgradeCategory !== 'permanent';
+    rows.forEach((row, index) => {
+      const y = roomy ? 394 + index * 116 : 372 + index * 65;
+      this.plate(195, y, 328, roomy ? 106 : 59, COLOR.card, COLOR.border, 11);
+      this.fittedText(43, y - (roomy ? 31 : 17), row.label.toUpperCase(),
+        roomy ? 13 : 12, COLOR.white, 240, true);
+      this.fittedText(43, y - (roomy ? 9 : 0), row.description,
+        10, COLOR.secondary, roomy ? 280 : 218);
+      if (roomy) {
+        this.fittedText(43, y + 12, row.summary, 10, '#fde68a', 286);
+      }
+      this.text(43, y + (roomy ? 34 : 20), 'LEVEL ' + row.level + ' / ' + row.max,
         10, COLOR.faint);
-      const label = !row.unlocked ? 'LOCKED' : row.level >= row.max ? 'MAX' : row.cost + ' G';
-      this.button(307, y + (compact ? 0 : 7), 89, 30, label, () => this.runAction(row.action),
-        'normal', !row.unlocked || row.level >= row.max || profile.gold < row.cost, 10);
+      const available = row.unlocked && row.level < row.max && profile.gold >= row.cost;
+      const label = !row.unlocked ? 'SLOT' : row.level >= row.max ? 'MAX' :
+        row.cost.toLocaleString('nl-BE') + ' G';
+      this.button(309, y + (roomy ? 33 : 12), 88, 31,
+        label, () => this.runAction(row.action),
+        available ? 'normal' : 'quiet', !available, 10);
     });
-    if (compact && pages > 1) {
-      this.button(99, 700, 111, 28, '‹ VORIGE', () => {
-        this.upgradePage = Math.max(0, this.upgradePage - 1);
-        this.scene.restart();
-      }, 'quiet', this.upgradePage === 0, 10);
-      this.text(195, 700, (this.upgradePage + 1) + '/' + pages, 11, COLOR.secondary, true);
-      this.button(292, 700, 111, 28, 'VOLGENDE ›', () => {
-        this.upgradePage = Math.min(pages - 1, this.upgradePage + 1);
-        this.scene.restart();
-      }, 'quiet', this.upgradePage === pages - 1, 10);
-    }
+    this.text(195, 705, this.upgradeCategory === 'equipment'
+      ? 'Andere held verbeteren? Selecteer die bij HELDEN.'
+      : this.upgradeCategory === 'abilities'
+      ? 'Vaardigheden openen op heldlevel 1, 10 en 20.'
+      : 'Permanent: bonussen gelden voor al je helden.',
+    10, COLOR.secondary, true);
   }
 
   private setUpgradeCategory(category: 'equipment' | 'abilities' | 'permanent'): void {
     this.upgradeCategory = category;
-    this.upgradePage = 0;
     this.scene.restart();
   }
 
@@ -503,8 +504,26 @@ export class MainMenuScene extends Phaser.Scene {
   };
 
   private section(title: string, subtitle: string): void {
-    this.text(44, 257, title, 17, COLOR.white, false, true);
-    this.text(44, 280, subtitle, 10, COLOR.secondary);
+    this.add.rectangle(39, 273, 3, 23, COLOR.accent, 0.9);
+    this.fittedText(52, 267, title, 16, COLOR.white, 285, true);
+    this.fittedText(43, 292, subtitle, 10, COLOR.secondary, 305);
+    this.add.rectangle(195, 306, 306, 1, COLOR.border, 0.7);
+  }
+
+  /** Keep all card labels inside their own available width on small screens. */
+  private fittedText(x: number, y: number, value: string, size: number,
+    color: string, maxWidth: number, bold = false): Phaser.GameObjects.Text {
+    const label = this.text(x, y, value, size, color, false, bold);
+    if (label.width <= maxWidth) return label;
+    let keep = Math.min(value.length - 1,
+      Math.floor(value.length * maxWidth / label.width) - 1);
+    keep = Math.max(2, keep);
+    label.setText(value.slice(0, keep).trimEnd() + '…');
+    while (label.width > maxWidth && keep > 2) {
+      keep -= 1;
+      label.setText(value.slice(0, keep).trimEnd() + '…');
+    }
+    return label;
   }
 
   private text(x: number, y: number, value: string, size: number, color: string,
