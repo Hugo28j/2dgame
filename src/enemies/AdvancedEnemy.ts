@@ -13,6 +13,7 @@ export type { BulletPattern } from './projectilePatterns';
 
 export type EnemyFire = (enemy: AdvancedEnemy, pattern: BulletPattern, volley?: number, speed?: number) => void;
 export type EnemyExplosion = (enemy: AdvancedEnemy, radius: number) => void;
+export type EnemySummon = (enemy: AdvancedEnemy, count: number) => void;
 export type EnemyBomb = (enemy: AdvancedEnemy, targetX: number, targetY: number,
   count: number, radius: number, windupMs: number) => void;
 
@@ -77,7 +78,7 @@ export class AdvancedEnemy extends Slime {
 
   public updateAI(targetX: number, targetY: number, now: number,
     fire: EnemyFire, explode: EnemyExplosion, dropBombs?: EnemyBomb,
-    coverTank?: Readonly<ShieldSurface>): void {
+    coverTank?: Readonly<ShieldSurface>, summon?: EnemySummon): void {
     if (this.aiState === 'defeated') return;
     super.chase(targetX, targetY);
     if (this.isTreantShield) {
@@ -90,6 +91,10 @@ export class AdvancedEnemy extends Slime {
       this.drawTreantShield();
     }
     if (this.isKnockedBack(now)) return;
+    if (this.worldId === 2 && this.kind !== 'boss') {
+      this.updateFrozenMinion(targetX, targetY, now, fire, dropBombs, summon);
+      return;
+    }
     const distance = Phaser.Math.Distance.Between(this.x, this.y, targetX, targetY);
     const speed = this.stats.movementSpeed * this.slowMultiplier;
 
@@ -179,6 +184,42 @@ export class AdvancedEnemy extends Slime {
         }
         break;
       }
+    }
+  }
+
+  /** Six world-2 enemy roles with dedicated attacks and positioning. */
+  private updateFrozenMinion(targetX: number, targetY: number, now: number,
+    fire: EnemyFire, dropBombs?: EnemyBomb, summon?: EnemySummon): void {
+    const speed = this.stats.movementSpeed * this.slowMultiplier;
+    switch (this.kind) {
+      case 'archer':
+      case 'mage':
+      case 'bomber':
+      case 'charger': {
+        const range = this.kind === 'archer' ? 230 :
+          this.kind === 'mage' ? 185 : this.kind === 'bomber' ? 310 : 175;
+        const movement = rangedVelocity(this.x, this.y, targetX, targetY, speed,
+          range, this.orbitSign);
+        this.setVelocity(movement.x, movement.y);
+        if (this.kind === 'mage' && now >= this.nextSpecialAt) {
+          summon?.(this, 2);
+          this.nextSpecialAt = now + 5000;
+        }
+        if (now < this.nextShotAt) break;
+        if (this.kind === 'bomber') {
+          dropBombs?.(this, targetX, targetY, 1, 62, 950);
+        } else {
+          fire(this, this.kind === 'charger' ? 'shotgun-six' : 'single');
+        }
+        this.nextShotAt = now + (this.kind === 'charger' ? 4400 :
+          this.kind === 'mage' ? Math.max(2300, this.stats.attackIntervalMs) :
+          this.stats.attackIntervalMs);
+        break;
+      }
+      case 'tank':
+        // Slow, high-HP chaser; splits into two Snow Puffs on death.
+        break;
+      default: break;
     }
   }
 
