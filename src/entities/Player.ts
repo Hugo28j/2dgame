@@ -26,6 +26,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   private chilledUntil = 0;
   private frozenUntil = 0;
   public get isFrozen(): boolean { return this.scene.time.now < this.frozenUntil; }
+  public get isChilled(): boolean { return this.scene.time.now < this.chilledUntil; }
+  public clearFrost(): void {
+    this.chilledUntil = 0;
+    this.frozenUntil = 0;
+  }
 
   public chill(now: number): void {
     this.chilledUntil = Math.max(this.chilledUntil, now + FROZEN_EARLY.chillDurationMs);
