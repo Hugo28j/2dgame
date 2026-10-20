@@ -97,12 +97,17 @@ describe('six boss arenas and seven original archetypes', () => {
     expect(getBossPlan(20, 2, 0).bombs).toBeGreaterThan(3);
   });
 
-  it('scales health and damage across the six boss encounters', () => {
-    const stats = [5, 10, 15, 20, 25, 30].map(room => getEnemyStatsForRoom('boss', room));
+  it('scales boss damage and regular HP across the six boss encounters', () => {
+    const rooms = [5, 10, 15, 20, 25, 30];
+    const stats = rooms.map(room => getEnemyStatsForRoom('boss', room));
     for (let i = 1; i < stats.length; i++) {
-      expect(stats[i]!.maxHp).toBeGreaterThan(stats[i - 1]!.maxHp);
+      // Bramble Gunner on room 15 is deliberately easier than the normal HP curve.
+      if (rooms[i] !== 15) expect(stats[i]!.maxHp).toBeGreaterThan(stats[i - 1]!.maxHp);
       expect(stats[i]!.damage).toBeGreaterThan(stats[i - 1]!.damage);
     }
+    // Bloom Sentinel, the other room-15 boss, still follows regular scaling.
+    expect(getEnemyStatsForRoom('boss', 15, 1, 1).maxHp)
+      .toBeGreaterThan(getEnemyStatsForRoom('boss', 10).maxHp);
   });
 
   it('generates fast machinegun, rotating spiral, cross and circular phase-two patterns', () => {
