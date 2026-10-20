@@ -259,10 +259,18 @@ export class MainMenuScene extends Phaser.Scene {
           const ability = ABILITIES[id];
           const unlocked = isAbilityUnlocked(id, profile.heroLevels[profile.selectedHero]);
           const stats = getAbilityStats(id, profile.abilityLevels[id]);
+          const effect = ability.kind === 'dash'
+            ? stats.dashSpeed + ' SNELHEID · ' + (stats.cooldownMs / 1000).toFixed(1) + 'S CD'
+            : ability.kind === 'heal'
+            ? stats.heal + ' HP · ' + (stats.invulnerabilityMs / 1000).toFixed(1) + 'S SCHILD'
+            : ability.kind === 'drain'
+            ? stats.damage + ' DMG · +' + stats.heal + ' HP'
+            : ability.kind === 'slow'
+            ? stats.damage + ' DMG · ' + Math.round((1 - stats.slowFactor) * 100) + '% TRAAG'
+            : stats.damage + ' DMG · ' + stats.radius + ' BEREIK';
           return {
             label: ability.name,
-            description: unlocked ? ability.description + ' · ' +
-              (ability.damage > 0 ? stats.damage + ' DMG' : stats.heal + ' HP') :
+            description: unlocked ? ability.description + ' · ' + effect :
               'Ontgrendelt op heldlevel ' + ability.unlockLevel,
             level: profile.abilityLevels[id], unlocked, max: MAX_ABILITY_LEVEL,
             cost: abilityUpgradeCost(profile.abilityLevels[id]),
