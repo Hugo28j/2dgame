@@ -3,7 +3,7 @@ import type { AttackData } from '../combat/damage';
 import { addAndLaunch } from '../combat/launchProjectile';
 import { Projectile } from '../entities/Projectile';
 import type { Player } from '../entities/Player';
-import type { Slime } from '../enemies/Slime';
+import { Slime } from '../enemies/Slime';
 import type { Vector2Value } from '../input/vectorMath';
 import { fireIntervalMs, getWeaponStats, WARHAMMER_GROUND_SLAM, type WeaponId } from './weaponConfig';
 import { isInsideMeleeSwing } from './meleeCombat';
