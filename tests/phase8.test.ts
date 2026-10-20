@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   SaveManager, applyProfileAction, defaultProfile, validateProfile,
 } from '../src/progression/ProgressStore';
-import { armorBonuses, rollArmor, armorUpgradeCost } from '../src/progression/armor';
+import { armorBonuses, rollEnemyArmor, armorUpgradeCost } from '../src/progression/armor';
 import { RunLedger } from '../src/progression/RunLedger';
 import { RUN_UPGRADES, RunUpgradeDeck } from '../src/progression/runUpgrades';
 
@@ -50,7 +50,7 @@ describe('phase 8 save migration and permanent shop', () => {
     const migrated = validateProfile(old);
     expect(migrated.version).toBe(4);
     expect(migrated.gold).toBe(700);
-    expect(migrated.selectedHero).toBe('mage');
+    expect(migrated.selectedHero).toBe('guardian');
     expect(migrated.heroLevels.ranger).toBe(4);
     expect(migrated.permanentLevels.hp).toBe(0);
     expect(migrated.highestRoom).toBe(1);
@@ -59,7 +59,7 @@ describe('phase 8 save migration and permanent shop', () => {
   it('replaces legacy permanent purchases with percentage armor upgrades', () => {
     let profile = { ...defaultProfile(), gold: 100000 };
     expect(applyProfileAction(profile, { type: 'upgradePermanent', id: 'hp' })).toEqual(profile);
-    const item = rollArmor(true, 0, 0, 0, 'old-test')!;
+    const item = rollEnemyArmor('normal', 0, 0, 0, 'old-test', 'enemy', 'guardian')!;
     profile = { ...profile, armorInventory: [item] };
     profile = applyProfileAction(profile, { type: 'equipArmor', id: item.id });
     const oldBonus = armorBonuses(profile.armorInventory, profile.equippedArmor.guardian, 'guardian').hp;
@@ -83,10 +83,9 @@ describe('phase 8 save migration and permanent shop', () => {
     };
     const first = new SaveManager(local);
     expect(first.current.gold).toBe(500);
-    const report = new RunLedger('persist-armor').report(true);
-    expect(first.dispatch({ type: 'settleRun', report,
-      rolls: { drop: 0, rarity: 0, kind: 0 },
-      secondRoll: { drop: .9, rarity: 0, kind: 0 } })).toBe(true);
+    const itemFromFloor = rollEnemyArmor('normal', 0, 0, 0,
+      'persist-armor', 'enemy1', 'guardian')!;
+    expect(first.dispatch({ type: 'collectArmor', item: itemFromFloor })).toBe(true);
     const second = new SaveManager(local);
     expect(second.current.gold).toBe(500);
     expect(second.current.armorInventory).toHaveLength(1);
@@ -109,7 +108,7 @@ describe('phase 8 save migration and permanent shop', () => {
     expect(corrupt.highestRoom).toBe(30);
     expect(corrupt.permanentLevels.hp).toBe(0);
     expect(corrupt.permanentLevels.damage).toBe(15);
-    expect(corrupt.selectedHero).toBe('ranger');
+    expect(corrupt.selectedHero).toBe('guardian');
     expect(corrupt.settledRunIds).toEqual(['ok']);
   });
 });
