@@ -14,27 +14,27 @@ import {
   MAX_PERMANENT_LEVEL, PERMANENT_UPGRADE_IDS, PERMANENT_UPGRADES, permanentUpgradeCost,
 } from '../progression/economy';
 import {
-  HERO_WEAPONS, WEAPON_IDS, WEAPONS, getWeaponStats,
+  HERO_WEAPONS, WEAPONS, getWeaponStats,
   weaponUpgradeCost, MAX_WEAPON_LEVEL,
 } from '../weapons/weaponConfig';
 import {
   ABILITIES, HERO_ABILITIES, MAX_ABILITY_LEVEL, abilityUpgradeCost, getAbilityStats,
   isAbilityUnlocked,
 } from '../abilities/abilityConfig';
+import { abilityMenuSummary, equipmentForHero } from '../ui/menuPresentation';
 
 type MenuTab = 'worlds' | 'heroes' | 'weapons' | 'upgrades' | 'settings';
 type ButtonStyle = 'normal' | 'selected' | 'primary' | 'danger' | 'quiet';
 const FONT = 'system-ui, sans-serif';
 const COLOR = {
-  background: 0x080f1c, panel: 0x101e30, card: 0x16263b,
-  border: 0x2b405a, accent: 0x38bdf8, gold: 0xfbbf24, muted: 0x9daec5,
-  white: '#f4f8ff', secondary: '#a6b8ce', faint: '#7487a0',
+  background: 0x090f19, panel: 0x111e2d, card: 0x192a3b,
+  border: 0x304459, accent: 0x58d4eb, gold: 0xfbbf24, muted: 0x9daec5,
+  white: '#f5f9ff', secondary: '#b9c9d8', faint: '#899bad',
 } as const;
 
 export class MainMenuScene extends Phaser.Scene {
   private tab: MenuTab = 'worlds';
   private heroPage = 0;
-  private upgradePage = 0;
   private upgradeCategory: 'equipment' | 'abilities' | 'permanent' = 'permanent';
   private settingsView: 'general' | 'controls' = 'general';
   private resetRequested = false;
@@ -50,7 +50,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.drawBackground();
     this.drawHeader();
     this.drawNavigation();
-    this.plate(195, 478, 354, 474, COLOR.panel, COLOR.border, 17);
+    this.plate(195, 490, 354, 476, COLOR.panel, COLOR.border, 17);
 
     if (this.tab === 'worlds') this.drawWorlds();
     else if (this.tab === 'heroes') this.drawHeroes();
@@ -59,9 +59,10 @@ export class MainMenuScene extends Phaser.Scene {
     else if (this.settingsView === 'controls') this.drawControls();
     else this.drawSettings();
 
-    this.button(195, 763, 340, 61, '▶   SPEEL ' + getWorld(progressStore.current.selectedWorld).name.toUpperCase(),
-      () => this.scene.start(GAME_SCENE_KEY), 'primary', false, 14);
-    this.text(195, 807, '5 WERELDEN  ·  50 KAMERS  ·  10 BOSSEN PER WERELD', 10, COLOR.faint, true);
+    this.button(195, 766, 342, 60, '▶   START AVONTUUR',
+      () => this.scene.start(GAME_SCENE_KEY), 'primary', false, 17);
+    this.text(195, 810, getWorld(progressStore.current.selectedWorld).name.toUpperCase() +
+      '  ·  KAMER 1–50', 11, COLOR.secondary, true);
 
     this.input.keyboard?.on('keydown', this.captureBinding);
     // Capture before Phaser delivers game-object clicks; the click that opens
@@ -76,52 +77,58 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   private drawBackground(): void {
-    this.cameras.main.setBackgroundColor('#080f1c');
+    this.cameras.main.setBackgroundColor('#090f19');
     this.add.rectangle(195, 422, 390, 844, COLOR.background);
-    this.add.circle(355, 47, 170, 0x12395a, 0.2);
-    this.add.circle(0, 746, 182, 0x12435e, 0.14);
-    const grid = this.add.graphics().setAlpha(0.11);
-    grid.lineStyle(1, 0x355879, 1);
-    for (let x = 0; x <= 390; x += 30) grid.lineBetween(x, 0, x, 844);
-    for (let y = 0; y <= 844; y += 30) grid.lineBetween(0, y, 390, y);
-    this.add.rectangle(195, 2, 390, 4, COLOR.accent, 0.7);
+    this.add.circle(360, 4, 190, 0x15516b, 0.16);
+    this.add.circle(-40, 790, 175, 0x0e4762, 0.13);
+    const lines = this.add.graphics().setAlpha(0.06);
+    lines.lineStyle(1, 0x5b8599, 1);
+    for (let x = 0; x <= 390; x += 40) lines.lineBetween(x, 0, x, 844);
+    for (let y = 0; y <= 844; y += 40) lines.lineBetween(0, y, 390, y);
   }
 
   private drawHeader(): void {
-    // Simple original geometric crest; no external assets or fonts needed.
     const crest = this.add.graphics();
-    crest.lineStyle(2, 0x67e8f9, 0.9);
-    crest.strokeCircle(195, 32, 18);
-    crest.fillStyle(COLOR.accent, 1);
-    crest.fillTriangle(195, 17, 205, 37, 185, 37);
-    crest.fillStyle(0xfbbf24, 1);
-    crest.fillTriangle(195, 42, 200, 33, 190, 33);
-    this.text(195, 66, 'DUNGEON ASCENT', 26, COLOR.white, true, true);
-    this.text(195, 97, 'ROGUELIKE  /  ACTION  /  SURVIVE', 10, COLOR.secondary, true);
+    crest.lineStyle(2, COLOR.accent, 0.85);
+    crest.strokeCircle(195, 29, 15);
+    crest.fillStyle(COLOR.accent);
+    crest.fillTriangle(195, 16, 204, 37, 186, 37);
+    crest.fillStyle(COLOR.gold);
+    crest.fillTriangle(195, 38, 200, 31, 190, 31);
+    this.text(195, 65, 'DUNGEON ASCENT', 27, COLOR.white, true, true);
+    this.text(195, 96, 'KIES JE UITRUSTING  ·  OVERLEEF DE DUNGEON', 10,
+      COLOR.secondary, true);
 
     const profile = progressStore.current;
-    this.plate(195, 148, 354, 66, 0x14243a, 0x39506b, 13);
-    this.add.circle(52, 148, 17, HEROES[profile.selectedHero].color);
-    this.text(81, 136, 'ACTIEVE HELD', 9, COLOR.faint);
-    this.text(81, 148, HEROES[profile.selectedHero].name.toUpperCase(), 14, COLOR.white, false, true);
-    this.text(81, 164, WEAPONS[profile.selectedWeapon].name, 9, '#7dd3fc');
-    this.add.rectangle(234, 148, 1, 36, 0x415772, 0.85);
-    this.text(260, 135, 'GOUD', 10, COLOR.faint);
-    this.text(260, 151, profile.gold.toLocaleString('nl-BE') + '  G', 17, '#fde68a', false, true);
-    this.text(23, 189, 'WERELD ' + profile.selectedWorld + '/5', 10, COLOR.faint);
-    this.text(367, 189, 'RECORD ' + profile.worldBestRooms[profile.selectedWorld - 1] +
-      '/' + CHAPTER_ROOM_COUNT, 10, COLOR.secondary, true);
+    const hero = HEROES[profile.selectedHero];
+    this.plate(195, 150, 354, 74, 0x152638, 0x30485b, 13);
+    this.add.circle(55, 147, 23, hero.color, 0.18).setStrokeStyle(2, hero.color, 0.9);
+    this.add.image(55, 147, hero.textureKey).setDisplaySize(45, 45);
+    this.text(90, 129, 'JOUW HELD  ·  LV.' + profile.heroLevels[profile.selectedHero],
+      10, COLOR.faint);
+    this.fittedText(90, 150, hero.name.toUpperCase(), 15, COLOR.white, 134, true);
+    this.fittedText(90, 169, WEAPONS[profile.selectedWeapon].name, 10, '#8ce3f1', 132);
+    this.add.rectangle(238, 150, 1, 44, COLOR.border);
+    this.text(256, 132, 'BESCHIKBAAR GOUD', 9, COLOR.faint);
+    this.fittedText(256, 157, profile.gold.toLocaleString('nl-BE') + ' G',
+      19, '#fde68a', 110, true);
+    this.text(23, 196, 'WERELD ' + profile.selectedWorld + ' / 5', 10, COLOR.secondary);
+    this.text(367, 196, 'RECORD ' +
+      profile.worldBestRooms[profile.selectedWorld - 1] + ' / ' + CHAPTER_ROOM_COUNT,
+      10, COLOR.secondary, true);
   }
 
   private drawNavigation(): void {
     const tabs: Array<[MenuTab, string]> = [
       ['worlds', 'WERELDEN'], ['heroes', 'HELDEN'], ['weapons', 'WAPENS'],
-      ['upgrades', 'UPGR.'], ['settings', 'OPTIES'],
+      ['upgrades', 'UPGRADES'], ['settings', 'OPTIES'],
     ];
-    tabs.forEach(([tab, label], i) => {
-      const x = 41 + i * 77;
-      this.button(x, 221, 72, 38, label, () => this.chooseTab(tab),
-        this.tab === tab ? 'selected' : 'quiet', false, 9);
+    tabs.forEach(([tab, label], index) => {
+      const x = 42 + index * 76.5;
+      const active = this.tab === tab;
+      this.button(x, 227, 72, 42, label, () => this.chooseTab(tab),
+        active ? 'selected' : 'quiet', false, 9);
+      if (active) this.add.rectangle(x, 247, 38, 3, COLOR.accent, 0.9);
     });
   }
 
