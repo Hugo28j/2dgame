@@ -164,6 +164,11 @@ export class AbilityController {
     this.refresh(now);
   }
 
+  public shortenActiveCooldowns(now: number, factor: number): void {
+    this.cooldowns.shortenRemaining(now, factor);
+    this.refresh(now);
+  }
+
   /** Freezes all ability cooldowns as soon as the last enemy dies. */
   public pauseCooldowns(now: number): void {
     this.cooldowns.pause(now);
@@ -691,8 +696,8 @@ export class AbilityController {
   }
 
   /** Shield Bubble has exactly a 30-second base cooldown for the Guardian. */
-  private cooldownModifier(id: AbilityId): number {
-    return id === 'guardian-charge' ? 1 : this.player.abilityCooldownModifier;
+  private cooldownModifier(_id: AbilityId): number {
+    return this.player.abilityCooldownModifier;
   }
 
   private stats(id: AbilityId): AbilityStats {

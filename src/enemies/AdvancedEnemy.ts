@@ -23,6 +23,7 @@ export class AdvancedEnemy extends Slime {
   public readonly kind: Exclude<EnemyKind, 'slime'>;
   public readonly stats: Readonly<SlimeRuntimeStats>;
   private nextShotAt = 0;
+  public fasterTwin = false;
   private bossVolleys = 0;
   private readonly roomNumber: number;
   private readonly worldId: WorldId;
@@ -167,6 +168,19 @@ export class AdvancedEnemy extends Slime {
         const mode = getBossPlan(this.roomNumber, phase, this.bossVolleys, this.bossSlot);
         const move = rangedVelocity(this.x, this.y, targetX, targetY, speed,
           profile.preferredRange, this.orbitSign);
+        if (this.worldId === 1 && this.roomNumber === 15 && this.fasterTwin) {
+          const sibling = this.scene.children.list.find(child =>
+            child instanceof AdvancedEnemy && child !== this && child.active &&
+            child.kind === 'boss' && child.fasterTwin && child.bossSlot === this.bossSlot);
+          if (sibling instanceof AdvancedEnemy) {
+            const dx = this.x - sibling.x, dy = this.y - sibling.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist > 1 && dist < 210) {
+              move.x += dx / dist * speed * 0.9;
+              move.y += dy / dist * speed * 0.9;
+            }
+          }
+        }
         if (this.windupEndsAt === 0 && this.dashEndsAt === 0) {
           const body = this.body;
           const blockedX = body instanceof Phaser.Physics.Arcade.Body &&
@@ -187,7 +201,7 @@ export class AdvancedEnemy extends Slime {
           }
           this.bossVolleys++;
           const scaledInterval = this.stats.attackIntervalMs * mode.tempo;
-          this.nextShotAt = now + Math.max(150, scaledInterval);
+          this.nextShotAt = now + Math.max(100, scaledInterval / (this.fasterTwin ? 1.5 : 1));
         }
         // Only explicitly charging bosses use dash logic; other nine archetypes
         // are NOT automatically assigned the old common charge attack.

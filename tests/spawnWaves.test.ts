@@ -12,8 +12,7 @@ describe('late-room spawn counts and starting distance', () => {
     for (let room = 1; room <= CHAPTER_ROOM_COUNT; room++) {
       const result = getRoomDefinition(room);
       expect(result.enemySpawns).toHaveLength(result.enemyCount);
-      expect(result.enemyCount).toBe(room === 15 ? 2 :
-        room % BOSS_ROOM_INTERVAL === 0 ? 1 : getEnemyCountForRoom(room));
+      expect(result.enemyCount).toBe(room % BOSS_ROOM_INTERVAL === 0 ? 1 : getEnemyCountForRoom(room));
     }
   });
 

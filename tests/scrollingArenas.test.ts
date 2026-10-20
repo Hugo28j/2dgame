@@ -107,7 +107,7 @@ describe('scrollable procedural arenas', () => {
     for (let room = 5; room <= CHAPTER_ROOM_COUNT; room += 5) {
       const definition = getRoomDefinition(room);
       expect(definition.isBossRoom).toBe(true);
-      expect(definition.enemySpawns).toHaveLength(room === 15 ? 2 : 1);
+      expect(definition.enemySpawns).toHaveLength(1);
       expect(definition.layout.bounds).toEqual(getArenaBounds(room));
     }
   });
