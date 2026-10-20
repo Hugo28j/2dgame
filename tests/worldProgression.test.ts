@@ -10,7 +10,7 @@ import {
 } from '../src/progression/ProgressStore';
 
 const completedRun = (worldId: 1 | 2 | 3 | 4 | 5, id: string, victory: boolean,
-  room = 50) => {
+  room = CHAPTER_ROOM_COUNT) => {
   const run = new RunLedger(id, worldId);
   run.enterRoom(room);
   run.collectGold(37);
@@ -18,7 +18,7 @@ const completedRun = (worldId: 1 | 2 | 3 | 4 | 5, id: string, victory: boolean,
 };
 
 describe('five unique playable worlds', () => {
-  it('has five worlds with distinct names, palettes and 10 bosses per world', () => {
+  it('has five worlds with themed seven-boss rosters across six encounters', () => {
     expect(WORLD_COUNT).toBe(5);
     expect(new Set(WORLDS.map(w => w.name)).size).toBe(5);
     expect(new Set(WORLDS.map(w => w.floor)).size).toBe(5);
@@ -28,11 +28,12 @@ describe('five unique playable worlds', () => {
       expect(world.bossNames).toHaveLength(10);
       for (let room = 5; room <= CHAPTER_ROOM_COUNT; room += 5) {
         expect(getRoomDefinition(room).isBossRoom).toBe(true);
-        expect(getRoomDefinition(room).enemyCount).toBe(1);
+        expect(getRoomDefinition(room).enemyCount).toBe(room === 15 ? 2 : 1);
         bossNames.add(getWorldBossName(world.id, room));
+        if (room === 15) bossNames.add(getWorldBossName(world.id, room, 1));
       }
     }
-    expect(bossNames.size).toBe(50);
+    expect(bossNames.size).toBe(35);
   });
 
   it('uses different floor patterns in the five maps without unsafe spawn positions', () => {
@@ -40,7 +41,7 @@ describe('five unique playable worlds', () => {
     expect(new Set(firstPatterns).size).toBe(5);
     for (const world of WORLDS) {
       const patterns = new Set<string>();
-      for (let room = 1; room <= 50; room++) {
+      for (let room = 1; room <= CHAPTER_ROOM_COUNT; room++) {
         const definition = getRoomDefinition(room, world.id);
         expect(definition.enemySpawns).toHaveLength(definition.enemyCount);
         if (!definition.isBossRoom) patterns.add(definition.layout.id);
@@ -78,16 +79,16 @@ describe('world unlocking and persistent selection', () => {
     expect(applyProfileAction(start, { type: 'selectWorld', id: 2 })).toEqual(start);
   });
 
-  it('does not unlock a world by reaching room 50 without clearing it', () => {
+  it('does not unlock a world by reaching room 30 without clearing it', () => {
     const p = applyProfileAction(defaultProfile(), {
-      type: 'settleRun', report: completedRun(1, 'failed-at-50', false),
+      type: 'settleRun', report: completedRun(1, 'failed-at-30', false),
     });
     expect(p.completedWorlds).toBe(0);
-    expect(p.worldBestRooms[0]).toBe(50);
+    expect(p.worldBestRooms[0]).toBe(30);
     expect(isWorldUnlocked(2, p.completedWorlds)).toBe(false);
   });
 
-  it('opens exactly the next world after clearing room 50, then persists selection', () => {
+  it('opens exactly the next world after clearing room 30, then persists selection', () => {
     let p = defaultProfile();
     for (let world = 1; world <= WORLD_COUNT; world++) {
       const w = world as 1 | 2 | 3 | 4 | 5;
@@ -95,7 +96,7 @@ describe('world unlocking and persistent selection', () => {
       p = applyProfileAction(p, { type: 'settleRun',
         report: completedRun(w, 'win-world-' + w, true) });
       expect(p.completedWorlds).toBe(world);
-      expect(p.worldBestRooms[w - 1]).toBe(50);
+      expect(p.worldBestRooms[w - 1]).toBe(30);
       expect(p.totalGoldEarned).toBe(37 * world);
       if (world < WORLD_COUNT) {
         const next = (world + 1) as 1 | 2 | 3 | 4 | 5;
@@ -123,8 +124,8 @@ describe('world unlocking and persistent selection', () => {
     const saved = validateProfile(original);
     expect(saved.gold).toBe(945);
     expect(saved.selectedHero).toBe('guardian'); // Locked heroes are still validated.
-    expect(saved.highestRoom).toBe(33);
-    expect(saved.worldBestRooms).toEqual([33, 1, 1, 1, 1]);
+    expect(saved.highestRoom).toBe(30);
+    expect(saved.worldBestRooms).toEqual([30, 1, 1, 1, 1]);
     expect(saved.selectedWorld).toBe(1);
     expect(saved.completedWorlds).toBe(0);
     expect(saved.totalGoldEarned).toBe(0);
