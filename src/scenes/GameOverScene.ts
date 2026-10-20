@@ -79,14 +79,22 @@ export class GameOverScene extends Phaser.Scene {
         fontFamily, fontSize: '15px', fontStyle: 'bold', color: '#86efac',
       }).setOrigin(0.5);
     }
-    const armorDrop = profile.lastArmorDrop?.runId === report.runId
-      ? profile.lastArmorDrop.item : null;
-    this.add.text(195, 566, armorDrop
-      ? '✦ ARMOR: ' + RARITY_CONFIG[armorDrop.rarity].label.toUpperCase() + ' ' +
-        armorDefinition(armorDrop).name : 'Geen armor drop deze run',
-      { fontFamily, fontSize: '12px', fontStyle: 'bold',
-        color: armorDrop ? '#' + RARITY_CONFIG[armorDrop.rarity].color.toString(16).padStart(6, '0') : '#94a3b8' }
-    ).setOrigin(0.5);
+    const armorDrops = profile.lastArmorDrop?.runId === report.runId
+      ? profile.lastArmorDrop.items : [];
+    if (armorDrops.length) {
+      armorDrops.forEach((item, index) => {
+        this.add.text(195, 558 + index * 25,
+          '✦ ' + (index + 1) + ': ' + RARITY_CONFIG[item.rarity].label.toUpperCase() +
+          ' ' + armorDefinition(item).name,
+          { fontFamily, fontSize: '11px', fontStyle: 'bold',
+            color: '#' + RARITY_CONFIG[item.rarity].color.toString(16).padStart(6, '0') }
+        ).setOrigin(0.5);
+      });
+    } else {
+      this.add.text(195, 566, 'Geen armor drop deze run', {
+        fontFamily, fontSize: '11px', color: '#94a3b8',
+      }).setOrigin(0.5);
+    }
     const upgrades = data.chosenUpgrades;
     this.add.text(43, 503, 'TIJDELIJKE UPGRADES', {
       fontFamily, fontSize: '13px', fontStyle: 'bold', color: '#7dd3fc',

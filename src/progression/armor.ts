@@ -1,4 +1,5 @@
-/** Armor is account-wide equipment. All stat boosts are fractions of baseline stats. */
+import { HERO_IDS, type HeroId } from '../heroes/heroConfig';
+/** Armor is hero-specific equipment. All stat boosts are fractions of baseline stats. */
 export const ARMOR_SLOTS = ['helm', 'body', 'boots'] as const;
 export type ArmorSlot = typeof ARMOR_SLOTS[number];
 export const ARMOR_RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const;
@@ -8,12 +9,14 @@ export const ARMOR_MAX_STARS = 5;
 export interface ArmorItem {
   id: string;
   kind: string;
+  heroId: HeroId;
   rarity: ArmorRarity;
   level: number;
   stars: number;
 }
 export interface ArmorDefinition {
   kind: string;
+  heroId: HeroId;
   slot: ArmorSlot;
   name: string;
   symbol: string;
@@ -21,7 +24,7 @@ export interface ArmorDefinition {
   hp: number; defense: number; weaponDamage: number;
   attackSpeed: number; movementSpeed: number;
 }
-export const ARMOR_DEFINITIONS: readonly ArmorDefinition[] = [
+const ARMOR_TEMPLATES: readonly Omit<ArmorDefinition, 'heroId'>[] = [
   { kind: 'vanguard-helm', slot: 'helm', name: 'Vanguard Helm', symbol: '♜', hp: .035, defense: 0, weaponDamage: .025, attackSpeed: 0, movementSpeed: 0 },
   { kind: 'hunter-hood', slot: 'helm', name: 'Hunter Hood', symbol: '♞', hp: .025, defense: 0, weaponDamage: .04, attackSpeed: 0, movementSpeed: 0 },
   { kind: 'sage-crown', slot: 'helm', name: 'Sage Crown', symbol: '♛', hp: .045, defense: 0, weaponDamage: .018, attackSpeed: 0, movementSpeed: 0 },
@@ -32,6 +35,12 @@ export const ARMOR_DEFINITIONS: readonly ArmorDefinition[] = [
   { kind: 'swift-greaves', slot: 'boots', name: 'Swift Greaves', symbol: '↝', hp: 0, defense: 0, weaponDamage: 0, attackSpeed: .04, movementSpeed: .025 },
   { kind: 'runner-treads', slot: 'boots', name: 'Runner Treads', symbol: '➤', hp: 0, defense: 0, weaponDamage: 0, attackSpeed: .032, movementSpeed: .035 },
 ];
+/** Each hero owns nine themed armor variants, three per slot. */
+export const ARMOR_DEFINITIONS: readonly ArmorDefinition[] = HERO_IDS.flatMap(heroId =>
+  ARMOR_TEMPLATES.map(template => ({
+    ...template, heroId, kind: heroId + '-' + template.kind,
+    name: heroId.charAt(0).toUpperCase() + heroId.slice(1) + ' ' + template.name,
+  })));
 export const RARITY_CONFIG: Readonly<Record<ArmorRarity, {
   label: string; weight: number; multiplier: number; sell: number; color: number;
 }>> = {
@@ -48,33 +57,48 @@ export function validArmorItem(raw: unknown): raw is ArmorItem {
   if (!raw || typeof raw !== 'object') return false;
   const item = raw as Partial<ArmorItem>;
   return typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 120 &&
-    ARMOR_DEFINITIONS.some(x => x.kind === item.kind) &&
+    HERO_IDS.includes(item.heroId as HeroId) &&
+    ARMOR_DEFINITIONS.some(x => x.kind === item.kind && x.heroId === item.heroId) &&
     ARMOR_RARITIES.includes(item.rarity as ArmorRarity) &&
     Number.isInteger(item.level) && item.level! >= 1 && item.level! <= ARMOR_MAX_LEVEL &&
     Number.isInteger(item.stars) && item.stars! >= 0 && item.stars! <= ARMOR_MAX_STARS;
 }
 
 export function rollArmor(victory: boolean, dropRoll: number, rarityRoll: number,
-  kindRoll: number, runId: string): ArmorItem | undefined {
+  kindRoll: number, runId: string, heroId: HeroId = 'guardian',
+  index = 0): ArmorItem | undefined {
   if (![dropRoll, rarityRoll, kindRoll].every(n => Number.isFinite(n) && n >= 0 && n < 1)) return;
-  if (dropRoll >= (victory ? .1 : .01)) return;
+  // Primary: guaranteed on victory / 40% on defeat. Secondary: 20% / 10%.
+  if (dropRoll >= (index === 0 ? (victory ? 1 : .4) : (victory ? .2 : .1))) return;
   let remaining = rarityRoll * 100;
   let rarity: ArmorRarity = 'common';
   for (const choice of ARMOR_RARITIES) {
     remaining -= RARITY_CONFIG[choice].weight;
     if (remaining < 0) { rarity = choice; break; }
   }
-  return { id: 'armor-' + runId, kind: ARMOR_DEFINITIONS[Math.floor(kindRoll * ARMOR_DEFINITIONS.length)]!.kind,
-    rarity, level: 1, stars: 0 };
+  const catalog = ARMOR_DEFINITIONS.filter(x => x.heroId === heroId);
+  return {
+    id: 'armor-' + runId + '-' + index, heroId,
+    kind: catalog[Math.floor(kindRoll * catalog.length)]!.kind,
+    rarity, level: 1, stars: 0,
+  };
 }
 
+export interface ArmorRoll { drop: number; rarity: number; kind: number }
+export function rollArmorRewards(victory: boolean, runId: string, heroId: HeroId,
+  rolls: readonly [ArmorRoll, ArmorRoll]): ArmorItem[] {
+  return rolls.flatMap((roll, index) => {
+    const item = rollArmor(victory, roll.drop, roll.rarity, roll.kind, runId, heroId, index);
+    return item ? [item] : [];
+  });
+}
 export function armorUpgradeCost(item: ArmorItem): number {
   return Math.round((30 + item.level * 20) * RARITY_CONFIG[item.rarity].multiplier);
 }
-export function armorBonuses(items: readonly ArmorItem[], equipped: Readonly<Record<ArmorSlot, string | null>>) {
+export function armorBonuses(items: readonly ArmorItem[], equipped: Readonly<Record<ArmorSlot, string | null>>, heroId?: HeroId) {
   const totals = { hp: 0, defense: 0, weaponDamage: 0, attackSpeed: 0, movementSpeed: 0 };
   for (const slot of ARMOR_SLOTS) {
-    const item = items.find(x => x.id === equipped[slot] && armorDefinition(x).slot === slot);
+    const item = items.find(x => x.id === equipped[slot] && armorDefinition(x).slot === slot && (!heroId || x.heroId === heroId));
     if (!item) continue;
     const definition = armorDefinition(item);
     const factor = RARITY_CONFIG[item.rarity].multiplier *
