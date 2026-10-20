@@ -51,6 +51,17 @@ describe('armor equipment progression', () => {
     expect(p.equippedArmor.guardian.helm).toBeNull();
     expect(p.gold).toBe(9000 - cost + RARITY_CONFIG.common.sell);
   });
+  it('keeps identical gear separate per hero and rejects cross-hero fusion', () => {
+    const guardian = rollArmor(true, 0, 0, 0, 'g', 'guardian')!;
+    const ranger = rollArmor(true, 0, 0, 0, 'r', 'ranger')!;
+    let profile = { ...defaultProfile(), unlockedHeroes: ['guardian', 'ranger'] as ('guardian' | 'ranger')[], armorInventory: [guardian, ranger] };
+    profile = applyProfileAction(profile, { type: 'equipArmor', id: guardian.id });
+    profile = applyProfileAction(profile, { type: 'equipArmor', id: ranger.id });
+    expect(profile.equippedArmor.guardian.helm).toBe(guardian.id);
+    expect(profile.equippedArmor.ranger.helm).toBe(ranger.id);
+    expect(applyProfileAction(profile, { type: 'fuseArmor', id: guardian.id })).toEqual(profile);
+    expect(armorBonuses(profile.armorInventory, profile.equippedArmor.guardian, 'ranger').hp).toBe(0);
+  });
   it('provides only percentages and supports three gear slots', () => {
     for (const item of ARMOR_DEFINITIONS) {
       expect(['helm', 'body', 'boots']).toContain(item.slot);
