@@ -756,6 +756,125 @@ export class GameScene extends Phaser.Scene {
     }
   };
 
+  /** Blizzard Tyrant's frosty seeker pursues the player's *current* position
+   * for at most fifteen seconds and obeys normal projectile hit/slow rules.
+   */
+  private launchHomingOrb(enemy: AdvancedEnemy): void {
+    if (!this.player || !this.enemyProjectiles) return;
+    const alive = this.enemyProjectiles.getChildren()
+      .filter(child => child instanceof HomingEnemyProjectile && child.active).length;
+    if (alive >= HOMING_ORB.maxActive) return;
+    const dx = this.player.x - enemy.x, dy = this.player.y - enemy.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const orb = new HomingEnemyProjectile(this,
+      enemy.x + dx / length * 43, enemy.y + dy / length * 43,
+      { x: this.player.x, y: this.player.y },
+      enemy.stats.damage * HOMING_ORB.damageMultiplier);
+    this.enemyProjectiles.add(orb);
+  }
+
+  /** Crystal Empress sends an ice barrier from the left arena wall all the
+   * way across. The telegraph marks its collision area and a narrow safe gap.
+   */
+  private launchFrozenWall(enemy: AdvancedEnemy, volley: number): void {
+    if (!this.player || !this.currentRoom ||
+        this.frozenWalls.size > 0 || this.roomProgress.doorOpen) return;
+    const bounds = this.currentRoom.layout.bounds;
+    const gapY = wallGapCenter(this.player.y, bounds, volley);
+    const warning = this.add.graphics().setDepth(24);
+    const ice = this.add.graphics().setDepth(27);
+    const now = this.time.now;
+    this.frozenWalls.add({
+      warning, ice, bounds, gapY, warnAt: now,
+      launchAt: now + ICE_WALL.warningMs,
+      hit: false, owner: enemy,
+      damage: enemy.stats.damage * ICE_WALL.damageMultiplier,
+    });
+  }
+
+  private updateFrozenWalls(now: number): void {
+    for (const wall of this.frozenWalls) {
+      const { bounds, gapY } = wall;
+      const top = bounds.y, bottom = bounds.y + bounds.height;
+      const upper = Math.max(0, gapY - ICE_WALL.gapHalfHeight - top);
+      const lowerStart = gapY + ICE_WALL.gapHalfHeight;
+      const lower = Math.max(0, bottom - lowerStart);
+      const remove = (): void => {
+        wall.warning.destroy();
+        wall.ice.destroy();
+        this.frozenWalls.delete(wall);
+      };
+      if (!wall.owner.active || wall.owner.aiState === 'defeated' ||
+          this.roomProgress.doorOpen) { remove(); continue; }
+      if (now < wall.launchAt) {
+        // Full-arena translucent warning, leaving a clearly marked dodge gap.
+        const pulse = 0.12 + 0.09 * (0.5 + Math.sin(now / 60) * 0.5);
+        wall.warning.clear();
+        wall.warning.fillStyle(0x38bdf8, pulse);
+        wall.warning.fillRect(bounds.x, top, bounds.width, upper);
+        wall.warning.fillRect(bounds.x, lowerStart, bounds.width, lower);
+        wall.warning.fillStyle(0xcffafe, 0.48);
+        wall.warning.fillRect(bounds.x, gapY - ICE_WALL.gapHalfHeight - 2, bounds.width, 3);
+        wall.warning.fillRect(bounds.x, lowerStart, bounds.width, 3);
+        wall.warning.lineStyle(5, 0x67e8f9, 0.95);
+        wall.warning.lineBetween(bounds.x + 4, top, bounds.x + 4, gapY - ICE_WALL.gapHalfHeight);
+        wall.warning.lineBetween(bounds.x + 4, lowerStart, bounds.x + 4, bottom);
+        continue;
+      }
+      wall.warning.clear();
+      const startX = bounds.x - ICE_WALL.thickness;
+      const x = wallXAt(startX, wall.launchAt, now);
+      const prevX = wallXAt(startX, wall.launchAt, now - 70);
+      if (x - ICE_WALL.thickness > bounds.x + bounds.width) { remove(); continue; }
+
+      // Two thick ice segments with a bright leading edge and jagged facets.
+      const thickness = ICE_WALL.thickness;
+      const leadingX = x + thickness / 2;
+      const drawSegment = (sy: number, h: number): void => {
+        if (h <= 0) return;
+        wall.ice.fillStyle(0x082f49, 0.84);
+        wall.ice.fillRect(x - thickness / 2, sy, thickness, h);
+        wall.ice.fillStyle(0x7dd3fc, 0.72);
+        wall.ice.fillRect(x - thickness / 2 + 5, sy, 25, h);
+        wall.ice.fillStyle(0xdffcff, 0.92);
+        wall.ice.fillRect(leadingX - 6, sy, 6, h);
+        for (let y = sy + 8; y < sy + h - 9; y += 35) {
+          wall.ice.fillStyle(0xe0f2fe, 0.85);
+          wall.ice.fillTriangle(leadingX - 6, y - 12,
+            leadingX + 13, y, leadingX - 6, y + 12);
+          wall.ice.lineStyle(1, 0x38bdf8, 0.8);
+          wall.ice.lineBetween(x - thickness / 2 + 8, y - 12, leadingX - 6, y + 12);
+        }
+      };
+      wall.ice.clear();
+      drawSegment(top, upper);
+      drawSegment(lowerStart, lower);
+
+      // Swept collision guards against fast ice walls skipping across a player
+      // between rendered frames; damage is applied only once per cast.
+      if (!wall.hit && this.player) {
+        const hero = { x: this.player.x, y: this.player.y };
+        const atCurrentPosition = wallHitsCircle(x, gapY, hero, ICE_WALL.playerPadding);
+        const crossedPlayer = hero.x >= Math.min(prevX, x) - thickness / 2 -
+          ICE_WALL.playerPadding &&
+          hero.x <= Math.max(prevX, x) + thickness / 2 + ICE_WALL.playerPadding &&
+          Math.abs(hero.y - gapY) + ICE_WALL.playerPadding > ICE_WALL.gapHalfHeight;
+        if (atCurrentPosition || crossedPlayer) {
+          wall.hit = true;
+          this.damagePlayer({ damage: wall.damage, criticalChance: 0, criticalMultiplier: 1 });
+        }
+      }
+    }
+  }
+
+  private clearFrozenWalls(): void {
+    for (const wall of this.frozenWalls) {
+      wall.warning.destroy();
+      wall.ice.destroy();
+    }
+    this.frozenWalls.clear();
+  }
+
   /** Telegraph targeted bombs well before detonation. All timers are cancelled on room exit. */
   private readonly dropBossBombs = (enemy: AdvancedEnemy, targetX: number, targetY: number,
     count: number, radius: number, windupMs: number): void => {
