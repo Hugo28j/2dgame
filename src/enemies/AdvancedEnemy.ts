@@ -61,7 +61,7 @@ export class AdvancedEnemy extends Slime {
       this.shieldGraphic = scene.add.graphics().setDepth(13);
     }
     this.nextShotAt = scene.time.now + stats.attackIntervalMs;
-    this.nextSpecialAt = scene.time.now + 1500;
+    this.nextSpecialAt = scene.time.now + (worldId === 2 && kind === 'mage' ? 5000 : 1500);
   }
 
   public get isBoss(): boolean { return this.kind === 'boss'; }
