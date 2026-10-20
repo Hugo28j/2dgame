@@ -15,7 +15,7 @@ import { coverIsClose, firstShieldOnPath, type ShieldPoint } from '../enemies/tr
 import { ICE_WALL, HOMING_ORB, wallGapCenter, wallHitsCircle, wallXAt } from '../enemies/frozenBossAttacks';
 import { FROZEN_EARLY, canSummonFrostMinions } from '../enemies/frozenEarlyGame';
 import { withinRadius } from '../enemies/enemyMovement';
-import { shotAngles } from '../enemies/projectilePatterns';
+import { splitTwinShotAngle, shotAngles } from '../enemies/projectilePatterns';
 import {
   ENEMY_DEFEATED_EVENT,
   ENEMY_SPAWNED_EVENT,
@@ -884,7 +884,12 @@ export class GameScene extends Phaser.Scene {
     volley = 0, speedFactor = 1): void => {
     if (!this.player || !this.enemyProjectiles || this.gameOver || this.transitioning) return;
     const angle = Math.atan2(this.player.y - enemy.y, this.player.x - enemy.x);
-    const angles = shotAngles(pattern, angle, volley);
+    // The two split Void Sentinels fire in opposite directions and rotate
+    // twice as quickly as the original spiral. Keep other bosses unchanged.
+    const angles = this.worldId === 1 && enemy.fasterTwin &&
+      enemy.stats.roomNumber === 15
+      ? [splitTwinShotAngle(volley, enemy.splitTwinIndex)]
+      : shotAngles(pattern, angle, volley);
     const speed = (enemy.kind === 'boss' ? (220 + getBossTier(enemy.stats.roomNumber) * 8) *
       (enemy.stats.roomNumber === 30 ? 1.25 : 1) :
       enemy.kind === 'mage' ? 220 : 320) * speedFactor;
