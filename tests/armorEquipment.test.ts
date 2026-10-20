@@ -54,7 +54,8 @@ describe('armor equipment progression', () => {
   it('keeps identical gear separate per hero and rejects cross-hero fusion', () => {
     const guardian = rollArmor(true, 0, 0, 0, 'g', 'guardian')!;
     const ranger = rollArmor(true, 0, 0, 0, 'r', 'ranger')!;
-    let profile = { ...defaultProfile(), unlockedHeroes: ['guardian', 'ranger'] as ('guardian' | 'ranger')[], armorInventory: [guardian, ranger] };
+    let profile: ReturnType<typeof defaultProfile> = { ...defaultProfile(),
+      unlockedHeroes: ['guardian', 'ranger'], armorInventory: [guardian, ranger] };
     profile = applyProfileAction(profile, { type: 'equipArmor', id: guardian.id });
     profile = applyProfileAction(profile, { type: 'equipArmor', id: ranger.id });
     expect(profile.equippedArmor.guardian.helm).toBe(guardian.id);
