@@ -1,64 +1,83 @@
 import Phaser from 'phaser';
 import { HERO_IDS, HEROES, type HeroId } from './heroConfig';
 
-/** Original, distinctive top-down hero avatars pre-rendered at boot. */
-function heroShape(g: Phaser.GameObjects.Graphics, id: HeroId, color: number): void {
-  g.fillStyle(0x08111f); g.fillCircle(24, 24, 22);
-  g.lineStyle(2, 0xe2e8f0, 0.75); g.strokeCircle(24, 24, 21);
+/** Humanoid side/top-down base, facing right so sprite rotation follows aim. */
+function body(g: Phaser.GameObjects.Graphics, armor: number, cloth: number, skin = 0xf2c9a5): void {
+  g.fillStyle(0x020617, 0.35); g.fillEllipse(30, 39, 51, 24);
+  // Two separated legs and boots.
+  g.fillStyle(cloth); g.fillRoundedRect(8, 19, 23, 9, 4); g.fillRoundedRect(8, 38, 23, 9, 4);
+  g.fillStyle(0x111827); g.fillRoundedRect(5, 19, 10, 9, 3); g.fillRoundedRect(5, 38, 10, 9, 3);
+  // Torso, shoulder and arms.
+  g.fillStyle(armor); g.fillRoundedRect(22, 15, 27, 36, 8);
+  g.fillStyle(cloth); g.fillRoundedRect(28, 9, 18, 8, 4); g.fillRoundedRect(28, 49, 18, 8, 4);
+  g.fillStyle(skin); g.fillCircle(48, 33, 10);
+  g.fillStyle(0xf8fafc); g.fillCircle(54, 30, 2);
+  g.fillStyle(0x0f172a); g.fillCircle(55, 30, 1);
+  g.lineStyle(2, 0xe2e8f0, 0.65); g.strokeRoundedRect(22, 15, 27, 36, 8);
+}
 
+function heroShape(g: Phaser.GameObjects.Graphics, id: HeroId, color: number): void {
   switch (id) {
-    case 'ranger': // Hood and longbow
-      g.fillStyle(color); g.fillTriangle(24, 5, 7, 37, 41, 37);
-      g.fillStyle(0x082435); g.fillEllipse(24, 26, 18, 15);
-      g.fillStyle(0xe0f2fe); g.fillRect(19, 24, 5, 2); g.fillRect(27, 24, 5, 2);
-      g.lineStyle(2, 0xfef08a); g.strokeCircle(40, 27, 7);
+    case 'ranger':
+      g.fillStyle(0x164e63); g.fillTriangle(13, 8, 7, 55, 38, 34); // cloak
+      body(g, color, 0x155e75);
+      g.fillStyle(color); g.fillTriangle(38, 10, 58, 22, 42, 39); // hood
+      g.lineStyle(3, 0xfde68a); g.strokeCircle(56, 34, 13);
+      g.lineStyle(2, 0xf8fafc); g.lineBetween(56, 20, 56, 48);
+      g.fillStyle(0xfef3c7); g.fillTriangle(58, 31, 64, 34, 58, 37);
       break;
-    case 'mage': // Floating wizard with an orb
-      g.fillStyle(color); g.fillTriangle(24, 6, 11, 41, 37, 41);
-      g.fillStyle(0x1e1b4b); g.fillCircle(24, 24, 12);
-      g.fillStyle(0xf5d0fe); g.fillCircle(24, 24, 5);
-      g.lineStyle(2, 0xffffff); g.strokeCircle(24, 24, 8);
+    case 'mage':
+      g.fillStyle(0x4c1d95); g.fillTriangle(8, 9, 4, 58, 42, 38);
+      body(g, color, 0x6b21a8);
+      g.fillStyle(color); g.fillTriangle(37, 20, 48, 1, 59, 25); // hat
+      g.lineStyle(3, 0xd8b4fe); g.lineBetween(38, 53, 60, 8);
+      g.fillStyle(0xf5d0fe); g.fillCircle(60, 8, 5); g.fillStyle(0xffffff); g.fillCircle(60, 8, 2);
       break;
-    case 'guardian': // Helmet and shield
-      g.fillStyle(color); g.fillRoundedRect(9, 12, 30, 29, 7);
-      g.fillStyle(0x334155); g.fillRect(14, 18, 20, 12);
-      g.fillStyle(0xfef9c3); g.fillRect(17, 23, 14, 3);
-      g.lineStyle(2, 0xffffff); g.strokeCircle(35, 33, 8);
+    case 'guardian':
+      body(g, 0xb45309, color);
+      g.fillStyle(0x475569); g.fillRoundedRect(37, 20, 20, 24, 7); // helmet
+      g.fillStyle(0xfde68a); g.fillRect(48, 27, 10, 4);
+      g.fillStyle(color); g.fillRoundedRect(27, 11, 15, 42, 5); // plate
+      g.fillStyle(0x334155); g.fillCircle(35, 52, 12); // shield
+      g.lineStyle(3, 0xf8fafc); g.strokeCircle(35, 52, 11);
+      g.lineStyle(4, 0xf8fafc); g.lineBetween(48, 13, 62, 4); // sword
+      g.fillStyle(0xfbbf24); g.fillTriangle(58, 3, 64, 0, 62, 7);
       break;
-    case 'frostblade': // Ice crown and angular double blade
-      g.fillStyle(color); g.fillTriangle(9, 13, 14, 2, 22, 14);
-      g.fillTriangle(22, 14, 24, 0, 29, 14);
-      g.fillTriangle(27, 14, 36, 2, 40, 15);
-      g.fillRoundedRect(12, 14, 24, 27, 6);
-      g.fillStyle(0x0c4a6e); g.fillRect(18, 21, 12, 6);
-      g.lineStyle(3, 0xffffff); g.lineBetween(36, 13, 42, 38);
-      g.fillStyle(0xe0f2fe); g.fillTriangle(34, 11, 39, 4, 41, 15);
+    case 'frostblade':
+      g.fillStyle(0x0c4a6e); g.fillTriangle(9, 7, 4, 57, 40, 36);
+      body(g, color, 0x0369a1);
+      g.fillStyle(0xe0f2fe); g.fillTriangle(40, 21, 46, 6, 51, 22);
+      g.fillTriangle(47, 20, 55, 7, 58, 25); // ice crown
+      g.lineStyle(4, 0xe0f2fe); g.lineBetween(40, 13, 61, 3);
+      g.lineBetween(42, 52, 62, 61);
+      g.fillStyle(0x7dd3fc); g.fillTriangle(58, 0, 64, 1, 60, 7);
+      g.fillTriangle(59, 57, 64, 63, 57, 63);
       break;
-    case 'pyromancer': // Flaming hood and two gauntlets
-      g.fillStyle(color); g.fillTriangle(24, 0, 9, 28, 39, 28);
-      g.fillTriangle(14, 14, 8, 37, 25, 24);
-      g.fillTriangle(34, 14, 40, 37, 23, 24);
-      g.fillStyle(0x7c2d12); g.fillRoundedRect(13, 21, 22, 21, 7);
-      g.fillStyle(0xffedd5); g.fillRect(18, 27, 5, 3); g.fillRect(27, 27, 5, 3);
-      g.fillStyle(0xfef08a); g.fillCircle(8, 36, 5); g.fillCircle(40, 36, 5);
+    case 'pyromancer':
+      g.fillStyle(0x7c2d12); g.fillTriangle(10, 5, 5, 59, 43, 36);
+      body(g, color, 0x9a3412);
+      g.fillStyle(0xef4444); g.fillTriangle(39, 23, 48, 3, 58, 25);
+      g.fillStyle(0xfef08a); g.fillCircle(38, 10, 6); g.fillCircle(39, 55, 6);
+      g.fillStyle(0xfb923c); g.fillTriangle(34, 10, 40, 0, 44, 12);
+      g.fillTriangle(35, 55, 41, 44, 45, 58);
       break;
-    case 'stormstrider': // Winged lightning helmet
-      g.fillStyle(color); g.fillRoundedRect(13, 14, 22, 29, 6);
-      g.fillTriangle(12, 19, 0, 11, 5, 29);
-      g.fillTriangle(36, 19, 48, 11, 43, 29);
-      g.fillStyle(0x0f172a); g.fillRect(17, 23, 14, 7);
-      g.fillStyle(0xfef9c3); g.fillRect(18, 26, 5, 2); g.fillRect(27, 26, 5, 2);
-      g.lineStyle(3, 0xfffbeb); g.lineBetween(27, 3, 20, 15);
-      g.lineBetween(20, 15, 29, 15);
-      g.lineBetween(29, 15, 23, 21);
+    case 'stormstrider':
+      g.fillStyle(0x1e3a8a); g.fillTriangle(13, 12, 1, 20, 18, 31);
+      g.fillTriangle(13, 52, 1, 44, 18, 33); // winged cloak
+      body(g, color, 0x1d4ed8);
+      g.fillStyle(0xfef9c3); g.fillTriangle(40, 18, 49, 3, 57, 23);
+      g.lineStyle(4, 0xfef08a); g.lineBetween(36, 54, 62, 8); // spear
+      g.fillStyle(0xffffff); g.fillTriangle(58, 5, 64, 1, 63, 10);
+      g.lineStyle(3, 0xffffff); g.lineBetween(25, 6, 32, 15);
+      g.lineBetween(32, 15, 27, 20);
       break;
-    case 'voidwalker': // Crescent halo, hollow eye, cape
-      g.fillStyle(0x581c87); g.fillTriangle(24, 7, 3, 43, 45, 43);
-      g.fillStyle(color); g.fillCircle(24, 23, 14);
-      g.fillStyle(0x160c2e); g.fillEllipse(24, 26, 22, 16);
-      g.fillStyle(0xf5d0fe); g.fillCircle(24, 26, 5);
-      g.fillStyle(0x312050); g.fillCircle(26, 25, 3);
-      g.lineStyle(3, 0xe9d5ff); g.strokeCircle(24, 12, 15);
+    case 'voidwalker':
+      g.fillStyle(0x3b0764); g.fillTriangle(12, 4, 3, 60, 48, 37);
+      body(g, color, 0x581c87, 0xc4a0b5);
+      g.fillStyle(0x160c2e); g.fillRoundedRect(39, 21, 20, 25, 9);
+      g.fillStyle(0xf5d0fe); g.fillCircle(54, 31, 4);
+      g.lineStyle(4, 0xe9d5ff); g.beginPath(); g.arc(51, 34, 18, -1.2, 1.25); g.strokePath();
+      g.lineStyle(3, 0x7e22ce); g.lineBetween(39, 53, 61, 13); // scythe
       break;
   }
 }
@@ -69,7 +88,7 @@ export function createHeroArt(scene: Phaser.Scene): void {
     if (scene.textures.exists(hero.textureKey)) continue;
     const g = scene.make.graphics({ x: 0, y: 0 }, false);
     heroShape(g, id, hero.color);
-    g.generateTexture(hero.textureKey, 48, 48);
+    g.generateTexture(hero.textureKey, 64, 64);
     g.destroy();
   }
 }

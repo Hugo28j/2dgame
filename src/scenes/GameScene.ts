@@ -138,8 +138,10 @@ export class GameScene extends Phaser.Scene {
     this.loadRoom(firstRoom, false);
     this.drawPlayerHealth();
     this.abilities = new AbilityController(
-      this, this.player, this.enemies, this.controls, this.damageSystem,
+      this, this.player, profile.heroLevels[profile.selectedHero], profile.abilityLevels,
+      this.enemies, this.controls, this.damageSystem,
       (x, y, result) => this.showDamageNumber(x, y, result),
+      () => this.drawPlayerHealth(),
       () => this.gameOver || this.transitioning || this.chapterComplete || this.choosingUpgrade,
     );
 

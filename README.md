@@ -97,7 +97,17 @@ Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de br
 - Ranger gebruikt Ascent Bow/Hunter Crossbow, Mage gebruikt Arcane Staff/Twin Rune Tome, Guardian gebruikt Dawnblade/Bulwark Hammer, Frostblade gebruikt Glacial Blade/Ice Daggers, Pyromancer gebruikt Ember Staff/Phoenix Orbs, Stormstrider gebruikt Storm Wand/Tempest Spear en Voidwalker gebruikt Abyss Orb/Shadow Scythe.
 - Bij het ontgrendelen van een held wordt diens eerste wapen gratis mee ontgrendeld en meteen uitgerust. Het tweede wapen kan daarna met goud worden gekocht.
 - Helden en hun wapens behouden afzonderlijke upgrades. Het menu onthoudt bovendien per held welk van zijn wapens het laatst was geselecteerd.
-- SaveManager v3 migreert v1/v2-profielen: aankopen blijven behouden en iedere reeds ontgrendelde held ontvangt zijn nieuwe basiswapen.
+- SaveManager v4 migreert oudere profielen: aankopen blijven behouden en iedere reeds ontgrendelde held ontvangt zijn basiswapen.
+
+## Persoonlijke hero-abilities en karakterdesigns
+
+- Iedere held heeft drie exclusieve actieve abilities. Slot 1 is beschikbaar vanaf heldlevel 1; slot 2 ontgrendelt op level 10 en slot 3 op level 20.
+- Guardian: Shield Charge, Ground Slam en Aegis Sanctuary. Ranger: Windstep, Arrow Rain en Predator Volley. Mage: Arcane Blink, Arcane Burst en Time Warp.
+- Frostblade: Ice Lunge, Frozen Ring en Whiteout. Pyromancer: Flame Rush, Fire Nova en Inferno. Stormstrider: Lightning Step, Thunder Pulse en Eye of the Storm. Voidwalker: Rift Walk, Void Collapse en Soul Drain.
+- Elke ability heeft een afzonderlijk permanent level van 1 tot 20. Upgrades versterken schade, healing, bereik of dashsnelheid en verkorten de cooldown.
+- De abilitywinkel toont uitsluitend de drie abilities van de actieve held en geeft bij vergrendelde slots duidelijk het vereiste heldlevel aan.
+- Alle zeven helden hebben nieuwe mensachtige 64×64-illustraties met een lichaam, hoofd, armen, benen en herkenbare uitrusting in plaats van eenvoudige ronde avatars.
+- SaveManager v4 initialiseert de 21 nieuwe abilitylevels veilig zonder bestaande goud-, wereld-, hero- of wapenvoortgang te verliezen.
 
 ## Huidige fase
 
@@ -108,7 +118,7 @@ Fase 8 – Progressie en economie:
 - Een apart Game Over / Chapter Complete scherm toont kamer, kills, damage, beloningen, blijvende goudbalans en je tijdelijke upgrades.
 - Je bestaande hero- en wapenniveaus blijven bestaan. Vijf globale permanente upgrade-tracks (HP, damage, defense, wapenschade en aanvalssnelheid) komen erbij.
 - Na kamer 2, 4, 7, 10, 13, 16 en 19 kies je één van drie tijdelijke run-upgrades. Bij een volgende run begin je zonder tijdelijke bonussen.
-- SaveManager v3 valideert en migreert oude lokale v1/v2-savebestanden, bewaart persoonlijke records en ondersteunt reset na bevestiging.
+- SaveManager v4 valideert en migreert oude lokale savebestanden, bewaart persoonlijke records en ondersteunt reset na bevestiging.
 
 De audio-instellingen zijn voorbereid; geluid en definitieve sprites volgen in fase 9. De eerste versie gebruikt geen online accounts of aankopen.
 
