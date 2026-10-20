@@ -108,7 +108,7 @@ export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number,
     if (worldId === 1 && ((kind === 'archer' && room >= 21) ||
       (kind === 'slime' && room >= 26))) continue;
     const weight = worldId === 1 && kind === 'mage' && room >= 21 ? 7 :
-      worldId === 1 && kind === 'bomber' && room >= 26 ? 8 :
+      worldId === 1 && kind === 'bomber' && room >= 26 ? 12 :
       kind === 'slime' ? Math.max(2, 7 - Math.floor(room / 9)) :
       Math.min(6, 2 + Math.floor((room - unlock) / 5));
     for (let i = 0; i < weight; i++) weighted.push(kind);
