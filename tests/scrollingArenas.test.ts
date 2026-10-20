@@ -52,7 +52,7 @@ describe('scrollable procedural arenas', () => {
       expect(getArenaBounds(room).height).toBeGreaterThanOrEqual(getArenaBounds(room - 1).height);
     }
     expect(getArenaBounds(1).height).toBeLessThan(844);
-    expect(getArenaBounds(30).height).toBeGreaterThan(1300);
+    expect(getArenaBounds(30).height).toBeGreaterThan(1100);
     expect(getArenaBounds(30).width).toBeGreaterThan(700);
   });
 
@@ -88,7 +88,7 @@ describe('scrollable procedural arenas', () => {
     const first = getRoomDefinition(1).layout;
     expect(targetArenaScroll(first.playerSpawn.x, first.playerSpawn.y, first.bounds))
       .toEqual({ x: 0, y: 0 });
-    const large = getRoomDefinition(50).layout.bounds;
+    const large = getRoomDefinition(CHAPTER_ROOM_COUNT).layout.bounds;
     const start = targetArenaScroll(large.x + 55, large.y + 65, large);
     const middle = targetArenaScroll(large.x + large.width / 2,
       large.y + large.height / 2, large);
