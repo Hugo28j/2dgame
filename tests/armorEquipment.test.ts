@@ -48,7 +48,7 @@ describe('armor equipment progression', () => {
     expect(armorBonuses(p.armorInventory, p.equippedArmor.guardian, 'guardian').hp).toBeGreaterThan(0);
     p = applyProfileAction(p, { type: 'sellArmor', id: one.id });
     expect(p.armorInventory).toHaveLength(0);
-    expect(p.equippedArmor.helm).toBeNull();
+    expect(p.equippedArmor.guardian.helm).toBeNull();
     expect(p.gold).toBe(9000 - cost + RARITY_CONFIG.common.sell);
   });
   it('provides only percentages and supports three gear slots', () => {
