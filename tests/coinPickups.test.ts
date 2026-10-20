@@ -56,7 +56,7 @@ describe('collectible enemy coin rewards', () => {
     expect(ledger.collectGold(1_000_000_000)).toBe(true);
     expect(ledger.collectGold(1)).toBe(true);
     expect(ledger.runGold).toBe(1_000_000_000);
-    expect(CHAPTER_ROOM_COUNT).toBe(50);
+    expect(CHAPTER_ROOM_COUNT).toBe(30);
   });
 });
 
