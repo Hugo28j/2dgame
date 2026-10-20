@@ -61,17 +61,19 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   public constructor(
     scene: Phaser.Scene, x: number, y: number,
     public readonly heroId: HeroId = 'ranger', level = 1,
-    permanent: Readonly<{ hp: number; damage: number; defense: number }> = { hp: 0, damage: 0, defense: 0 },
+    private readonly armor: Readonly<{
+      hp: number; defense: number; weaponDamage: number; attackSpeed: number; movementSpeed: number;
+    }> = { hp: 0, defense: 0, weaponDamage: 0, attackSpeed: 0, movementSpeed: 0 },
   ) {
     super(scene, x, y, HEROES[heroId].textureKey);
     this.setDisplaySize(56, 56);
     const stats = getHeroStats(heroId, level);
-    this.maxHp = stats.maxHp + permanent.hp;
+    this.maxHp = stats.maxHp * (1 + this.armor.hp);
     this.currentHp = this.maxHp;
-    this.defense = stats.defense + permanent.defense;
-    this.damage = stats.damage + permanent.damage;
+    this.defense = stats.defense * (1 + this.armor.defense);
+    this.damage = stats.damage;
     this.attackSpeed = stats.attackSpeed;
-    this.movementSpeed = stats.movementSpeed;
+    this.movementSpeed = stats.movementSpeed * (1 + this.armor.movementSpeed);
     this.criticalChance = stats.criticalChance;
     this.criticalMultiplier = stats.criticalMultiplier;
     this.abilityCooldownModifier = stats.abilityCooldownModifier;
@@ -105,11 +107,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   public applyHeroLevel(previousLevel: number, nextLevel: number): void {
     const before = getHeroStats(this.heroId, previousLevel);
     const after = getHeroStats(this.heroId, nextLevel);
-    const hpGain = after.maxHp - before.maxHp;
+    const hpGain = (after.maxHp - before.maxHp) * (1 + this.armor.hp);
     this.maxHp += hpGain;
     this.currentHp = Math.min(this.maxHp, this.currentHp + hpGain);
     this.damage += after.damage - before.damage;
-    this.defense += after.defense - before.defense;
+    this.defense += (after.defense - before.defense) * (1 + this.armor.defense);
   }
 
   public move(direction: Readonly<Vector2Value>): void {

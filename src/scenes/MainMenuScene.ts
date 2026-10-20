@@ -11,8 +11,10 @@ import {
   type ControlAction,
 } from '../input/keyBindings';
 import {
-  MAX_PERMANENT_LEVEL, PERMANENT_UPGRADE_IDS, PERMANENT_UPGRADES, permanentUpgradeCost,
-} from '../progression/economy';
+  ARMOR_SLOTS, ARMOR_MAX_LEVEL, ARMOR_MAX_STARS, RARITY_CONFIG,
+  armorDefinition, armorUpgradeCost, armorBonuses, armorStatText,
+  type ArmorSlot,
+} from '../progression/armor';
 import {
   HERO_WEAPONS, WEAPONS, getWeaponStats,
   weaponUpgradeCost, MAX_WEAPON_LEVEL, SECOND_WEAPON_UNLOCK_LEVEL,
@@ -35,7 +37,9 @@ const COLOR = {
 export class MainMenuScene extends Phaser.Scene {
   private tab: MenuTab = 'worlds';
   private heroPage = 0;
-  private upgradeCategory: 'equipment' | 'abilities' | 'permanent' = 'permanent';
+  private upgradeCategory: 'equipment' | 'abilities' | 'armor' = 'armor';
+  private armorPage = 0;
+  private armorSlot: ArmorSlot = 'helm';
   private settingsView: 'general' | 'controls' = 'general';
   private resetRequested = false;
   private awaitingKey?: ControlAction;
@@ -270,9 +274,9 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   private drawUpgrades(): void {
-    this.section('VERBETER JE UITRUSTING', 'Hero-levels via XP; uitrusting via goud');
-    const choices: Array<['permanent' | 'equipment' | 'abilities', string]> = [
-      ['permanent', 'PERMANENT'], ['equipment', 'HELD & WAPEN'], ['abilities', 'ABILITIES'],
+    this.section('VERBETER JE UITRUSTING', 'Armor via drops, upgrades en fusion');
+    const choices: Array<['armor' | 'equipment' | 'abilities', string]> = [
+      ['armor', 'ARMOR'], ['equipment', 'HELD & WAPEN'], ['abilities', 'ABILITIES'],
     ];
     choices.forEach(([category, label], index) => {
       const widths = [104, 126, 102];
@@ -282,20 +286,16 @@ export class MainMenuScene extends Phaser.Scene {
         this.upgradeCategory === category ? 'selected' : 'quiet', false, 10);
     });
 
+    if (this.upgradeCategory === 'armor') {
+      this.drawArmor();
+      return;
+    }
     const profile = progressStore.current;
     const equipment = equipmentForHero(profile.selectedHero);
     const rows: Array<{
       label: string; description: string; summary: string; level: number;
       unlocked: boolean; max: number; cost: number; action: ProfileAction;
-    }> = this.upgradeCategory === 'permanent'
-      ? PERMANENT_UPGRADE_IDS.map(id => ({
-          label: PERMANENT_UPGRADES[id].name,
-          description: PERMANENT_UPGRADES[id].description, summary: '',
-          level: profile.permanentLevels[id], unlocked: true, max: MAX_PERMANENT_LEVEL,
-          cost: permanentUpgradeCost(id, profile.permanentLevels[id]),
-          action: { type: 'upgradePermanent', id } as const,
-        }))
-      : this.upgradeCategory === 'abilities'
+    }> = this.upgradeCategory === 'abilities'
         ? HERO_ABILITIES[profile.selectedHero].map(id => {
             const ability = ABILITIES[id];
             const unlocked = isAbilityUnlocked(id, profile.heroLevels[profile.selectedHero]);
@@ -334,7 +334,7 @@ export class MainMenuScene extends Phaser.Scene {
             })),
           ];
 
-    const roomy = this.upgradeCategory !== 'permanent';
+    const roomy = true;
     rows.forEach((row, index) => {
       const y = roomy ? 394 + index * 116 : 372 + index * 65;
       this.plate(195, y, 328, roomy ? 106 : 59, COLOR.card, COLOR.border, 11);
@@ -359,13 +359,79 @@ export class MainMenuScene extends Phaser.Scene {
       ? 'Andere held verbeteren? Selecteer die bij HELDEN.'
       : this.upgradeCategory === 'abilities'
       ? 'Vaardigheden openen op heldlevel 5, 20 en 30.'
-      : 'Permanent: bonussen gelden voor al je helden.',
+      : 'Armorbonussen gelden voor al je helden.',
     10, COLOR.secondary, true);
   }
 
-  private setUpgradeCategory(category: 'equipment' | 'abilities' | 'permanent'): void {
+  private setUpgradeCategory(category: 'equipment' | 'abilities' | 'armor'): void {
     this.upgradeCategory = category;
     this.scene.restart();
+  }
+
+  private drawArmor(): void {
+    const profile = progressStore.current;
+    const items = profile.armorInventory.filter(item => armorDefinition(item).slot === this.armorSlot);
+    const equipped = profile.equippedArmor;
+    const totals = armorBonuses(profile.armorInventory, equipped);
+    const labels: Record<ArmorSlot, string> = { helm: 'HELM', body: 'BODY ARMOR', boots: 'BOOTS' };
+    ARMOR_SLOTS.forEach((slot, index) => {
+      const id = equipped[slot];
+      const item = profile.armorInventory.find(entry => entry.id === id);
+      const x = 81 + index * 114;
+      this.button(x, 362, 107, 65, item
+        ? labels[slot] + ' ★' + item.stars : labels[slot] + ' · LEEG',
+      () => { this.armorSlot = slot; this.armorPage = 0; this.scene.restart(); },
+      this.armorSlot === slot ? 'selected' : 'quiet', false, 10);
+    });
+    this.fittedText(32, 410, 'TOTAAL: HP +' + (totals.hp * 100).toFixed(1) +
+      '% · DEF +' + (totals.defense * 100).toFixed(1) + '%', 10, '#86efac', 328);
+    this.fittedText(32, 426, 'WAPEN +' + (totals.weaponDamage * 100).toFixed(1) +
+      '% · SCHIETEN +' + (totals.attackSpeed * 100).toFixed(1) +
+      '% · LOPEN +' + (totals.movementSpeed * 100).toFixed(1) + '%', 10, '#86efac', 328);
+    this.text(36, 451, labels[this.armorSlot] + ' · INVENTARIS (' + items.length + ')',
+      12, COLOR.white, false, true);
+    if (items.length === 0) {
+      this.text(195, 530, 'GEEN ARMOR IN DIT SLOT', 12, COLOR.secondary, true, true);
+      this.text(195, 554, '10% bij winst · 1% bij verlies', 10, COLOR.faint, true, true);
+    }
+    const pageSize = 2;
+    const pages = Math.max(1, Math.ceil(items.length / pageSize));
+    this.armorPage = Math.max(0, Math.min(this.armorPage, pages - 1));
+    items.slice(this.armorPage * pageSize, (this.armorPage + 1) * pageSize).forEach((item, index) => {
+      const def = armorDefinition(item);
+      const rar = RARITY_CONFIG[item.rarity];
+      const y = 504 + index * 93;
+      this.plate(195, y, 329, 88, COLOR.card, rar.color, 9);
+      this.text(46, y - 29, def.symbol + '  ' + def.name.toUpperCase(), 12,
+        '#' + rar.color.toString(16).padStart(6, '0'), false, true);
+      this.text(46, y - 12, rar.label.toUpperCase() + '  · LV.' + item.level +
+        '  ' + '★'.repeat(item.stars) + (equipped[this.armorSlot] === item.id ? ' · AAN' : ''),
+        10, COLOR.secondary);
+      this.fittedText(46, y + 3, armorStatText(item), 9, '#86efac', 294);
+      const equippedHere = equipped[this.armorSlot] === item.id;
+      this.button(75, y + 27, 67, 26, equippedHere ? 'UIT' : 'DRAAG',
+        () => this.runAction(equippedHere ?
+          { type: 'unequipArmor', slot: this.armorSlot } : { type: 'equipArmor', id: item.id }),
+        'normal', false, 9);
+      this.button(154, y + 27, 82, 26,
+        item.level >= ARMOR_MAX_LEVEL ? 'MAX' : armorUpgradeCost(item) + ' G',
+        () => this.runAction({ type: 'upgradeArmor', id: item.id }),
+        'quiet', item.level >= ARMOR_MAX_LEVEL || profile.gold < armorUpgradeCost(item), 9);
+      const hasDuplicate = item.stars < ARMOR_MAX_STARS &&
+        items.some(other => other.id !== item.id && other.kind === item.kind &&
+          other.rarity === item.rarity && other.stars === item.stars);
+      this.button(235, y + 27, 70, 26, 'FUSION',
+        () => this.runAction({ type: 'fuseArmor', id: item.id }), 'quiet', !hasDuplicate, 9);
+      this.button(312, y + 27, 65, 26, 'VERKOOP',
+        () => this.runAction({ type: 'sellArmor', id: item.id }), 'quiet', false, 9);
+    });
+    this.button(97, 704, 105, 33, '‹ VORIGE', () => {
+      this.armorPage--; this.scene.restart();
+    }, 'quiet', this.armorPage <= 0, 10);
+    this.text(195, 704, this.armorPage + 1 + '/' + pages, 11, COLOR.secondary, true, true);
+    this.button(290, 704, 105, 33, 'VOLGENDE ›', () => {
+      this.armorPage++; this.scene.restart();
+    }, 'quiet', this.armorPage >= pages - 1, 10);
   }
 
   private drawSettings(): void {

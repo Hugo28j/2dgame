@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   SaveManager, applyProfileAction, defaultProfile, validateProfile,
 } from '../src/progression/ProgressStore';
-import { permanentBonuses, permanentUpgradeCost } from '../src/progression/economy';
+import { armorBonuses, rollArmor, armorUpgradeCost } from '../src/progression/armor';
 import { RunLedger } from '../src/progression/RunLedger';
 import { RUN_UPGRADES, RunUpgradeDeck } from '../src/progression/runUpgrades';
 
@@ -56,17 +56,21 @@ describe('phase 8 save migration and permanent shop', () => {
     expect(migrated.highestRoom).toBe(1);
   });
 
-  it('has bounded prices, levels and real combat stat bonuses', () => {
+  it('replaces legacy permanent purchases with percentage armor upgrades', () => {
     let profile = { ...defaultProfile(), gold: 100000 };
-    const base = permanentBonuses(profile.permanentLevels);
-    const updated = applyProfileAction(profile, { type: 'upgradePermanent', id: 'hp' });
-    expect(updated.gold).toBe(profile.gold - permanentUpgradeCost('hp', 0));
-    expect(permanentBonuses(updated.permanentLevels).hp).toBe(base.hp + 8);
-    profile = updated;
-    for (let i = 0; i < 20; i += 1) {
-      profile = applyProfileAction(profile, { type: 'upgradePermanent', id: 'hp' });
+    expect(applyProfileAction(profile, { type: 'upgradePermanent', id: 'hp' })).toEqual(profile);
+    const item = rollArmor(true, 0, 0, 0, 'old-test')!;
+    profile = { ...profile, armorInventory: [item] };
+    profile = applyProfileAction(profile, { type: 'equipArmor', id: item.id });
+    const oldBonus = armorBonuses(profile.armorInventory, profile.equippedArmor).hp;
+    const cost = armorUpgradeCost(item);
+    profile = applyProfileAction(profile, { type: 'upgradeArmor', id: item.id });
+    expect(profile.gold).toBe(100000 - cost);
+    expect(armorBonuses(profile.armorInventory, profile.equippedArmor).hp).toBeGreaterThan(oldBonus);
+    for (let i = 0; i < 35; i++) {
+      profile = applyProfileAction(profile, { type: 'upgradeArmor', id: item.id });
     }
-    expect(profile.permanentLevels.hp).toBe(15);
+    expect(profile.armorInventory[0]?.level).toBe(30);
   });
 
   it('reads the legacy storage key and preserves progress after reloading', () => {
@@ -79,10 +83,16 @@ describe('phase 8 save migration and permanent shop', () => {
     };
     const first = new SaveManager(local);
     expect(first.current.gold).toBe(500);
-    expect(first.dispatch({ type: 'upgradePermanent', id: 'defense' })).toBe(true);
+    const report = new RunLedger('persist-armor').report(true);
+    expect(first.dispatch({ type: 'settleRun', report,
+      rolls: { drop: 0, rarity: 0, kind: 0 } })).toBe(true);
     const second = new SaveManager(local);
-    expect(second.current.gold).toBe(500 - permanentUpgradeCost('defense', 0));
-    expect(second.current.permanentLevels.defense).toBe(1);
+    expect(second.current.gold).toBe(500);
+    expect(second.current.armorInventory).toHaveLength(1);
+    const item = second.current.armorInventory[0]!;
+    expect(second.dispatch({ type: 'equipArmor', id: item.id })).toBe(true);
+    const third = new SaveManager(local);
+    expect(third.current.equippedArmor.helm).toBe(item.id);
     second.reset();
     expect(new SaveManager(local).current).toEqual(defaultProfile());
   });

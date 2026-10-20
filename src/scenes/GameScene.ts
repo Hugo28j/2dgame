@@ -40,7 +40,7 @@ import { targetArenaScroll } from '../rooms/cameraFollow';
 import { WeaponController } from '../weapons/WeaponController';
 import { WEAPONS } from '../weapons/weaponConfig';
 import { progressStore } from '../progression/ProgressStore';
-import { permanentBonuses } from '../progression/economy';
+import { armorBonuses } from '../progression/armor';
 import { RunLedger } from '../progression/RunLedger';
 import { coinDropsForEnemy } from '../progression/coinRewards';
 import { roomClearHealing } from '../progression/roomHealing';
@@ -133,13 +133,14 @@ export class GameScene extends Phaser.Scene {
 
     const firstRoom = getRoomDefinition(1, this.worldId);
     const profile = progressStore.current;
+    const gear = armorBonuses(profile.armorInventory, profile.equippedArmor);
     this.player = new Player(
       this,
       firstRoom.layout.playerSpawn.x,
       firstRoom.layout.playerSpawn.y,
       profile.selectedHero,
       profile.heroLevels[profile.selectedHero],
-      permanentBonuses(profile.permanentLevels),
+      gear,
     );
     this.controls = new InputController(this);
     this.projectiles = this.physics.add.group({ allowGravity: false });
@@ -149,10 +150,10 @@ export class GameScene extends Phaser.Scene {
     this.weapon = new WeaponController(
       this, this.player, this.projectiles,
       profile.selectedWeapon, profile.weaponLevels[profile.selectedWeapon],
-      permanentBonuses(profile.permanentLevels).weaponDamage,
-      permanentBonuses(profile.permanentLevels).weaponSpeed,
+      0, 1 + gear.attackSpeed,
       this.enemies,
       this.handleMeleeHit,
+      1 + gear.weaponDamage,
     );
     this.enemySpawner = new EnemySpawner(this, this.enemies);
 

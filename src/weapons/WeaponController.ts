@@ -26,6 +26,7 @@ export class WeaponController {
     private readonly permanentSpeed = 1,
     private readonly meleeTargets?: Phaser.Physics.Arcade.Group,
     private readonly onMeleeHit?: (target: Slime, attack: Readonly<AttackData>) => void,
+    private readonly armorDamageMultiplier = 1,
   ) {}
   public get attackMode(): 'melee' | 'projectile' { return this.config.attackMode; }
   public get config() { return getWeaponStats(this.weaponId, this.upgradeLevel); }
@@ -250,7 +251,7 @@ export class WeaponController {
     const magicBonus = this.owner.heroId === 'mage' &&
       (config.effect === 'magic' || config.effect === 'chain-lightning') ? 1.2 : 1;
     return {
-      damage: (config.damage + this.permanentDamage + this.owner.damage) * magicBonus,
+      damage: (config.damage * this.armorDamageMultiplier + this.permanentDamage + this.owner.damage) * magicBonus,
       criticalChance: this.owner.criticalChance + config.criticalChanceModifier,
       criticalMultiplier: Math.max(this.owner.criticalMultiplier, config.criticalMultiplier),
     };
