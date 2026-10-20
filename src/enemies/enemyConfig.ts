@@ -1,5 +1,6 @@
 import { getWorld, type WorldId } from '../worlds/worldConfig';
 import { BOSSES, getBossProfile, getBossTier } from './bossProfiles';
+import { BRAMBLE_GUNNER_HP_MULTIPLIER, WORLD1_MOSSLING_SPEED_MULTIPLIER } from './enemyBalance';
 
 export type EnemyKind = 'slime' | 'archer' | 'charger' | 'mage' | 'tank' | 'bomber' | 'boss';
 
@@ -34,7 +35,7 @@ export const BOSS_NAMES = BOSSES.map(boss => boss.name);
 export const SLIME_DIFFICULTY = Object.freeze({ hpPerRoom: 0.08, damagePerRoom: 0.05 });
 
 export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number,
-  worldId: WorldId = 1): SlimeRuntimeStats => {
+  worldId: WorldId = 1, bossSlot = 0): SlimeRuntimeStats => {
   const base = ENEMY_CONFIGS[kind];
   const number = Math.max(1, Math.floor(roomNumber));
   const completed = number - 1;
@@ -42,10 +43,15 @@ export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number,
   return {
     ...base, roomNumber: number,
     maxHp: Math.round(base.maxHp * (1 + completed * SLIME_DIFFICULTY.hpPerRoom) *
-      (kind === 'boss' ? 1 + (getBossTier(number) - 1) * 0.09 : 1) * world.hpMultiplier),
+      (kind === 'boss' ? 1 + (getBossTier(number) - 1) * 0.09 : 1) * world.hpMultiplier *
+      // Only Bramble Gunner (first boss, world 1 room 15); Bloom Sentinel
+      // in the same room and other world's gunner retain full HP.
+      (kind === 'boss' && worldId === 1 && number === 15 && bossSlot === 0
+        ? BRAMBLE_GUNNER_HP_MULTIPLIER : 1)),
     damage: Math.round(base.damage * (1 + completed * SLIME_DIFFICULTY.damagePerRoom) *
       (kind === 'boss' ? 1 + (getBossTier(number) - 1) * 0.05 : 1) * world.damageMultiplier),
-    movementSpeed: Math.round(base.movementSpeed * world.speedMultiplier),
+    movementSpeed: Math.round(base.movementSpeed * world.speedMultiplier *
+      (kind === 'slime' && worldId === 1 ? WORLD1_MOSSLING_SPEED_MULTIPLIER : 1)),
     attackIntervalMs: Math.round(base.attackIntervalMs / world.attackSpeedMultiplier),
   };
 };
