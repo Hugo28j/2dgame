@@ -642,6 +642,11 @@ export class GameScene extends Phaser.Scene {
     const selected = new Set(chosen);
     this.pendingSpawnIndices = this.pendingSpawnIndices.filter(i => !selected.has(i));
     const spawned = this.enemySpawner.spawnRoom(this.currentRoom, chosen, this.worldId);
+    if (this.worldId === 2) {
+      for (const enemy of spawned) {
+        if (enemy instanceof AdvancedEnemy && enemy.isFrostWitch) this.summonFrostMinions(enemy);
+      }
+    }
     this.nextEnemyWaveAt = this.time.now + settings.intervalMs;
     return spawned;
   }
@@ -1012,6 +1017,10 @@ export class GameScene extends Phaser.Scene {
   private readonly dropBossBombs = (enemy: AdvancedEnemy, targetX: number, targetY: number,
     count: number, radius: number, windupMs: number): void => {
     if (!this.player || this.gameOver || this.transitioning || this.roomProgress.doorOpen) return;
+    if (this.worldId === 2 && enemy.kind === 'bomber') {
+      this.throwFrozenSlowBomb(enemy, targetX, targetY, radius, windupMs);
+      return;
+    }
     if (enemy.isPoisonAlchemist) {
       this.throwPoisonBottles(enemy, targetX, targetY, count, radius);
       return;
@@ -1256,6 +1265,17 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private spawnSplitSnowPuffs(enemy: AdvancedEnemy): void {
+    if (!this.currentRoom || !this.enemySpawner || this.roomProgress.doorOpen) return;
+    const bounds = this.currentRoom.layout.bounds;
+    const positions = [-44, 44].map(dx => ({
+      x: Phaser.Math.Clamp(enemy.x + dx, bounds.x + 38, bounds.x + bounds.width - 38),
+      y: Phaser.Math.Clamp(enemy.y + 28, bounds.y + 38, bounds.y + bounds.height - 38),
+    }));
+    this.roomProgress.addEnemies(2);
+    this.enemySpawner.summonSnowPuffs(positions, this.currentRoom.number);
+  }
+
   private readonly handleEnemySpawned = (): void => {
     this.aliveEnemies += 1;
     this.updateEnemyCount();
@@ -1265,6 +1285,9 @@ export class GameScene extends Phaser.Scene {
     const kind = enemy instanceof AdvancedEnemy ? enemy.kind : 'slime';
     if (this.gameOver || !this.run.defeatEnemy(enemy.enemyId, kind)) return;
     this.spawnCoins(enemy.x, enemy.y, kind);
+    if (this.worldId === 2 && enemy instanceof AdvancedEnemy && enemy.kind === 'tank') {
+      this.spawnSplitSnowPuffs(enemy);
+    }
     this.aliveEnemies = Math.max(0, this.aliveEnemies - 1);
     this.updateEnemyCount();
     if (this.roomProgress.registerEnemyDefeated()) {
@@ -1289,7 +1312,7 @@ export class GameScene extends Phaser.Scene {
   /** Coin drops remain in the chamber until picked up, never grant gold
    * instantly, and are discarded at room exit / run end. */
   private spawnCoins(x: number, y: number, kind: Parameters<typeof coinDropsForEnemy>[0]): void {
-    const drops = coinDropsForEnemy(kind);
+    const drops = coinDropsForEnemy(kind, this.worldId, this.roomProgress.roomNumber);
     const bounds = this.currentRoom?.layout.bounds;
     if (!bounds) return;
     for (let i = 0; i < drops.length; i += 1) {
