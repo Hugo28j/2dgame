@@ -479,6 +479,7 @@ export class GameScene extends Phaser.Scene {
 
     this.abilities?.cancelMotion();
     this.weapon?.clearGroundEffects();
+    this.player?.clearFrost();
     this.clearBossBombs();
     this.clearCoins();
     this.witchSummons.clear();
@@ -531,6 +532,79 @@ export class GameScene extends Phaser.Scene {
 
     if (showBanner) {
       this.showRoomBanner(room);
+    }
+  }
+
+  /** Every living ice witch attempts to call exactly two Snow Puffs each
+   * five seconds. Both summons count toward clearing the chamber, and per-
+   * witch / per-room live caps keep infinite fights and FPS spikes away.
+   */
+  private readonly summonFrostMinions = (witch: AdvancedEnemy): void => {
+    if (!witch.isFrostWitch || witch.aiState === 'defeated' || !witch.active ||
+      this.gameOver || this.transitioning || this.roomProgress.doorOpen ||
+      !this.currentRoom || !this.player || !this.enemies || !this.enemySpawner) return;
+
+    let owned = this.witchSummons.get(witch);
+    if (!owned) { owned = new Set<Slime>(); this.witchSummons.set(witch, owned); }
+    for (const summon of owned) {
+      if (!summon.active || summon.aiState === 'defeated') owned.delete(summon);
+    }
+    const aliveSummons = this.enemies.getChildren().filter(child =>
+      child instanceof Slime && child.active && child.aiState !== 'defeated' &&
+      child.enemyId.startsWith('frost-summon-')).length;
+    if (!canSummonFrostMinions(aliveSummons, owned.size, FROZEN_EARLY.witchSummonCount)) return;
+    const layout = this.currentRoom.layout;
+    const candidates: { x: number; y: number }[] = [];
+    for (const range of [65, 105, 145]) {
+      for (let i = 0; i < 8 && candidates.length < FROZEN_EARLY.witchSummonCount; i++) {
+        const angle = i * Math.PI / 4 + this.time.now / 3900;
+        const x = Phaser.Math.Clamp(witch.x + Math.cos(angle) * range,
+          layout.bounds.x + 38, layout.bounds.x + layout.bounds.width - 38);
+        const y = Phaser.Math.Clamp(witch.y + Math.sin(angle) * range,
+          layout.bounds.y + 38, layout.bounds.y + layout.bounds.height - 38);
+        if (Math.hypot(x - this.player.x, y - this.player.y) < 95 ||
+          Math.hypot(x - witch.x, y - witch.y) < 35 ||
+          layout.obstacles.some(o =>
+            Math.abs(x - o.x) < o.width / 2 + 36 &&
+            Math.abs(y - o.y) < o.height / 2 + 36) ||
+          candidates.some(p => Math.hypot(p.x - x, p.y - y) < 54)) continue;
+        candidates.push({ x, y });
+      }
+      if (candidates.length === FROZEN_EARLY.witchSummonCount) break;
+    }
+    if (candidates.length !== FROZEN_EARLY.witchSummonCount) return;
+
+    this.roomProgress.addEnemies(candidates.length);
+    const spawned = this.enemySpawner.summonSnowPuffs(candidates, this.currentRoom.number);
+    for (const summon of spawned) owned.add(summon);
+    for (const point of candidates) {
+      const portal = this.add.circle(point.x, point.y, 25, 0x67e8f9, 0.28)
+        .setStrokeStyle(3, 0xcffafe, 0.85).setDepth(16);
+      this.tweens.add({ targets: portal, alpha: 0, scale: 1.6, duration: 460,
+        onComplete: () => portal.destroy() });
+    }
+    this.updateEnemyCount();
+  };
+
+  private drawFrostStatus(): void {
+    if (!this.player) return;
+    const g = this.frostStatusVisual ??=
+      this.add.graphics().setDepth(27);
+    g.clear();
+    if (!this.player.isFrozen && !this.player.isChilled) return;
+    const x = this.player.x, y = this.player.y;
+    const frozen = this.player.isFrozen;
+    g.lineStyle(frozen ? 5 : 3, frozen ? 0xdafaff : 0x38bdf8, frozen ? 0.96 : 0.6);
+    g.strokeCircle(x, y, frozen ? 31 : 26);
+    g.fillStyle(0x67e8f9, frozen ? 0.22 : 0.09);
+    g.fillCircle(x, y, frozen ? 30 : 25);
+    if (frozen) {
+      g.lineStyle(2, 0xffffff, 0.94);
+      for (let i = 0; i < 6; i++) {
+        const a = i * Math.PI / 3;
+        g.lineBetween(x + Math.cos(a) * 29, y + Math.sin(a) * 29,
+          x + Math.cos(a) * 41, y + Math.sin(a) * 41);
+      }
     }
   }
 
@@ -1483,6 +1557,9 @@ export class GameScene extends Phaser.Scene {
     this.upgradeReady = false;
     this.abilities?.destroy();
     this.abilities = undefined;
+    this.frostStatusVisual?.destroy();
+    this.frostStatusVisual = undefined;
+    this.witchSummons.clear();
     this.weapon?.clearGroundEffects();
     this.controls?.destroy();
     this.projectiles?.clear(true, true);
