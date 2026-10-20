@@ -14,6 +14,8 @@ import {
 import { targetsInRadius } from './areaTargets';
 import { DashState } from './DashState';
 import { inForwardRectangle, normalizedDirection, rayHitsCircle } from './directedGeometry';
+import { findTeleportDestination, safeBombBlastDistance } from './teleportDestination';
+import type { RoomLayout } from '../rooms/roomConfig';
 
 interface AbilityButton {
   readonly id: AbilityId; readonly x: number; readonly y: number;
@@ -28,6 +30,14 @@ interface AimHold {
   readonly originX: number;
   readonly originY: number;
   direction: Vector2Value;
+}
+
+interface BombState {
+  readonly sprite: Phaser.Physics.Arcade.Sprite;
+  readonly stats: Readonly<AbilityStats>;
+  readonly sourceX: number;
+  readonly sourceY: number;
+  readonly maximumRange: number;
 }
 
 interface TrailPatch {
@@ -55,8 +65,10 @@ export class AbilityController {
   private readonly scene: Phaser.Scene;
   private readonly slots: readonly [AbilityId, AbilityId, AbilityId];
   private readonly aimPreview: Phaser.GameObjects.Graphics;
+  private readonly shieldVisual: Phaser.GameObjects.Graphics;
+  private readonly shieldHud: Phaser.GameObjects.Text;
   private readonly trails: TrailPatch[] = [];
-  private readonly bombs = new Set<Phaser.GameObjects.Arc>();
+  private readonly bombs = new Set<BombState>();
   private readonly flameHitAt = new WeakMap<Slime, number>();
   private aimHold?: AimHold;
   private companion?: Companion;
@@ -78,10 +90,16 @@ export class AbilityController {
     private readonly refreshHealth: () => void,
     private readonly blocked: () => boolean,
     private readonly enemyProjectiles?: Phaser.Physics.Arcade.Group,
+    private readonly arenaLayout?: () => Pick<RoomLayout, 'bounds' | 'obstacles'> | undefined,
   ) {
     this.scene = scene;
     this.slots = HERO_ABILITIES[player.heroId];
     this.aimPreview = scene.add.graphics().setScrollFactor(0).setDepth(126);
+    this.shieldVisual = scene.add.graphics().setDepth(22);
+    this.shieldHud = scene.add.text(150, 53, '', {
+      fontFamily: 'system-ui, sans-serif', fontSize: '10px', fontStyle: 'bold',
+      color: '#fde68a', stroke: '#020617', strokeThickness: 2,
+    }).setOrigin(0, 0.5).setDepth(121).setScrollFactor(0);
 
     this.slots.forEach((id, index) => {
       const config = ABILITIES[id];
@@ -135,10 +153,24 @@ export class AbilityController {
       this.nextTrailAt = now + 32;
     }
     this.updateTrails(now);
+    this.updateBombs();
     this.updateCompanion(now, delta);
+    this.drawShield();
     if (now < this.timeWarpUntil && !this.blocked()) {
       for (const enemy of this.liveEnemies()) enemy.applySlow(now, 180, 0.33);
     }
+    this.refresh(now);
+  }
+
+  /** Freezes all ability cooldowns as soon as the last enemy dies. */
+  public pauseCooldowns(now: number): void {
+    this.cooldowns.pause(now);
+    this.refresh(now);
+  }
+
+  /** Continue from the remaining seconds when the next room starts. */
+  public resumeCooldowns(now: number): void {
+    this.cooldowns.resume(now);
     this.refresh(now);
   }
 
@@ -155,10 +187,7 @@ export class AbilityController {
     this.aimPreview.clear();
     for (const patch of this.trails) patch.visual.destroy();
     this.trails.length = 0;
-    for (const bomb of this.bombs) {
-      this.scene.tweens.killTweensOf(bomb);
-      bomb.destroy();
-    }
+    for (const bomb of this.bombs) bomb.sprite.destroy();
     this.bombs.clear();
     this.removeCompanion();
   }
@@ -169,6 +198,8 @@ export class AbilityController {
     this.scene.input.off(Phaser.Input.Events.POINTER_UP, this.onPointerRelease);
     this.scene.input.off(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.onPointerRelease);
     this.aimPreview.destroy();
+    this.shieldVisual.destroy();
+    this.shieldHud.destroy();
     for (const button of this.buttons) {
       button.background.removeAllListeners();
       button.background.destroy(); button.icon.destroy();
@@ -236,7 +267,16 @@ export class AbilityController {
     const move = this.inputs.getMovement();
     const aim = directedAim ?? this.inputs.getAim(this.player.x, this.player.y);
     const direction = normalizedDirection(
-      stats.kind === 'dash' && Math.hypot(move.x, move.y) > 0.1 ? move : aim);
+      (stats.kind === 'dash' || stats.kind === 'teleport') &&
+      Math.hypot(move.x, move.y) > 0.1 ? move : aim);
+    const layout = this.arenaLayout?.();
+    const teleportLanding = stats.kind === 'teleport' && layout
+      ? findTeleportDestination({ x: this.player.x, y: this.player.y },
+        direction, 170, layout.bounds, layout.obstacles)
+      : undefined;
+    if (stats.kind === 'teleport' && (!teleportLanding ||
+      Phaser.Math.Distance.Between(this.player.x, this.player.y,
+        teleportLanding.x, teleportLanding.y) < 12)) return false;
     if (stats.kind === 'dash') {
       if (!this.dash.begin(now, stats.durationMs, direction)) return false;
       this.activeDashSpeed = stats.dashSpeed;
@@ -247,6 +287,14 @@ export class AbilityController {
     }
 
     switch (stats.kind) {
+      case 'shield':
+        this.player.restoreShield();
+        this.drawShield();
+        this.pulse(this.player.x, this.player.y, 43, stats.color, 320);
+        break;
+      case 'teleport':
+        if (teleportLanding) this.teleportTo(teleportLanding.x, teleportLanding.y, now, stats);
+        break;
       case 'dash':
         this.player.beginInvulnerability(now, stats.invulnerabilityMs);
         this.pulse(this.player.x, this.player.y, 34, stats.color, 170);
@@ -291,6 +339,34 @@ export class AbilityController {
 
     this.refresh(now);
     return true;
+  }
+
+  private teleportTo(x: number, y: number, now: number, stats: Readonly<AbilityStats>): void {
+    // This is a true instantaneous relocation: there are no intermediate
+    // positions where a moving dash could be hit.
+    this.dash.cancel();
+    const fromX = this.player.x, fromY = this.player.y;
+    this.pulse(fromX, fromY, 35, stats.color, 220);
+    const body = this.player.body;
+    if (body instanceof Phaser.Physics.Arcade.Body) body.reset(x, y);
+    else this.player.setPosition(x, y);
+    this.player.setVelocity(0, 0);
+    this.player.beginInvulnerability(now, stats.invulnerabilityMs);
+    this.pulse(x, y, 35, stats.color, 260);
+  }
+
+  private drawShield(): void {
+    this.shieldVisual.clear();
+    if (this.player.shieldHp <= 0) {
+      this.shieldHud.setText('');
+      return;
+    }
+    const ratio = this.player.shieldHp / this.player.maxShieldHp;
+    this.shieldVisual.fillStyle(0x7dd3fc, 0.09 + 0.13 * ratio);
+    this.shieldVisual.fillCircle(this.player.x, this.player.y, 39);
+    this.shieldVisual.lineStyle(3, 0xfde68a, 0.5 + ratio * 0.5);
+    this.shieldVisual.strokeCircle(this.player.x, this.player.y, 39);
+    this.shieldHud.setText('🛡 ' + Math.ceil(this.player.shieldHp) + '/50');
   }
 
   private liveEnemies(): Slime[] {
@@ -378,25 +454,59 @@ export class AbilityController {
 
   private throwBomb(stats: Readonly<AbilityStats>,
     direction: Readonly<Vector2Value>): void {
-    const sourceX = this.player.x, sourceY = this.player.y;
-    const targetX = sourceX + direction.x * 245;
-    const targetY = sourceY + direction.y * 245;
-    const bomb = this.scene.add.circle(sourceX, sourceY, 12, stats.color, 1)
-      .setStrokeStyle(3, 0xffffff, 0.95).setDepth(29);
-    this.bombs.add(bomb);
-    this.scene.tweens.add({
-      targets: bomb, x: targetX, y: targetY, scale: 1.35,
-      duration: 430, ease: 'Sine.easeOut',
-      onComplete: () => {
-        this.bombs.delete(bomb);
-        bomb.destroy();
-        if (this.blocked()) return;
-        this.pulse(targetX, targetY, stats.radius, stats.color, 380);
-        for (const enemy of targetsInRadius(targetX, targetY, stats.radius, this.liveEnemies())) {
-          this.hitEnemy(enemy, stats);
-        }
-      },
+    // Physical flying projectile, launched in the chosen direction rather than
+    // an AOE centred on the caster. Damage is only dealt at its distant impact.
+    const dir = normalizedDirection(direction);
+    const x = this.player.x + dir.x * 34;
+    const y = this.player.y + dir.y * 34;
+    const sprite = this.scene.physics.add.sprite(x, y, 'enemy-bullet')
+      .setTint(stats.color).setScale(2.1).setDepth(29);
+    const body = sprite.body;
+    if (body instanceof Phaser.Physics.Arcade.Body) {
+      body.setAllowGravity(false);
+      body.setCircle(7, 1, 1);
+    }
+    sprite.setVelocity(dir.x * 510, dir.y * 510);
+    this.bombs.add({
+      sprite, stats, sourceX: this.player.x, sourceY: this.player.y,
+      maximumRange: Math.max(360, stats.radius + 130),
     });
+  }
+
+  private updateBombs(): void {
+    const layout = this.arenaLayout?.();
+    for (const bomb of this.bombs) {
+      const projectile = bomb.sprite;
+      if (!projectile.active || this.blocked() || !layout) {
+        this.removeBomb(bomb);
+        continue;
+      }
+      const distance = Phaser.Math.Distance.Between(
+        bomb.sourceX, bomb.sourceY, projectile.x, projectile.y);
+      const armed = distance >= safeBombBlastDistance(bomb.stats.radius);
+      const bounds = layout.bounds;
+      const outside = projectile.x < bounds.x + 12 || projectile.x > bounds.x + bounds.width - 12 ||
+        projectile.y < bounds.y + 12 || projectile.y > bounds.y + bounds.height - 12;
+      const hitObstacle = layout.obstacles.some(o =>
+        Math.abs(o.x - projectile.x) <= o.width / 2 + 9 &&
+        Math.abs(o.y - projectile.y) <= o.height / 2 + 9);
+      const hitEnemy = armed && this.liveEnemies().some(enemy =>
+        Phaser.Math.Distance.Between(projectile.x, projectile.y, enemy.x, enemy.y) <= 27);
+      if (!outside && !hitObstacle && !hitEnemy && distance < bomb.maximumRange) continue;
+      const x = projectile.x, y = projectile.y;
+      this.removeBomb(bomb);
+      // Fizzle near walls instead of exploding next to the player.
+      if (!armed) continue;
+      this.pulse(x, y, bomb.stats.radius, bomb.stats.color, 380);
+      for (const enemy of targetsInRadius(x, y, bomb.stats.radius, this.liveEnemies())) {
+        this.hitEnemy(enemy, bomb.stats);
+      }
+    }
+  }
+
+  private removeBomb(bomb: BombState): void {
+    bomb.sprite.destroy();
+    this.bombs.delete(bomb);
   }
 
   private addTrailPatch(kind: 'ice' | 'fire', now: number): void {
