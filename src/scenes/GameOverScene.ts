@@ -107,7 +107,10 @@ export class GameOverScene extends Phaser.Scene {
       this.tweens.add({ targets: [plate, caption], alpha: { from: 0, to: 1 },
         duration: 380, delay: 340, ease: 'Sine.easeOut' });
     };
+    let navigating = false;
     const navigate = (target: string): void => {
+      if (navigating) return;
+      navigating = true;
       // Also safe when the user clicks before deferred cleanup fires.
       if (this.scene.isSleeping(GAME_SCENE_KEY)) this.scene.stop(GAME_SCENE_KEY);
       this.scene.start(target);
