@@ -71,7 +71,7 @@ export class AdvancedEnemy extends Slime {
 
   public get isBoss(): boolean { return this.kind === 'boss'; }
   public get isFrostWitch(): boolean {
-    return this.worldId === 2 && this.kind === 'mage' && this.roomNumber <= FROZEN_EARLY.lastRoom;
+    return this.worldId === 2 && this.kind === 'mage';
   }
   public get isTreantShield(): boolean { return this.kind === 'tank' && this.worldId === 1; }
   public get shieldSurface(): ShieldSurface {
@@ -100,6 +100,10 @@ export class AdvancedEnemy extends Slime {
       this.drawTreantShield();
     }
     if (this.isKnockedBack(now)) return;
+    if (this.worldId === 2 && this.kind !== 'boss' && this.kind !== 'mage' && this.kind !== 'archer') {
+      this.updateLateFrozenMob(targetX, targetY, now, fire, dropBombs);
+      return;
+    }
     const distance = Phaser.Math.Distance.Between(this.x, this.y, targetX, targetY);
     const speed = this.stats.movementSpeed * this.slowMultiplier;
 
@@ -210,6 +214,20 @@ export class AdvancedEnemy extends Slime {
     g.lineBetween(x - 13, y - 2, x + 14, y - 2);
     g.fillStyle(0x67e8f9, 0.7 + 0.2 * Math.sin(now / 240));
     g.fillCircle(x + 16, y - 18, 4);
+  }
+
+  private updateLateFrozenMob(targetX: number, targetY: number, now: number,
+    fire: EnemyFire, dropBombs?: EnemyBomb): void {
+    if (this.kind === 'tank') return; // Giant chaser that splits on defeat.
+    if (this.kind !== 'bomber' && this.kind !== 'charger') return;
+    const speed = this.stats.movementSpeed * this.slowMultiplier;
+    const movement = rangedVelocity(this.x, this.y, targetX, targetY, speed,
+      this.kind === 'bomber' ? 310 : 175, this.orbitSign);
+    this.setVelocity(movement.x, movement.y);
+    if (now < this.nextShotAt) return;
+    if (this.kind === 'bomber') dropBombs?.(this, targetX, targetY, 1, 62, 950);
+    else fire(this, 'shotgun-six');
+    this.nextShotAt = now + (this.kind === 'charger' ? 4400 : this.stats.attackIntervalMs);
   }
 
   /** The drawn plate is the same actual line segment used in damage interception.

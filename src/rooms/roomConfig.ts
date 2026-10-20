@@ -161,11 +161,11 @@ export const getRoomDefinition = (roomNumber: number, worldId: WorldId = 1): Roo
   // Each world visits the same 21 hand-designed patterns in a different order.
   const index = (regularIndex + (worldId - 1) * 4) % TEMPLATES.length;
   const layout = makeLayout(room, index);
-  const enemyCount = isBossRoom ? (room === 15 ? 2 : 1) : getEnemyCountForRoom(room);
+  const enemyCount = isBossRoom ? (worldId === 2 && room === 15 ? 3 : (room === 15 || (worldId === 2 && (room === 20 || room === 30)) ? 2 : 1)) : getEnemyCountForRoom(room);
   // Bosses receive an open arena: mobility and projectile patterns remain fair.
   const bossLayout = isBossRoom ? makeLayout(room, 0) : layout;
   const bossSpawns = Array.from({ length: enemyCount }, (_, index) => ({
-    x: bossLayout.bounds.x + bossLayout.bounds.width * (enemyCount === 1 ? 0.5 : index === 0 ? 0.32 : 0.68),
+    x: bossLayout.bounds.x + bossLayout.bounds.width * (enemyCount === 1 ? 0.5 : enemyCount === 3 ? 0.25 + index * 0.25 : index === 0 ? 0.32 : 0.68),
     y: bossLayout.bounds.y + Math.min(190, bossLayout.bounds.height * 0.21),
   }));
   return {

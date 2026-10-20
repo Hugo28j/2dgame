@@ -642,6 +642,11 @@ export class GameScene extends Phaser.Scene {
     const selected = new Set(chosen);
     this.pendingSpawnIndices = this.pendingSpawnIndices.filter(i => !selected.has(i));
     const spawned = this.enemySpawner.spawnRoom(this.currentRoom, chosen, this.worldId);
+    if (this.worldId === 2) {
+      for (const enemy of spawned) {
+        if (enemy instanceof AdvancedEnemy && enemy.isFrostWitch) this.summonFrostMinions(enemy);
+      }
+    }
     this.nextEnemyWaveAt = this.time.now + settings.intervalMs;
     return spawned;
   }
@@ -1012,6 +1017,10 @@ export class GameScene extends Phaser.Scene {
   private readonly dropBossBombs = (enemy: AdvancedEnemy, targetX: number, targetY: number,
     count: number, radius: number, windupMs: number): void => {
     if (!this.player || this.gameOver || this.transitioning || this.roomProgress.doorOpen) return;
+    if (this.worldId === 2 && enemy.kind === 'bomber') {
+      this.throwFrozenSlowBomb(enemy, targetX, targetY, radius, windupMs);
+      return;
+    }
     if (enemy.isPoisonAlchemist) {
       this.throwPoisonBottles(enemy, targetX, targetY, count, radius);
       return;
@@ -1049,6 +1058,57 @@ export class GameScene extends Phaser.Scene {
       this.bombTimers.add(timer);
     }
   };
+
+  /** The long-range ice bomb visibly flies to its target before leaving a slow field. */
+  private throwFrozenSlowBomb(enemy: AdvancedEnemy, targetX: number, targetY: number,
+    radius: number, windupMs: number): void {
+    const bounds = this.currentRoom?.layout.bounds;
+    if (!bounds) return;
+    const x = Phaser.Math.Clamp(targetX, bounds.x + radius, bounds.x + bounds.width - radius);
+    const y = Phaser.Math.Clamp(targetY, bounds.y + radius, bounds.y + bounds.height - radius);
+    const bomb = this.add.circle(enemy.x, enemy.y, 11, 0x67e8f9, 0.95)
+      .setStrokeStyle(3, 0xffffff).setDepth(30);
+    const target = this.add.circle(x, y, radius, 0x67e8f9, 0.12)
+      .setStrokeStyle(2, 0xbae6fd, 0.75).setDepth(24);
+    this.bombWarnings.add(bomb);
+    this.bombWarnings.add(target);
+    const startY = enemy.y;
+    this.tweens.add({
+      targets: bomb, x, y, duration: windupMs, ease: 'Linear',
+      onUpdate: tween => bomb.setY(Phaser.Math.Linear(startY, y, tween.progress) -
+        75 * Math.sin(Math.PI * tween.progress)),
+      onComplete: () => {
+        this.bombWarnings.delete(bomb);
+        this.bombWarnings.delete(target);
+        bomb.destroy();
+        target.destroy();
+        if (this.gameOver || this.transitioning || this.roomProgress.doorOpen) return;
+        const patch = this.add.circle(x, y, radius, 0x7dd3fc, 0.28)
+          .setStrokeStyle(2, 0xbae6fd, 0.75).setDepth(22);
+        this.bombWarnings.add(patch);
+        let damageAt = 0;
+        let ticks = 0;
+        const timer = this.time.addEvent({ delay: 100, repeat: 24, callback: () => {
+          ticks++;
+          if (patch.active && this.player && !this.roomProgress.doorOpen &&
+              withinRadius(x, y, this.player.x, this.player.y, radius)) {
+            this.player.chill(this.time.now);
+            if (this.time.now >= damageAt) {
+              damageAt = this.time.now + 850;
+              this.damagePlayer({ damage: enemy.stats.damage * 0.23,
+                criticalChance: 0, criticalMultiplier: 1 });
+            }
+          }
+          if (ticks >= 25) {
+            this.bombWarnings.delete(patch);
+            patch.destroy();
+            this.bombTimers.delete(timer);
+          }
+        } });
+        this.bombTimers.add(timer);
+      },
+    });
+  }
 
   /** Each green bottle visibly arcs from the alchemist to its target before
    * breaking. Impact creates a five-second damaging poison circle.
@@ -1256,6 +1316,17 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private spawnSplitSnowPuffs(enemy: AdvancedEnemy): void {
+    if (!this.currentRoom || !this.enemySpawner || this.roomProgress.doorOpen) return;
+    const bounds = this.currentRoom.layout.bounds;
+    const positions = [-44, 44].map(dx => ({
+      x: Phaser.Math.Clamp(enemy.x + dx, bounds.x + 38, bounds.x + bounds.width - 38),
+      y: Phaser.Math.Clamp(enemy.y + 28, bounds.y + 38, bounds.y + bounds.height - 38),
+    }));
+    this.roomProgress.addEnemies(2);
+    this.enemySpawner.summonSnowPuffs(positions, this.currentRoom.number);
+  }
+
   private readonly handleEnemySpawned = (): void => {
     this.aliveEnemies += 1;
     this.updateEnemyCount();
@@ -1265,6 +1336,9 @@ export class GameScene extends Phaser.Scene {
     const kind = enemy instanceof AdvancedEnemy ? enemy.kind : 'slime';
     if (this.gameOver || !this.run.defeatEnemy(enemy.enemyId, kind)) return;
     this.spawnCoins(enemy.x, enemy.y, kind);
+    if (this.worldId === 2 && enemy instanceof AdvancedEnemy && enemy.kind === 'tank') {
+      this.spawnSplitSnowPuffs(enemy);
+    }
     this.aliveEnemies = Math.max(0, this.aliveEnemies - 1);
     this.updateEnemyCount();
     if (this.roomProgress.registerEnemyDefeated()) {
@@ -1289,7 +1363,7 @@ export class GameScene extends Phaser.Scene {
   /** Coin drops remain in the chamber until picked up, never grant gold
    * instantly, and are discarded at room exit / run end. */
   private spawnCoins(x: number, y: number, kind: Parameters<typeof coinDropsForEnemy>[0]): void {
-    const drops = coinDropsForEnemy(kind);
+    const drops = coinDropsForEnemy(kind, this.worldId, this.roomProgress.roomNumber);
     const bounds = this.currentRoom?.layout.bounds;
     if (!bounds) return;
     for (let i = 0; i < drops.length; i += 1) {

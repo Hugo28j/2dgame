@@ -43,7 +43,7 @@ export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number,
   const world = getWorld(worldId);
   return {
     ...base, roomNumber: number,
-    maxHp: Math.round(base.maxHp * (1 + completed * SLIME_DIFFICULTY.hpPerRoom) *
+    maxHp: Math.round(base.maxHp * (worldId === 2 && kind === 'mage' ? 3 : 1) * (1 + completed * SLIME_DIFFICULTY.hpPerRoom) *
       (kind === 'boss' ? 1 + (getBossTier(number) - 1) * 0.09 : 1) * world.hpMultiplier *
       // Only Bramble Gunner (first boss, world 1 room 15); Bloom Sentinel
       // in the same room and other world's gunner retain full HP.
@@ -59,6 +59,10 @@ export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number,
 export const getSlimeStatsForRoom = (roomNumber: number, worldId: WorldId = 1): SlimeRuntimeStats =>
   getEnemyStatsForRoom('slime', roomNumber, worldId);
 
+export const WORLD2_UNLOCK_ROOMS = {
+  archer: 1, mage: 3, slime: 11, tank: 15, bomber: 20, charger: 30,
+} as const;
+
 /** First rooms contain only slimes. New enemies unlock gradually, then become
  * more frequent as the dungeon gets deeper. Deterministic for reproducible runs. */
 export const ENEMY_UNLOCK_ROOMS = {
@@ -68,12 +72,17 @@ export const ENEMY_UNLOCK_ROOMS = {
 export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number,
   worldId: WorldId = 1): EnemyKind => {
   const room = Math.max(1, Math.floor(roomNumber));
-  if (room % 5 === 0) return 'boss';
+  if (room % 5 === 0) {
+    if (worldId === 2 && room === 15 && spawnIndex === 2) return 'tank';
+    if (worldId === 2 && room === 20 && spawnIndex === 1) return 'bomber';
+    if (worldId === 2 && room === 30 && spawnIndex === 1) return 'charger';
+    return 'boss';
+  }
   const index = Math.max(0, Math.floor(spawnIndex));
   if (worldId === FROZEN_EARLY.world && room <= FROZEN_EARLY.lastRoom) {
     return earlyFrozenEnemy(room, index);
   }
-  const entries = Object.entries(ENEMY_UNLOCK_ROOMS) as Array<
+  const entries = Object.entries(worldId === 2 ? WORLD2_UNLOCK_ROOMS : ENEMY_UNLOCK_ROOMS) as Array<
     [Exclude<EnemyKind, 'boss'>, number]>;
   // A new enemy always appears when its type is first introduced.
   const newKind = entries.find(([, unlock]) => unlock === room);
