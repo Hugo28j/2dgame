@@ -23,3 +23,10 @@ export function shotAngles(pattern: BulletPattern, targetAngle: number, volley =
     case 'single': return [targetAngle];
   }
 }
+
+/** Room-15 split bosses spiral in opposite directions at twice the usual angular speed. */
+export function splitTwinShotAngle(volley: number, twinIndex: 0 | 1): number {
+  const angularStep = Math.PI / 3; // Original spiral is PI/6 per volley.
+  return (twinIndex === 0 ? 0 : Math.PI) +
+    (twinIndex === 0 ? 1 : -1) * volley * angularStep;
+}
