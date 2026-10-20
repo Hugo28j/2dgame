@@ -82,7 +82,7 @@ export class AbilityController {
   public constructor(
     scene: Phaser.Scene,
     private readonly player: Player,
-    private readonly heroLevel: number,
+    private heroLevel: number,
     private readonly abilityLevels: Readonly<Record<AbilityId, number>>,
     private readonly enemies: Phaser.Physics.Arcade.Group,
     private readonly inputs: InputController,
@@ -162,6 +162,21 @@ export class AbilityController {
       for (const enemy of this.liveEnemies()) enemy.applySlow(now, 180, 0.33);
     }
     this.refresh(now);
+  }
+
+  public setHeroLevel(level: number): void {
+    this.heroLevel = level;
+    this.buttons.forEach(button => {
+      const config = ABILITIES[button.id];
+      const unlocked = isAbilityUnlocked(button.id, level);
+      button.background.setStrokeStyle(2.5, unlocked ? config.color : 0x475569);
+      button.icon.setText(unlocked ? config.symbol : '🔒');
+      button.icon.setFontSize(unlocked ? '23px' : '16px');
+      button.hint.setText(unlocked ? this.inputs.getAbilityLabel(
+        config.slot === 1 ? 'dash' : config.slot === 2 ? 'fireNova' : 'iceBlast') +
+        (isAimedAbility(config.kind) ? ' ↗' : '') : 'LV.' + config.unlockLevel);
+    });
+    this.refresh(this.scene.time.now);
   }
 
   public shortenActiveCooldowns(now: number, factor: number): void {
