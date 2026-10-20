@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FROZEN_EARLY, canSummonFrostMinions, earlyFrozenEnemy } from '../src/enemies/frozenEarlyGame';
+import { FROZEN_EARLY, canSummonFrostMinions } from '../src/enemies/frozenEarlyGame';
 import { getEnemyKindForRoom } from '../src/enemies/enemyConfig';
 import { getWorldCharacter } from '../src/enemies/worldCharacters';
 import { RoomProgress } from '../src/rooms/RoomProgress';
