@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ARMOR_DEFINITIONS, ARMOR_RARITIES, RARITY_CONFIG, armorBonuses,
-  armorUpgradeCost, rollArmor } from '../src/progression/armor';
+  armorUpgradeCost, rollEnemyArmor } from '../src/progression/armor';
 import { applyProfileAction, defaultProfile } from '../src/progression/ProgressStore';
 
 const report = (runId: string, victory: boolean) => ({
@@ -8,33 +8,33 @@ const report = (runId: string, victory: boolean) => ({
   enemiesDefeated: 1, bossesDefeated: 0, totalDamage: 0, earnedGold: 10,
 });
 describe('armor equipment progression', () => {
-  it('guarantees first win reward and uses independent bonus rates', () => {
-    expect(rollArmor(true, .999, .9, .4, 'a')).toBeDefined();
-    expect(rollArmor(true, .199, .9, .4, 'a', 'guardian', 1)).toBeDefined();
-    expect(rollArmor(true, .2, .9, .4, 'a', 'guardian', 1)).toBeUndefined();
-    expect(rollArmor(false, .399, .9, .4, 'a')).toBeDefined();
-    expect(rollArmor(false, .4, .9, .4, 'a')).toBeUndefined();
-    expect(rollArmor(false, .099, .9, .4, 'a', 'guardian', 1)).toBeDefined();
-    expect(rollArmor(false, .1, .9, .4, 'a', 'guardian', 1)).toBeUndefined();
+  it('uses 0.5% chance for normal kills and 5% for bosses', () => {
+    const drop = (kind: 'normal' | 'boss', chance: number) =>
+      rollEnemyArmor(kind, chance, 0, 0, 'run', 'enemy', 'guardian');
+    expect(drop('normal', .00499)).toBeDefined();
+    expect(drop('normal', .005)).toBeUndefined();
+    expect(drop('boss', .04999)).toBeDefined();
+    expect(drop('boss', .05)).toBeUndefined();
     expect(ARMOR_DEFINITIONS).toHaveLength(63);
     expect(ARMOR_RARITIES).toHaveLength(5);
   });
-  it('awards up to two items per unique run with the proper hero owner', () => {
+  it('gains armor only when collecting ground loot, never when winning or dying', () => {
     const initial = defaultProfile();
+    const item = rollEnemyArmor('boss', 0, .999, 0, 'run', 'enemy', 'guardian')!;
+    expect(item.rarity).toBe('legendary');
     expect(initial.armorInventory).toHaveLength(0);
-    const first = applyProfileAction(initial, { type: 'settleRun', report: report('a', true),
-      heroId: 'guardian', rolls: { drop: .99, rarity: .999, kind: 0 },
-      secondRoll: { drop: 0, rarity: 0, kind: 0 } });
-    expect(first.armorInventory).toHaveLength(2);
-    expect(first.armorInventory[0]?.rarity).toBe('legendary');
-    expect(first.armorInventory.every(x => x.heroId === 'guardian')).toBe(true);
-    expect(applyProfileAction(first, { type: 'settleRun', report: report('a', true),
-      rolls: { drop: 0, rarity: 0, kind: 0 } })).toEqual(first);
+    const victory = applyProfileAction(initial, { type: 'settleRun', report: report('a', true) });
+    expect(victory.armorInventory).toHaveLength(0);
+    const defeat = applyProfileAction(initial, { type: 'settleRun', report: report('b', false) });
+    expect(defeat.armorInventory).toHaveLength(0);
+    const collected = applyProfileAction(initial, { type: 'collectArmor', item });
+    expect(collected.armorInventory).toHaveLength(1);
+    expect(applyProfileAction(collected, { type: 'collectArmor', item })).toEqual(collected);
   });
   it('equips, levels, fuses duplicates, and sells correctly', () => {
     const base = { ...defaultProfile(), gold: 9000 };
-    const one = rollArmor(true, 0, 0, 0, 'one')!;
-    const two = rollArmor(true, 0, 0, 0, 'two')!;
+    const one = rollEnemyArmor('normal', 0, 0, 0, 'r', 'one', 'guardian')!;
+    const two = rollEnemyArmor('normal', 0, 0, 0, 'r', 'two', 'guardian')!;
     let p = { ...base, armorInventory: [one, two] };
     p = applyProfileAction(p, { type: 'equipArmor', id: one.id });
     expect(p.equippedArmor.guardian.helm).toBe(one.id);
@@ -52,8 +52,8 @@ describe('armor equipment progression', () => {
     expect(p.gold).toBe(9000 - cost + RARITY_CONFIG.common.sell);
   });
   it('keeps identical gear separate per hero and rejects cross-hero fusion', () => {
-    const guardian = rollArmor(true, 0, 0, 0, 'g', 'guardian')!;
-    const ranger = rollArmor(true, 0, 0, 0, 'r', 'ranger')!;
+    const guardian = rollEnemyArmor('normal', 0, 0, 0, 'r', 'g', 'guardian')!;
+    const ranger = rollEnemyArmor('normal', 0, 0, 0, 'r', 'rr', 'ranger')!;
     let profile: ReturnType<typeof defaultProfile> = { ...defaultProfile(),
       unlockedHeroes: ['guardian', 'ranger'], armorInventory: [guardian, ranger] };
     profile = applyProfileAction(profile, { type: 'equipArmor', id: guardian.id });
