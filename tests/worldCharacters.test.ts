@@ -32,17 +32,18 @@ describe('themed world enemies and bosses', () => {
     expect(getWorldCharacter(5, 'bomber').name).toBe('Singularity');
   });
 
-  it('gives all 50 bosses unique names and sprite keys, one per five rooms', () => {
+  it('gives all 35 bosses unique names and sprites across 30-room worlds', () => {
     const bosses = WORLDS.flatMap(world =>
-      Array.from({ length: 10 }, (_, tier) =>
-        getWorldCharacter(world.id, 'boss', (tier + 1) * 5)));
-    expect(new Set(bosses.map(boss => boss.name)).size).toBe(50);
-    expect(new Set(bosses.map(boss => boss.textureKey)).size).toBe(50);
+      [5, 10, 15, 20, 25, 30].flatMap(room =>
+        Array.from({ length: room === 15 ? 2 : 1 }, (_, slot) =>
+          getWorldCharacter(world.id, 'boss', room, slot))));
+    expect(new Set(bosses.map(boss => boss.name)).size).toBe(35);
+    expect(new Set(bosses.map(boss => boss.textureKey)).size).toBe(35);
     for (const boss of bosses) {
       expect(boss.kind).toBe('boss');
       expect(boss.textureKey.startsWith(`world-${boss.worldId}-boss-`)).toBe(true);
     }
-    expect(getWorldCharacter(5, 'boss', 50).name).toBe('Sovereign of Nothing');
+    expect(getWorldCharacter(5, 'boss', 30).name).toBe('Sovereign of Nothing');
   });
 });
 
@@ -75,7 +76,7 @@ describe('four world-specific playable heroes', () => {
     for (let world = 1; world <= 4; world++) {
       const w = world as WorldId;
       const run = new RunLedger('complete-' + world, w);
-      run.enterRoom(50);
+      run.enterRoom(30);
       profile = applyProfileAction(profile, { type: 'settleRun', report: run.report(true) });
       const nextId = (['frostblade', 'pyromancer', 'stormstrider', 'voidwalker'] as const)[world - 1]!;
       expect(isWorldUnlocked(HEROES[nextId].requiredWorld, profile.completedWorlds)).toBe(true);
