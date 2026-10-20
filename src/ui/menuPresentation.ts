@@ -1,12 +1,12 @@
-import { HERO_WEAPONS } from '../weapons/weaponConfig';
+import { HERO_WEAPONS, type WeaponId } from '../weapons/weaponConfig';
 import type { HeroId } from '../heroes/heroConfig';
 import type { AbilityStats } from '../abilities/abilityConfig';
 
 /** Only show upgrades relevant to the current loadout; other heroes remain
  * upgradeable by selecting them first. All saved levels remain intact.
  */
-export function equipmentForHero(heroId: HeroId): readonly string[] {
-  return [heroId, ...HERO_WEAPONS[heroId]];
+export function equipmentForHero(heroId: HeroId): { heroId: HeroId; weaponIds: readonly WeaponId[] } {
+  return { heroId, weaponIds: HERO_WEAPONS[heroId] };
 }
 
 /** Human-readable gameplay metrics. Unlike the former generic "0 DMG R0",
