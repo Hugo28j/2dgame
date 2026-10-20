@@ -1664,6 +1664,7 @@ export class GameScene extends Phaser.Scene {
     else if (id === 'meleeRange') this.weapon.extraMeleeRange += 0.2;
     else if (id === 'meleeStun') this.weapon.meleeStunMs = 500;
     else this.player.applyRunBonus(id);
+    if (id === 'cooldown') this.abilities?.shortenActiveCooldowns(this.time.now, 0.9);
     this.upgradeHitAreas.forEach(hitArea => hitArea.destroy());
     this.upgradeHitAreas = [];
     this.upgradeOverlay?.destroy(true);
