@@ -341,11 +341,11 @@ export class MainMenuScene extends Phaser.Scene {
         worn ? { type: 'unequipArmor', heroId, slot: this.armorSlot } :
           { type: 'equipArmor', id: item.id }), worn ? 'quiet' : 'normal', false, 10);
     });
-    this.button(95, 730, 95, 28, '‹ TERUG', () => {
+    this.button(95, 714, 95, 28, '‹ TERUG', () => {
       this.armorPage--; this.scene.restart();
     }, 'quiet', this.armorPage <= 0, 9);
-    this.text(195, 730, this.armorPage + 1 + '/' + pages, 10, COLOR.secondary, true);
-    this.button(294, 730, 95, 28, 'VOLGENDE ›', () => {
+    this.text(195, 714, this.armorPage + 1 + '/' + pages, 10, COLOR.secondary, true);
+    this.button(294, 714, 95, 28, 'VOLGENDE ›', () => {
       this.armorPage++; this.scene.restart();
     }, 'quiet', this.armorPage >= pages - 1, 9);
   }
@@ -420,8 +420,6 @@ export class MainMenuScene extends Phaser.Scene {
         unlocked, action: { type: 'upgradeAbility', id } as ProfileAction };
     });
     this.drawUpgradeRows(rows);
-    this.text(195, 705, 'Abilities komen vrij op level 5, 20 en 30.',
-      10, COLOR.secondary, true);
   }
 
   private drawWeaponUpgrades(): void {
