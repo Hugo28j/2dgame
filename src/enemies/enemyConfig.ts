@@ -42,7 +42,7 @@ export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number,
   const world = getWorld(worldId);
   return {
     ...base, roomNumber: number,
-    maxHp: Math.round(base.maxHp * (1 + completed * SLIME_DIFFICULTY.hpPerRoom) *
+    maxHp: Math.round(base.maxHp * (worldId === 2 && kind === 'mage' ? 3 : 1) * (1 + completed * SLIME_DIFFICULTY.hpPerRoom) *
       (kind === 'boss' ? 1 + (getBossTier(number) - 1) * 0.09 : 1) * world.hpMultiplier *
       // Only Bramble Gunner (first boss, world 1 room 15); Bloom Sentinel
       // in the same room and other world's gunner retain full HP.
@@ -70,7 +70,7 @@ export const ENEMY_UNLOCK_ROOMS = {
 
 export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number, worldId: WorldId = 1): EnemyKind => {
   const room = Math.max(1, Math.floor(roomNumber));
-  if (room % 5 === 0) return 'boss';
+  if (room % 5 === 0) return worldId === 2 && room === 30 && spawnIndex === 1 ? 'charger' : 'boss';
   const index = Math.max(0, Math.floor(spawnIndex));
   const entries = Object.entries(worldId === 2 ? WORLD2_UNLOCK_ROOMS : ENEMY_UNLOCK_ROOMS) as Array<
     [Exclude<EnemyKind, 'boss'>, number]>;
