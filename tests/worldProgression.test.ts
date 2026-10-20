@@ -59,7 +59,8 @@ describe('five unique playable worlds', () => {
       for (let world = 2; world <= WORLD_COUNT; world++) {
         const oldStats = getEnemyStatsForRoom(kind, 24, (world - 1) as 1 | 2 | 3 | 4 | 5);
         const newStats = getEnemyStatsForRoom(kind, 24, world as 1 | 2 | 3 | 4 | 5);
-        if ((kind === 'mage' || kind === 'archer') && world === 3) {
+        if ((kind === 'mage' && (world === 2 || world === 3)) ||
+            (kind === 'archer' && world === 3)) {
           // Frozen Hollow witches and boosted archers intentionally have
           // more HP than the corresponding World 3 base archetypes.
           expect(oldStats.maxHp).toBeGreaterThan(newStats.maxHp);
@@ -72,15 +73,17 @@ describe('five unique playable worlds', () => {
         } else {
           expect(newStats.damage).toBeGreaterThan(oldStats.damage);
         }
-        if (kind === 'slime' && world === 2) {
+        if ((kind === 'slime' || kind === 'bomber') && world === 2) {
           // World 1 Mosslings intentionally get +25% speed; Frozen Hollow
           // slimes retain their pre-existing speed rather than being buffed too.
-          expect(oldStats.movementSpeed).toBe(175);
-          expect(newStats.movementSpeed).toBe(116);
+          expect(oldStats.movementSpeed).toBe(kind === 'slime' ? 175 : 300);
+          expect(newStats.movementSpeed).toBe(kind === 'slime' ? 116 : 104);
         } else {
           expect(newStats.movementSpeed).toBeGreaterThanOrEqual(oldStats.movementSpeed);
         }
-        expect(newStats.attackIntervalMs).toBeLessThanOrEqual(oldStats.attackIntervalMs);
+        if (kind === 'mage' && world === 2)
+          expect(newStats.attackIntervalMs).toBeGreaterThan(oldStats.attackIntervalMs);
+        else expect(newStats.attackIntervalMs).toBeLessThanOrEqual(oldStats.attackIntervalMs);
       }
     }
     expect(getWorld(5).hpMultiplier).toBeGreaterThan(getWorld(1).hpMultiplier);
