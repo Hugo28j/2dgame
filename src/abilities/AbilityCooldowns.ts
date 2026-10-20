@@ -37,5 +37,14 @@ export class AbilityCooldowns {
     return true;
   }
 
+  /** Apply an acquired Focus upgrade to cooldowns that are already running. */
+  public shortenRemaining(now: number, factor: number): void {
+    if (!(factor > 0 && factor < 1)) return;
+    const clock = this.clock(now);
+    for (const [id, deadline] of this.nextReadyAt) {
+      if (deadline > clock) this.nextReadyAt.set(id, clock + (deadline - clock) * factor);
+    }
+  }
+
   public clear(): void { this.nextReadyAt.clear(); this.pausedAt = null; }
 }
