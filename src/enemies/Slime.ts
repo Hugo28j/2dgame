@@ -26,6 +26,7 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
   private slowedUntil = 0;
   private slowFactor = 1;
   private readonly healthBar: Phaser.GameObjects.Graphics;
+  private stunnedUntil = 0;
   private knockedUntil = 0;
   private knockbackX = 0;
   private knockbackY = 0;
@@ -80,6 +81,11 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
       this.slowFactor = 1;
       this.clearTint();
     }
+    if (now < this.stunnedUntil) {
+      this.setVelocity(0, 0);
+      this.drawHealthBar();
+      return;
+    }
     if (this.isKnockedBack(now)) {
       this.setVelocity(this.knockbackX, this.knockbackY);
       this.drawHealthBar();
@@ -115,6 +121,15 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
     this.setVelocity(velocity.x, velocity.y);
     this.setFlipX(velocity.x < 0);
     this.drawHealthBar();
+  }
+
+  public isStunned(now: number): boolean { return this.aiState === 'chasing' && now < this.stunnedUntil; }
+
+  public applyStun(now: number, durationMs: number): void {
+    if (this.aiState !== 'chasing' || durationMs <= 0) return;
+    this.stunnedUntil = Math.max(this.stunnedUntil, now + durationMs);
+    this.setVelocity(0, 0);
+    this.setTint(0xfde68a);
   }
 
   public isKnockedBack(now: number): boolean {

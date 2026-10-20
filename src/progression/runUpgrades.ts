@@ -1,6 +1,6 @@
 export type RunUpgradeId =
   | 'damage' | 'attackSpeed' | 'movement' | 'maxHp' | 'healing'
-  | 'projectile' | 'piercing' | 'crit' | 'defense' | 'cooldown';
+  | 'projectile' | 'piercing' | 'meleeRange' | 'meleeStun' | 'crit' | 'defense' | 'cooldown';
 export type UpgradeRarity = 'common' | 'rare' | 'epic';
 export interface RunUpgrade {
   id: RunUpgradeId;
@@ -17,6 +17,8 @@ export const RUN_UPGRADES: readonly RunUpgrade[] = [
   { id: 'healing', name: 'Herstel', description: 'Herstel 35 HP', rarity: 'common', maxStacks: 4 },
   { id: 'projectile', name: 'Dubbel Schot', description: '+1 projectiel per aanval', rarity: 'epic', maxStacks: 1 },
   { id: 'piercing', name: 'Doorboring', description: '+1 doorboring per projectiel', rarity: 'rare', maxStacks: 2 },
+  { id: 'meleeRange', name: 'Verlengde Slag', description: '+20% melee-bereik', rarity: 'rare', maxStacks: 3 },
+  { id: 'meleeStun', name: 'Verdovende Slagen', description: 'Elke melee-hit verdooft 0,5 seconde', rarity: 'epic', maxStacks: 1 },
   { id: 'crit', name: 'Precisie', description: '+6% kritieke kans', rarity: 'rare', maxStacks: 3 },
   { id: 'defense', name: 'Pantser', description: '+15% verdediging', rarity: 'common', maxStacks: 4 },
   { id: 'cooldown', name: 'Focus', description: '-10% ability cooldown', rarity: 'rare', maxStacks: 3 },
@@ -27,9 +29,13 @@ export class RunUpgradeDeck {
   private readonly stacks = new Map<RunUpgradeId, number>();
   public constructor(private readonly random: () => number = Math.random) {}
   public count(id: RunUpgradeId): number { return this.stacks.get(id) ?? 0; }
-  public offer(allowHealing = true): RunUpgrade[] {
+  public offer(allowHealing = true, attackMode: 'melee' | 'projectile' = 'projectile'): RunUpgrade[] {
     const pool = RUN_UPGRADES.filter(upgrade =>
-      this.count(upgrade.id) < upgrade.maxStacks && (allowHealing || upgrade.id !== 'healing'));
+      this.count(upgrade.id) < upgrade.maxStacks &&
+      (allowHealing || upgrade.id !== 'healing') &&
+      (attackMode === 'melee'
+        ? upgrade.id !== 'projectile' && upgrade.id !== 'piercing'
+        : upgrade.id !== 'meleeRange' && upgrade.id !== 'meleeStun'));
     // Fisher-Yates avoids repeated cards, biased sorts and unbounded retries.
     for (let i = pool.length - 1; i > 0; i -= 1) {
       const j = Math.min(i, Math.max(0, Math.floor(this.random() * (i + 1))));

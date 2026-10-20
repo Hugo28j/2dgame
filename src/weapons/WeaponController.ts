@@ -14,6 +14,8 @@ export class WeaponController {
   private readonly groundEffects = new Set<Phaser.GameObjects.Graphics>();
   public extraProjectiles = 0;
   public extraPiercing = 0;
+  public extraMeleeRange = 0;
+  public meleeStunMs = 0;
   public constructor(
     private readonly scene: Phaser.Scene,
     private readonly owner: Player,
@@ -25,6 +27,7 @@ export class WeaponController {
     private readonly meleeTargets?: Phaser.Physics.Arcade.Group,
     private readonly onMeleeHit?: (target: Slime, attack: Readonly<AttackData>) => void,
   ) {}
+  public get attackMode(): 'melee' | 'projectile' { return this.config.attackMode; }
   public get config() { return getWeaponStats(this.weaponId, this.upgradeLevel); }
   public update(time: number, firing: boolean, direction: Readonly<Vector2Value>): void {
     if (!firing || time < this.nextShotAt) return;
@@ -57,14 +60,18 @@ export class WeaponController {
   private swing(direction: Readonly<Vector2Value>): void {
     const config = this.config;
     const attack = this.createAttack();
+    const range = config.meleeRange * (1 + this.extraMeleeRange);
     for (const child of this.meleeTargets?.getChildren() ?? []) {
       const target = child as Slime;
       if (!target.active || target.aiState === 'defeated' ||
-        !isInsideMeleeSwing(this.owner, direction, target, config.meleeRange, config.meleeArc,
+        !isInsideMeleeSwing(this.owner, direction, target, range, config.meleeArc,
           // Dawnblade's wide whoosh can graze a mob even when its centre
           // lies just beyond the painted slash. Other weapons stay unchanged.
           this.weaponId === 'sunblade' ? 20 : 0)) continue;
       this.onMeleeHit?.(target, attack);
+      if (this.meleeStunMs > 0 && target.active && target.aiState !== 'defeated') {
+        target.applyStun(this.scene.time.now, this.meleeStunMs);
+      }
       if (config.specialEffects.includes('knockback') &&
         target.active && target.healthRatio > 0) {
         // Enemy AI respects the timed knockback, so the next chase frame
@@ -76,10 +83,10 @@ export class WeaponController {
 
     const angle = Math.atan2(direction.y, direction.x);
     if (this.weaponId === 'sunblade') {
-      this.animateDawnbladeWhoosh(angle, config.meleeArc, config.meleeRange, config.color);
+      this.animateDawnbladeWhoosh(angle, config.meleeArc, range, config.color);
       return;
     }
-    const arc = this.scene.add.arc(this.owner.x, this.owner.y, config.meleeRange,
+    const arc = this.scene.add.arc(this.owner.x, this.owner.y, range,
       Phaser.Math.RadToDeg(angle - config.meleeArc / 2),
       Phaser.Math.RadToDeg(angle + config.meleeArc / 2), false, config.color, 0.2)
       .setStrokeStyle(5, config.color, 0.95).setDepth(24);
@@ -139,16 +146,18 @@ export class WeaponController {
     const x = this.owner.x, y = this.owner.y;
     const { halfWidth, slowDurationMs, slowFactor } = WARHAMMER_GROUND_SLAM;
     const attack = this.createAttack();
+    const range = config.meleeRange * (1 + this.extraMeleeRange);
 
     for (const child of this.meleeTargets?.getChildren() ?? []) {
       if (!(child instanceof Slime) || !child.active || child.aiState === 'defeated') continue;
-      if (!inForwardRectangle(x, y, aim, child.x, child.y, config.meleeRange, halfWidth)) continue;
+      if (!inForwardRectangle(x, y, aim, child.x, child.y, range, halfWidth)) continue;
       this.onMeleeHit?.(child, attack);
+      if (this.meleeStunMs > 0 && child.active && child.aiState !== 'defeated') child.applyStun(time, this.meleeStunMs);
       if (child.active && child.healthRatio > 0) {
         child.applySlow(time, slowDurationMs, slowFactor);
       }
     }
-    this.animateGroundCracks(x, y, aim, config.meleeRange, halfWidth, config.color);
+    this.animateGroundCracks(x, y, aim, range, halfWidth, config.color);
   }
 
   /** Impact cracks propagate down the full collision rectangle, then fade.

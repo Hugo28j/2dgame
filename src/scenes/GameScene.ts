@@ -1539,7 +1539,7 @@ export class GameScene extends Phaser.Scene {
    * Combat stays frozen until the offer is chosen. */
   private showUpgradeOffer(): void {
     if (!this.player || this.choosingUpgrade) return;
-    const cards = this.upgrades.offer(this.player.currentHp < this.player.maxHp);
+    const cards = this.upgrades.offer(this.player.currentHp < this.player.maxHp, this.weapon?.attackMode ?? 'projectile');
     if (cards.length < 3) return;
     this.choosingUpgrade = true;
     this.upgradeReady = false;
@@ -1619,6 +1619,8 @@ export class GameScene extends Phaser.Scene {
       !this.upgrades.choose(id)) return;
     if (id === 'projectile') this.weapon.extraProjectiles += 1;
     else if (id === 'piercing') this.weapon.extraPiercing += 1;
+    else if (id === 'meleeRange') this.weapon.extraMeleeRange += 0.2;
+    else if (id === 'meleeStun') this.weapon.meleeStunMs = 500;
     else this.player.applyRunBonus(id);
     this.upgradeHitAreas.forEach(hitArea => hitArea.destroy());
     this.upgradeHitAreas = [];
