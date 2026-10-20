@@ -95,8 +95,7 @@ export class GameOverScene extends Phaser.Scene {
         fontFamily, fontSize: '17px', fontStyle: 'bold', color: '#fff',
       }).setOrigin(0.5).setDepth(21);
       const hit = this.add.zone(195, y, 300, 60).setDepth(30)
-        .setInteractive(new Phaser.Geom.Rectangle(-150, -30, 300, 60),
-          Phaser.Geom.Rectangle.Contains);
+        .setScrollFactor(0).setInteractive({ useHandCursor: true });
       const activate = (): void => { if (!this.scene.isActive()) return; callback(); };
       hit.on('pointerdown', activate);
       caption.setInteractive({ useHandCursor: true }).on('pointerdown', activate);
