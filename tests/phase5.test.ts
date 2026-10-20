@@ -47,11 +47,12 @@ describe('phase 5 progression and persistence', () => {
     const p = defaultProfile();
     expect(applyProfileAction(p, { type: 'selectHero', id: 'mage' }).selectedHero).toBe('guardian');
     const spent = applyProfileAction(p, { type: 'unlockHero', id: 'mage' });
-    expect(spent.gold).toBe(50);
-    expect(spent.selectedHero).toBe('mage');
-    expect(spent.unlockedHeroes).toContain('mage');
-    expect(spent.unlockedWeapons).toContain('staff');
-    const blocked = applyProfileAction(spent, { type: 'unlockWeapon', id: 'crossbow' });
+    expect(spent).toEqual(p);
+    const unlocked = applyProfileAction(p, { type: 'reachRoom', worldId: 1, room: 20 });
+    expect(unlocked.gold).toBe(p.gold);
+    expect(unlocked.unlockedHeroes).toContain('mage');
+    expect(unlocked.unlockedWeapons).toContain('staff');
+    const blocked = applyProfileAction(unlocked, { type: 'unlockWeapon', id: 'crossbow' });
     expect(blocked.unlockedWeapons).not.toContain('crossbow');
   });
   it('applies purchased levels only to unlocked items', () => {
@@ -76,8 +77,8 @@ describe('phase 5 progression and persistence', () => {
       weaponLevels: {},
     });
     expect(malformed.gold).toBe(0);
-    expect(malformed.selectedHero).toBe('ranger');
-    expect(malformed.selectedWeapon).toBe('bow');
+    expect(malformed.selectedHero).toBe('guardian');
+    expect(malformed.selectedWeapon).toBe('sunblade');
     expect(malformed.heroLevels.ranger).toBe(50);
   });
   it('awards nonnegative gold without duplicates from invalid values', () => {
