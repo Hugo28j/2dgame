@@ -66,7 +66,7 @@ describe('phase 8 save migration and permanent shop', () => {
     const cost = armorUpgradeCost(item);
     profile = applyProfileAction(profile, { type: 'upgradeArmor', id: item.id });
     expect(profile.gold).toBe(100000 - cost);
-    expect(armorBonuses(profile.armorInventory, profile.equippedArmor).hp).toBeGreaterThan(oldBonus);
+    expect(armorBonuses(profile.armorInventory, profile.equippedArmor.guardian, 'guardian').hp).toBeGreaterThan(oldBonus);
     for (let i = 0; i < 35; i++) {
       profile = applyProfileAction(profile, { type: 'upgradeArmor', id: item.id });
     }
