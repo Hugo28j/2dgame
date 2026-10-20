@@ -21,14 +21,15 @@ describe('phase 6 ability rules', () => {
     }
   });
 
-  it('unlocks personal ability slots at hero levels 1, 10 and 20', () => {
+  it('unlocks personal ability slots at hero levels 5, 20 and 30', () => {
     for (const heroId of HERO_IDS) {
       const [first, second, third] = HERO_ABILITIES[heroId];
-      expect(isAbilityUnlocked(first, 1)).toBe(true);
-      expect(isAbilityUnlocked(second, 9)).toBe(false);
-      expect(isAbilityUnlocked(second, 10)).toBe(true);
-      expect(isAbilityUnlocked(third, 19)).toBe(false);
-      expect(isAbilityUnlocked(third, 20)).toBe(true);
+      expect(isAbilityUnlocked(first, 4)).toBe(false);
+      expect(isAbilityUnlocked(first, 5)).toBe(true);
+      expect(isAbilityUnlocked(second, 19)).toBe(false);
+      expect(isAbilityUnlocked(second, 20)).toBe(true);
+      expect(isAbilityUnlocked(third, 29)).toBe(false);
+      expect(isAbilityUnlocked(third, 30)).toBe(true);
       expect(getAbilityStats(first, 20).cooldownMs).toBeLessThan(ABILITIES[first].cooldownMs);
     }
   });

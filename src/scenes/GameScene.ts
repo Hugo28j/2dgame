@@ -1459,7 +1459,11 @@ export class GameScene extends Phaser.Scene {
           this.abilities?.setHeroLevel(current);
           this.drawPlayerHealth();
           const notice = this.add.text(this.player.x, this.player.y - 55,
-            'LEVEL ' + current + '!  ' + (current >= 10 && previous < 10 || current >= 20 && previous < 20 ? 'ABILITY UNLOCKED!' : ''), {
+            'LEVEL ' + current + '!  ' + (
+              current >= 30 && previous < 30 ? 'ABILITY 3 UNLOCKED!' :
+              current >= 20 && previous < 20 ? 'ABILITY 2 UNLOCKED!' :
+              current >= 10 && previous < 10 ? 'SECOND WEAPON UNLOCKED!' :
+              current >= 5 && previous < 5 ? 'ABILITY 1 UNLOCKED!' : ''), {
               color: '#67e8f9', fontFamily: 'system-ui, sans-serif', fontSize: '17px',
               fontStyle: 'bold', stroke: '#020617', strokeThickness: 4,
             }).setOrigin(0.5).setDepth(100);
@@ -1477,7 +1481,7 @@ export class GameScene extends Phaser.Scene {
     const profile = progressStore.current;
     const id = profile.selectedHero;
     const level = profile.heroLevels[id];
-    this.xpHudText?.setText(level >= MAX_HERO_LEVEL ? 'HERO LV.20 · MAX' :
+    this.xpHudText?.setText(level >= MAX_HERO_LEVEL ? 'HERO LV.' + MAX_HERO_LEVEL + ' · MAX' :
       'HERO LV.' + level + '  ·  XP ' + profile.heroXp[id] + '/' + heroXpRequirement(level));
   }
 

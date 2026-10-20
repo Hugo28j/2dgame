@@ -15,7 +15,7 @@ import {
 } from '../progression/economy';
 import {
   HERO_WEAPONS, WEAPONS, getWeaponStats,
-  weaponUpgradeCost, MAX_WEAPON_LEVEL,
+  weaponUpgradeCost, MAX_WEAPON_LEVEL, SECOND_WEAPON_UNLOCK_LEVEL,
 } from '../weapons/weaponConfig';
 import {
   ABILITIES, HERO_ABILITIES, MAX_ABILITY_LEVEL, abilityUpgradeCost, getAbilityStats,
@@ -234,7 +234,7 @@ export class MainMenuScene extends Phaser.Scene {
     const profile = progressStore.current;
     const hero = HEROES[profile.selectedHero];
     this.section('WAPENS VAN ' + hero.name.toUpperCase(),
-      'Kies een wapen. Beide zijn exclusief voor deze held.');
+      'Tweede wapen komt gratis vrij op heldlevel 10.');
     HERO_WEAPONS[profile.selectedHero].forEach((id, index) => {
       const weapon = WEAPONS[id];
       const y = 392 + index * 161;
@@ -256,13 +256,13 @@ export class MainMenuScene extends Phaser.Scene {
       this.text(44, y + 31, 'SCHADE ' + stats.damage, 12, '#fde68a', false, true);
       this.text(158, y + 31, 'TEMPO ' + stats.fireRate.toFixed(2) + '/S',
         10, COLOR.secondary);
-      const label = selected ? 'ACTIEF' : unlocked ? 'KIES WAPEN' : weapon.unlockCost + ' G';
+      const label = selected ? 'ACTIEF' : unlocked ? 'KIES WAPEN' : 'LV.' + SECOND_WEAPON_UNLOCK_LEVEL;
       this.button(290, y + 54, 112, 30, label, () => this.runAction(
-        unlocked ? { type: 'selectWeapon', id } : { type: 'unlockWeapon', id },
+        { type: 'selectWeapon', id },
       ), selected ? 'selected' : 'normal',
-      selected || (!unlocked && profile.gold < weapon.unlockCost), 10);
+      selected || !unlocked, 10);
       if (weapon.unlockCost === 0) this.text(44, y + 56, 'STARTWAPEN', 10, '#86efac');
-      else if (!unlocked) this.text(44, y + 56, 'ONTGRENDEL VOOR ' + weapon.unlockCost + ' G',
+      else if (!unlocked) this.text(44, y + 56, 'GRATIS OP HELDLEVEL ' + SECOND_WEAPON_UNLOCK_LEVEL,
         9, COLOR.faint);
     });
     this.text(195, 705, 'Andere wapens? Kies eerst een held bij HELDEN.',
@@ -315,7 +315,8 @@ export class MainMenuScene extends Phaser.Scene {
               label: HEROES[equipment.heroId].name,
               description: 'Level omhoog door blauwe XP-kristallen te verzamelen',
               summary: 'XP ' + profile.heroXp[equipment.heroId] + '/' +
-                heroXpRequirement(profile.heroLevels[equipment.heroId]) +
+                (profile.heroLevels[equipment.heroId] >= MAX_HERO_LEVEL ? 'MAX' :
+                  heroXpRequirement(profile.heroLevels[equipment.heroId])) +
                 '  ·  ' + HEROES[equipment.heroId].name.toUpperCase(),
               level: profile.heroLevels[equipment.heroId],
               unlocked: profile.unlockedHeroes.includes(equipment.heroId),
@@ -357,7 +358,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.text(195, 705, this.upgradeCategory === 'equipment'
       ? 'Andere held verbeteren? Selecteer die bij HELDEN.'
       : this.upgradeCategory === 'abilities'
-      ? 'Vaardigheden openen op heldlevel 1, 10 en 20.'
+      ? 'Vaardigheden openen op heldlevel 5, 20 en 30.'
       : 'Permanent: bonussen gelden voor al je helden.',
     10, COLOR.secondary, true);
   }

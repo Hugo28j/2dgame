@@ -1,6 +1,6 @@
 import { HERO_IDS, HEROES, MAX_HERO_LEVEL, type HeroId } from '../heroes/heroConfig';
 import {
-  HERO_STARTER_WEAPON, MAX_WEAPON_LEVEL, WEAPON_IDS, WEAPONS,
+  HERO_STARTER_WEAPON, MAX_WEAPON_LEVEL, WEAPON_IDS, WEAPONS, isWeaponUnlockedForHero,
   weaponBelongsToHero, weaponUpgradeCost, type WeaponId,
 } from '../weapons/weaponConfig';
 import {
@@ -77,12 +77,6 @@ export function validateProfile(raw: unknown): Profile {
   const heroes = Array.isArray(input.unlockedHeroes)
     ? HERO_IDS.filter(id => id === fallbackHero || input.unlockedHeroes?.includes(id))
     : [fallbackHero];
-  const purchasedWeapons = Array.isArray(input.unlockedWeapons)
-    ? WEAPON_IDS.filter(id => input.unlockedWeapons?.includes(id)) : [];
-  // Every owned hero includes its free signature weapon. This also migrates
-  // existing saves to the new hero-bound loadout system without lost heroes.
-  const weapons = WEAPON_IDS.filter(id => purchasedWeapons.includes(id) ||
-    heroes.some(heroId => HERO_STARTER_WEAPON[heroId] === id));
   const heroLevels = { ...defaults.heroLevels };
   const heroXp = { ...defaults.heroXp };
   for (const id of HERO_IDS) heroXp[id] = validLevel((input as Partial<Profile>).heroXp?.[id], 0, 1_000_000_000);
@@ -90,6 +84,11 @@ export function validateProfile(raw: unknown): Profile {
   const abilityLevels = { ...defaults.abilityLevels };
   const permanentLevels = defaultPermanentLevels();
   for (const id of HERO_IDS) heroLevels[id] = validLevel(input.heroLevels?.[id], 1, MAX_HERO_LEVEL);
+  // Unlocks depend on each hero's current level rather than the old gold purchases.
+  // Existing saves retain hero levels and gain the alternate weapon once eligible.
+  const weapons = WEAPON_IDS.filter(id =>
+    heroes.includes(WEAPONS[id].heroId) &&
+    isWeaponUnlockedForHero(id, WEAPONS[id].heroId, heroLevels[WEAPONS[id].heroId]));
   for (const id of WEAPON_IDS) weaponLevels[id] = validLevel(input.weaponLevels?.[id], 1, MAX_WEAPON_LEVEL);
   for (const id of ABILITY_IDS) abilityLevels[id] = validLevel(
     input.abilityLevels?.[id], 1, MAX_ABILITY_LEVEL);
@@ -186,17 +185,7 @@ export function applyProfileAction(profile: Profile, action: ProfileAction): Pro
         selectedWeapons: { ...p.selectedWeapons, [action.id]: starter },
       };
     }
-    case 'unlockWeapon': {
-      const cost = WEAPONS[action.id].unlockCost;
-      if (p.unlockedWeapons.includes(action.id) || p.gold < cost ||
-        WEAPONS[action.id].heroId !== p.selectedHero ||
-        !p.unlockedHeroes.includes(WEAPONS[action.id].heroId)) return p;
-      return {
-        ...p, gold: p.gold - cost, unlockedWeapons: [...p.unlockedWeapons, action.id],
-        selectedWeapon: action.id,
-        selectedWeapons: { ...p.selectedWeapons, [p.selectedHero]: action.id },
-      };
-    }
+    case 'unlockWeapon': return p; // Alternate weapons unlock automatically via hero XP.
     case 'upgradeHero': return p; // Hero levels can only be earned with XP.
     case 'collectHeroXp': {
       if (!p.unlockedHeroes.includes(action.id) || !Number.isSafeInteger(action.amount) || action.amount <= 0) return p;
@@ -206,8 +195,14 @@ export function applyProfileAction(profile: Profile, action: ProfileAction): Pro
         xp -= heroXpRequirement(level);
         level++;
       }
+      const unlockedWeapons = level >= 10
+        ? WEAPON_IDS.filter(id => p.unlockedWeapons.includes(id) ||
+            (WEAPONS[id].heroId === action.id &&
+              isWeaponUnlockedForHero(id, action.id, level)))
+        : p.unlockedWeapons;
       return { ...p, heroLevels: { ...p.heroLevels, [action.id]: level },
-        heroXp: { ...p.heroXp, [action.id]: level >= MAX_HERO_LEVEL ? 0 : xp } };
+        heroXp: { ...p.heroXp, [action.id]: level >= MAX_HERO_LEVEL ? 0 : xp },
+        unlockedWeapons };
     }
     case 'upgradeWeapon': {
       if (!p.unlockedWeapons.includes(action.id) ||
