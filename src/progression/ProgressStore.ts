@@ -9,7 +9,7 @@ import {
 } from './economy';
 import type { RunReport } from './RunLedger';
 import { ARMOR_SLOTS, ARMOR_MAX_LEVEL, ARMOR_MAX_STARS, RARITY_CONFIG,
-  armorDefinition, armorUpgradeCost, rollArmorRewards, validArmorItem, type ArmorRoll,
+  armorDefinition, armorUpgradeCost, validArmorItem,
   type ArmorItem, type ArmorSlot } from './armor';
 import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
 import { WORLD_COUNT, isWorldUnlocked, toWorldId, type WorldId } from '../worlds/worldConfig';
@@ -82,10 +82,15 @@ export function validateProfile(raw: unknown): Profile {
   if (!raw || typeof raw !== 'object' ||
     ![1, 2, 3, 4].includes((raw as { version?: number }).version ?? -1)) return defaults;
   const input = raw as Partial<Profile>;
-  const fallbackHero: HeroId = (input.version ?? 0) >= 3 ? 'guardian' : 'ranger';
-  const heroes = Array.isArray(input.unlockedHeroes)
-    ? HERO_IDS.filter(id => id === fallbackHero || input.unlockedHeroes?.includes(id))
-    : [fallbackHero];
+  const fallbackHero: HeroId = 'guardian';
+  const legacyHeroes = Array.isArray(input.unlockedHeroes) ? input.unlockedHeroes : [];
+  const worldOneProgress = Math.max(
+    validLevel(input.highestRoom, 1, CHAPTER_ROOM_COUNT),
+    validLevel(input.worldBestRooms?.[0], 1, CHAPTER_ROOM_COUNT));
+  const heroes = HERO_IDS.filter(id => id === 'guardian' ||
+    (id === 'ranger' && worldOneProgress >= 10) ||
+    (id === 'mage' && worldOneProgress >= 20) ||
+    (id !== 'ranger' && id !== 'mage' && legacyHeroes.includes(id)));
   const heroLevels = { ...defaults.heroLevels };
   const heroXp = { ...defaults.heroXp };
   for (const id of HERO_IDS) heroXp[id] = validLevel((input as Partial<Profile>).heroXp?.[id], 0, 1_000_000_000);
@@ -197,6 +202,8 @@ export type ProfileAction =
   | { type: 'upgradeWeapon'; id: WeaponId }
   | { type: 'upgradeAbility'; id: AbilityId }
   | { type: 'upgradePermanent'; id: PermanentUpgradeId }
+  | { type: 'collectArmor'; item: ArmorItem }
+  | { type: 'reachRoom'; worldId: WorldId; room: number }
   | { type: 'equipArmor'; id: string }
   | { type: 'unequipArmor'; heroId: HeroId; slot: ArmorSlot }
   | { type: 'upgradeArmor'; id: string }
@@ -205,8 +212,7 @@ export type ProfileAction =
   | { type: 'setSetting'; key: 'musicEnabled' | 'sfxEnabled'; value: boolean }
   | { type: 'rebindKey'; action: ControlAction; key: string }
   | { type: 'resetKeyBindings' }
-  | { type: 'settleRun'; report: RunReport; heroId?: HeroId;
-      rolls?: ArmorRoll; secondRoll?: ArmorRoll }
+  | { type: 'settleRun'; report: RunReport; heroId?: HeroId }
   // Retained for compatibility with phase-5 tests; gameplay uses settleRun only.
   | { type: 'awardGold'; amount: number };
 
@@ -225,6 +231,8 @@ export function applyProfileAction(profile: Profile, action: ProfileAction): Pro
             selectedWeapons: { ...p.selectedWeapons, [p.selectedHero]: action.id } }
         : p;
     case 'unlockHero': {
+      // World-one milestone heroes are never sold for gold.
+      if (action.id === 'ranger' || action.id === 'mage' || action.id === 'guardian') return p;
       const cost = HEROES[action.id].unlockCost;
       if (p.unlockedHeroes.includes(action.id) || p.gold < cost ||
         !isWorldUnlocked(HEROES[action.id].requiredWorld, p.completedWorlds)) return p;
@@ -237,6 +245,26 @@ export function applyProfileAction(profile: Profile, action: ProfileAction): Pro
         selectedHero: action.id, selectedWeapon: starter,
         selectedWeapons: { ...p.selectedWeapons, [action.id]: starter },
       };
+    }
+    case 'reachRoom': {
+      if (action.worldId !== 1 || !Number.isSafeInteger(action.room) || action.room < 1 ||
+        action.room > CHAPTER_ROOM_COUNT) return p;
+      const worldBestRooms = [...p.worldBestRooms];
+      worldBestRooms[0] = Math.max(worldBestRooms[0]!, action.room);
+      const unlockedHeroes = HERO_IDS.filter(id => p.unlockedHeroes.includes(id) ||
+        id === 'ranger' && worldBestRooms[0]! >= 10 ||
+        id === 'mage' && worldBestRooms[0]! >= 20);
+      const unlockedWeapons = WEAPON_IDS.filter(id => p.unlockedWeapons.includes(id) ||
+        unlockedHeroes.includes(WEAPONS[id].heroId) &&
+        isWeaponUnlockedForHero(id, WEAPONS[id].heroId, p.heroLevels[WEAPONS[id].heroId]));
+      return { ...p, highestRoom: Math.max(p.highestRoom, action.room),
+        worldBestRooms, unlockedHeroes, unlockedWeapons };
+    }
+    case 'collectArmor': {
+      const item = action.item;
+      if (!validArmorItem(item) || !p.unlockedHeroes.includes(item.heroId) ||
+        p.armorInventory.length >= 250 || p.armorInventory.some(x => x.id === item.id)) return p;
+      return { ...p, armorInventory: [...p.armorInventory, { ...item }] };
     }
     case 'unlockWeapon': return p; // Alternate weapons unlock automatically via hero XP.
     case 'upgradeHero': return p; // Hero levels can only be earned with XP.
@@ -351,18 +379,16 @@ export function applyProfileAction(profile: Profile, action: ProfileAction): Pro
         worldId <= p.completedWorlds + 1;
       const completedWorlds = completesWorld ?
         Math.max(p.completedWorlds, worldId) : p.completedWorlds;
-      const random = (): ArmorRoll => ({
-        drop: Math.random(), rarity: Math.random(), kind: Math.random(),
-      });
-      const heroId = action.heroId && p.unlockedHeroes.includes(action.heroId)
-        ? action.heroId : p.selectedHero;
-      const drops = rollArmorRewards(report.victory, report.runId, heroId,
-        [action.rolls ?? random(), action.secondRoll ?? random()])
-        .slice(0, Math.max(0, 250 - p.armorInventory.length));
+      const unlockedHeroes = HERO_IDS.filter(id => p.unlockedHeroes.includes(id) ||
+        worldId === 1 && (id === 'ranger' && reached >= 10 ||
+          id === 'mage' && reached >= 20));
+      const unlockedWeapons = WEAPON_IDS.filter(id => p.unlockedWeapons.includes(id) ||
+        unlockedHeroes.includes(WEAPONS[id].heroId) &&
+        isWeaponUnlockedForHero(id, WEAPONS[id].heroId, p.heroLevels[WEAPONS[id].heroId]));
       return {
         ...p, gold: Math.min(MAX_GOLD, p.gold + reward),
-        armorInventory: [...p.armorInventory, ...drops],
-        lastArmorDrop: { runId: report.runId, items: drops },
+        unlockedHeroes, unlockedWeapons,
+        lastArmorDrop: null,
         totalGoldEarned: Math.min(MAX_GOLD, p.totalGoldEarned + reward),
         highestRoom: Math.max(p.highestRoom, reached),
         worldBestRooms, completedWorlds,
