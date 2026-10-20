@@ -50,7 +50,7 @@ describe('phase 8 save migration and permanent shop', () => {
     const migrated = validateProfile(old);
     expect(migrated.version).toBe(4);
     expect(migrated.gold).toBe(700);
-    expect(migrated.selectedHero).toBe('guardian');
+    expect(migrated.selectedHero).toBe('mage');
     expect(migrated.heroLevels.ranger).toBe(4);
     expect(migrated.permanentLevels.hp).toBe(0);
     expect(migrated.highestRoom).toBe(1);
