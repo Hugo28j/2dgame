@@ -7,6 +7,7 @@ import { addAndLaunch } from '../combat/launchProjectile';
 import { GAME_SCENE_KEY, GAME_TITLE, GAME_OVER_SCENE_KEY, GAME_WIDTH } from '../config/constants';
 import { EnemySpawner } from '../enemies/EnemySpawner';
 import { getBossProfile, getBossTier } from '../enemies/bossProfiles';
+import { MOSS_DASH, ROOT_BRANCH, rootBurstAngles } from '../enemies/worldOneBossBalance';
 import { SPORE_POISON, poisonActive, poisonCovers, poisonTickDue } from '../enemies/poisonHazard';
 import { AdvancedEnemy, type BulletPattern } from '../enemies/AdvancedEnemy';
 import { EnemyProjectile } from '../enemies/EnemyProjectile';
@@ -74,6 +75,7 @@ export class GameScene extends Phaser.Scene {
   private enemyProjectiles?: Phaser.Physics.Arcade.Group;
   private readonly bombTimers = new Set<Phaser.Time.TimerEvent>();
   private readonly bombWarnings = new Set<Phaser.GameObjects.Arc>();
+  private readonly rootEffects = new Set<Phaser.GameObjects.Graphics>();
   private readonly frozenWalls = new Set<{
     warning: Phaser.GameObjects.Graphics; ice: Phaser.GameObjects.Graphics;
     bounds: { x: number; y: number; width: number; height: number };
@@ -226,7 +228,8 @@ export class GameScene extends Phaser.Scene {
           : undefined;
         child.updateAI(this.player.x, this.player.y, this.time.now,
           this.fireEnemyProjectiles, this.explodeEnemy, this.dropBossBombs,
-          nearestCover?.shieldSurface, this.summonFrostMinions);
+          nearestCover?.shieldSurface, this.summonFrostMinions,
+          this.performRootAttack, this.dropDashTrailBomb);
       } else if (child instanceof Slime) {
         child.chase(this.player.x, this.player.y);
       }
@@ -1039,6 +1042,126 @@ export class GameScene extends Phaser.Scene {
     this.frozenWalls.clear();
   }
 
+  /** Animated ground-grown thorn lines and two rotated eight-way branch bursts. */
+  private readonly performRootAttack = (enemy: AdvancedEnemy, attack: 'line' | 'burst',
+    targetX: number, targetY: number, rotated: boolean): void => {
+    if (!this.currentRoom || this.gameOver || this.transitioning || this.roomProgress.doorOpen) return;
+    const bounds = this.currentRoom.layout.bounds;
+    const originX = enemy.x, originY = enemy.y;
+    const dx = targetX - originX, dy = targetY - originY;
+    const aim = Math.atan2(dy, dx);
+    const angles = attack === 'burst' ? rootBurstAngles(rotated) : [aim];
+    for (const angle of angles) {
+      const length = attack === 'burst' ? ROOT_BRANCH.burstLength :
+        Math.max(390, Math.hypot(dx, dy) + 95);
+      const endX = Phaser.Math.Clamp(originX + Math.cos(angle) * length, bounds.x + 12,
+        bounds.x + bounds.width - 12);
+      const endY = Phaser.Math.Clamp(originY + Math.sin(angle) * length, bounds.y + 12,
+        bounds.y + bounds.height - 12);
+      const preview = this.add.graphics().setDepth(24);
+      this.rootEffects.add(preview);
+      preview.lineStyle(ROOT_BRANCH.lineWidth + 10, 0x65a30d, .17);
+      preview.lineBetween(originX, originY, endX, endY);
+      preview.lineStyle(2, 0xd9f99d, .8);
+      preview.lineBetween(originX, originY, endX, endY);
+      const warningMs = attack === 'line' ? ROOT_BRANCH.lineWarningMs :
+        ROOT_BRANCH.burstWarningMs;
+      let timer: Phaser.Time.TimerEvent;
+      timer = this.time.delayedCall(warningMs, () => {
+        this.bombTimers.delete(timer);
+        this.rootEffects.delete(preview);
+        preview.destroy();
+        if (!enemy.active || enemy.aiState === 'defeated' || this.gameOver ||
+          this.transitioning || this.roomProgress.doorOpen) return;
+        const growth = this.add.graphics().setDepth(28);
+        this.rootEffects.add(growth);
+        const distance = Math.hypot(endX - originX, endY - originY);
+        this.tweens.addCounter({
+          from: 0, to: 1, duration: 260, ease: 'Cubic.easeOut',
+          onUpdate: tween => {
+            if (!growth.active) return;
+            const t = tween.getValue() ?? 0;
+            const tipX = Phaser.Math.Linear(originX, endX, t);
+            const tipY = Phaser.Math.Linear(originY, endY, t);
+            growth.clear();
+            growth.lineStyle(ROOT_BRANCH.lineWidth, 0x854d0e, 1);
+            growth.lineBetween(originX, originY, tipX, tipY);
+            growth.lineStyle(9, 0x65a30d, 1);
+            growth.lineBetween(originX, originY, tipX, tipY);
+            const steps = Math.floor(distance * t / 42);
+            for (let i = 1; i <= steps; i++) {
+              const fraction = i * 42 / distance;
+              const x = Phaser.Math.Linear(originX, endX, fraction);
+              const y = Phaser.Math.Linear(originY, endY, fraction);
+              const side = i % 2 ? 1 : -1;
+              growth.lineStyle(5, 0xa3e635, 1);
+              growth.lineBetween(x, y, x - Math.sin(angle + side * .42) * 21,
+                y + Math.cos(angle + side * .42) * 21);
+            }
+          },
+          onComplete: () => {
+            this.rootEffects.delete(growth);
+            growth.destroy();
+          },
+        });
+        // One hit per branch; warning gives time to leave its corridor.
+        if (this.player && this.player.active) {
+          const vx = endX - originX, vy = endY - originY;
+          const projection = Phaser.Math.Clamp(
+            ((this.player.x - originX) * vx + (this.player.y - originY) * vy) /
+              Math.max(1, vx * vx + vy * vy), 0, 1);
+          const closestX = originX + vx * projection, closestY = originY + vy * projection;
+          if (Math.hypot(this.player.x - closestX, this.player.y - closestY) <
+            ROOT_BRANCH.lineWidth / 2 + 13)
+            this.damagePlayer({ damage: enemy.stats.damage * .62,
+              criticalChance: 0, criticalMultiplier: 1 });
+        }
+      });
+      this.bombTimers.add(timer);
+    }
+  };
+
+  /** Moss Warden phase-two dash drops animated explosive seed-bombs. */
+  private readonly dropDashTrailBomb = (enemy: AdvancedEnemy, x: number, y: number): void => {
+    if (this.gameOver || this.transitioning || this.roomProgress.doorOpen) return;
+    const seed = this.add.circle(x, y, 9, 0x92400e, 1)
+      .setStrokeStyle(2, 0xfde68a).setDepth(27);
+    const fuse = this.add.circle(x + 2, y - 10, 3, 0xf97316, 1).setDepth(28);
+    const warning = this.add.circle(x, y, MOSS_DASH.trailRadius, 0xef4444, .11)
+      .setStrokeStyle(2, 0xfb923c, .82).setDepth(24);
+    this.bombWarnings.add(seed);
+    this.bombWarnings.add(fuse);
+    this.bombWarnings.add(warning);
+    this.tweens.add({ targets: seed, scale: 1.35, yoyo: true, repeat: 2,
+      duration: MOSS_DASH.trailFuseMs / 6 });
+    let timer: Phaser.Time.TimerEvent;
+    timer = this.time.delayedCall(MOSS_DASH.trailFuseMs, () => {
+      this.bombTimers.delete(timer);
+      for (const graphic of [seed, fuse, warning]) {
+        this.bombWarnings.delete(graphic);
+        graphic.destroy();
+      }
+      if (this.gameOver || this.transitioning || this.roomProgress.doorOpen ||
+        !enemy.active || enemy.aiState === 'defeated') return;
+      const flash = this.add.circle(x, y, MOSS_DASH.trailRadius, 0xf97316, .66)
+        .setStrokeStyle(3, 0xfef08a).setDepth(31);
+      this.tweens.add({ targets: flash, alpha: 0, scale: 1.4, duration: 330,
+        onComplete: () => flash.destroy() });
+      for (let i = 0; i < 6; i++) {
+        const a = i * Math.PI / 3;
+        const ember = this.add.circle(x, y, 3, 0xfbbf24).setDepth(32);
+        this.tweens.add({ targets: ember, x: x + Math.cos(a) * 35,
+          y: y + Math.sin(a) * 35, alpha: 0, duration: 340,
+          onComplete: () => ember.destroy() });
+      }
+      if (this.player && withinRadius(x, y, this.player.x, this.player.y,
+        MOSS_DASH.trailRadius))
+        this.damagePlayer({ damage: enemy.stats.damage * .5,
+          criticalChance: 0, criticalMultiplier: 1 });
+    });
+    this.bombTimers.add(timer);
+  };
+
   /** Telegraph targeted bombs well before detonation. All timers are cancelled on room exit. */
   private readonly dropBossBombs = (enemy: AdvancedEnemy, targetX: number, targetY: number,
     count: number, radius: number, windupMs: number): void => {
@@ -1137,17 +1260,20 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Each green bottle visibly arcs from the alchemist to its target before
-   * breaking. Impact creates a five-second damaging poison circle.
+   * breaking. Impact creates a 1.5-second damaging poison circle.
    */
   private throwPoisonBottles(enemy: AdvancedEnemy, count: number, radius: number): void {
     const bounds = this.currentRoom?.layout.bounds;
     if (!bounds) return;
     for (let i = 0; i < count; i++) {
-      // Uniform independent landing sites across the arena, not aimed at the player.
-      const x = Phaser.Math.Between(
+      // Landing sites can be directly under/near the boss or elsewhere in the arena.
+      const centerOnBoss = i === 0 || Math.random() < .28;
+      const x = centerOnBoss ? Phaser.Math.Clamp(enemy.x + Phaser.Math.Between(-30, 30),
+        bounds.x + radius + 8, bounds.x + bounds.width - radius - 8) : Phaser.Math.Between(
         Math.ceil(bounds.x + radius + 8),
         Math.floor(bounds.x + bounds.width - radius - 8));
-      const y = Phaser.Math.Between(
+      const y = centerOnBoss ? Phaser.Math.Clamp(enemy.y + Phaser.Math.Between(-30, 30),
+        bounds.y + radius + 8, bounds.y + bounds.height - radius - 8) : Phaser.Math.Between(
         Math.ceil(bounds.y + radius + 8),
         Math.floor(bounds.y + bounds.height - radius - 8));
       const marker = this.add.circle(x, y, radius, 0x4ade80, 0.14)
@@ -1224,6 +1350,8 @@ export class GameScene extends Phaser.Scene {
     for (const timer of this.bombTimers) timer.remove(false);
     this.bombTimers.clear();
     for (const warning of this.bombWarnings) if (warning.active) warning.destroy();
+    for (const root of this.rootEffects) if (root.active) root.destroy();
+    this.rootEffects.clear();
     this.bombWarnings.clear();
     this.clearFrozenWalls();
     for (const bottle of this.poisonBottles) {
