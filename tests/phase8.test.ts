@@ -48,7 +48,7 @@ describe('phase 8 save migration and permanent shop', () => {
       unlockedHeroes: ['ranger', 'mage'], heroLevels: { ranger: 4, mage: 3, guardian: 1 },
     };
     const migrated = validateProfile(old);
-    expect(migrated.version).toBe(2);
+    expect(migrated.version).toBe(3);
     expect(migrated.gold).toBe(700);
     expect(migrated.selectedHero).toBe('mage');
     expect(migrated.heroLevels.ranger).toBe(4);

@@ -90,6 +90,15 @@ Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de br
 - Nieuwe helden zijn pas met goud te kopen nadat hun wereld is vrijgespeeld. Het menu gebruikt pagina's voor alle zeven helden en de twaalf uitrustingsupgrades; bestaande saves migreren veilig met nieuwe helden op level 1.
 - Alle personageillustraties zijn lokaal via Phaser Graphics getekend en vooraf als textures gegenereerd; geen externe afbeeldingen, netwerkverzoeken of dure per-frame tekenoperaties.
 
+## Heldgebonden wapens en melee
+
+- Iedere held heeft twee exclusieve wapens; wapens kunnen niet door een andere held worden gekocht, geselecteerd of gebruikt.
+- Een nieuwe save start met de **Guardian** en zijn inbegrepen **Dawnblade**, een echt melee-wapen met een slaghoek en beperkt bereik.
+- Ranger gebruikt Ascent Bow/Hunter Crossbow, Mage gebruikt Arcane Staff/Twin Rune Tome, Guardian gebruikt Dawnblade/Bulwark Hammer, Frostblade gebruikt Glacial Blade/Ice Daggers, Pyromancer gebruikt Ember Staff/Phoenix Orbs, Stormstrider gebruikt Storm Wand/Tempest Spear en Voidwalker gebruikt Abyss Orb/Shadow Scythe.
+- Bij het ontgrendelen van een held wordt diens eerste wapen gratis mee ontgrendeld en meteen uitgerust. Het tweede wapen kan daarna met goud worden gekocht.
+- Helden en hun wapens behouden afzonderlijke upgrades. Het menu onthoudt bovendien per held welk van zijn wapens het laatst was geselecteerd.
+- SaveManager v3 migreert v1/v2-profielen: aankopen blijven behouden en iedere reeds ontgrendelde held ontvangt zijn nieuwe basiswapen.
+
 ## Huidige fase
 
 Fase 8 – Progressie en economie:
@@ -99,7 +108,7 @@ Fase 8 – Progressie en economie:
 - Een apart Game Over / Chapter Complete scherm toont kamer, kills, damage, beloningen, blijvende goudbalans en je tijdelijke upgrades.
 - Je bestaande hero- en wapenniveaus blijven bestaan. Vijf globale permanente upgrade-tracks (HP, damage, defense, wapenschade en aanvalssnelheid) komen erbij.
 - Na kamer 2, 4, 7, 10, 13, 16 en 19 kies je één van drie tijdelijke run-upgrades. Bij een volgende run begin je zonder tijdelijke bonussen.
-- SaveManager v2 valideert en migreert oude lokale v1-savebestanden, bewaart persoonlijke records en ondersteunt reset na bevestiging.
+- SaveManager v3 valideert en migreert oude lokale v1/v2-savebestanden, bewaart persoonlijke records en ondersteunt reset na bevestiging.
 
 De audio-instellingen zijn voorbereid; geluid en definitieve sprites volgen in fase 9. De eerste versie gebruikt geen online accounts of aankopen.
 

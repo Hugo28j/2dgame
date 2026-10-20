@@ -100,12 +100,17 @@ export class BootScene extends Phaser.Scene {
       'magic-projectile': 0xc084fc,
       'dagger-projectile': 0xe2e8f0,
       'lightning-projectile': 0x67e8f9,
+      'rune-projectile': 0xe9d5ff,
+      'ember-projectile': 0xfb923c,
+      'fire-projectile': 0xfdba74,
+      'void-projectile': 0xa855f7,
     };
     Object.entries(colors).forEach(([key, color]) => {
       if (this.textures.exists(key)) return;
       const graphics = this.make.graphics({ x: 0, y: 0 }, false);
       graphics.fillStyle(color);
-      if (key === 'magic-projectile') {
+      if (['magic-projectile', 'rune-projectile', 'ember-projectile',
+        'fire-projectile', 'void-projectile'].includes(key)) {
         graphics.fillCircle(12, 12, 9);
         graphics.fillStyle(0xffffff); graphics.fillCircle(12, 12, 3);
       } else if (key === 'lightning-projectile') {

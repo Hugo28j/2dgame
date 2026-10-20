@@ -4,7 +4,9 @@ import {
   applyProfileAction, defaultProfile, validateProfile,
 } from '../src/progression/ProgressStore';
 import { findChainTargets } from '../src/weapons/chainLightning';
-import { WEAPONS, WEAPON_IDS, getWeaponStats, weaponUpgradeCost } from '../src/weapons/weaponConfig';
+import {
+  HERO_WEAPONS, WEAPONS, WEAPON_IDS, getWeaponStats, weaponUpgradeCost,
+} from '../src/weapons/weaponConfig';
 
 describe('phase 5 heroes and weapons', () => {
   it('defines seven distinct heroes with positive stats and unlock rules', () => {
@@ -21,11 +23,13 @@ describe('phase 5 heroes and weapons', () => {
     expect(getHeroStats('ranger', 99)).toEqual(getHeroStats('ranger', 20));
     expect(heroUpgradeCost(2)).toBeGreaterThan(heroUpgradeCost(1));
   });
-  it('defines five meaningfully different weapons with scalable stats', () => {
-    expect(WEAPON_IDS).toHaveLength(5);
+  it('defines two hero-bound weapons per hero with ranged and melee combat', () => {
+    expect(WEAPON_IDS).toHaveLength(14);
+    for (const id of HERO_IDS) expect(HERO_WEAPONS[id]).toHaveLength(2);
     expect(WEAPONS.crossbow.piercing).toBeGreaterThan(0);
     expect(WEAPONS.daggers.projectileCount).toBe(2);
     expect(WEAPONS.lightning.effect).toBe('chain-lightning');
+    expect(WEAPONS.sunblade.attackMode).toBe('melee');
     expect(getWeaponStats('bow', 4).damage).toBeGreaterThan(getWeaponStats('bow', 1).damage);
     expect(getWeaponStats('bow', 100)).toEqual(getWeaponStats('bow', 20));
     expect(weaponUpgradeCost(3)).toBeGreaterThan(weaponUpgradeCost(2));
@@ -35,29 +39,30 @@ describe('phase 5 heroes and weapons', () => {
 describe('phase 5 progression and persistence', () => {
   it('starts with basic equipment and starter gold', () => {
     const p = defaultProfile();
-    expect(p.selectedHero).toBe('ranger');
-    expect(p.selectedWeapon).toBe('bow');
-    expect(p.unlockedHeroes).toEqual(['ranger']);
+    expect(p.selectedHero).toBe('guardian');
+    expect(p.selectedWeapon).toBe('sunblade');
+    expect(p.unlockedHeroes).toEqual(['guardian']);
   });
   it('cannot equip locked gear or spend more than available', () => {
     const p = defaultProfile();
-    expect(applyProfileAction(p, { type: 'selectHero', id: 'mage' }).selectedHero).toBe('ranger');
+    expect(applyProfileAction(p, { type: 'selectHero', id: 'mage' }).selectedHero).toBe('guardian');
     const spent = applyProfileAction(p, { type: 'unlockHero', id: 'mage' });
     expect(spent.gold).toBe(50);
     expect(spent.selectedHero).toBe('mage');
     expect(spent.unlockedHeroes).toContain('mage');
-    const blocked = applyProfileAction(spent, { type: 'unlockHero', id: 'guardian' });
-    expect(blocked.unlockedHeroes).not.toContain('guardian');
+    expect(spent.unlockedWeapons).toContain('staff');
+    const blocked = applyProfileAction(spent, { type: 'unlockWeapon', id: 'crossbow' });
+    expect(blocked.unlockedWeapons).not.toContain('crossbow');
   });
   it('applies purchased levels only to unlocked items', () => {
     let p = defaultProfile();
     const blocked = applyProfileAction(p, { type: 'upgradeWeapon', id: 'daggers' });
     expect(blocked.weaponLevels.daggers).toBe(1);
-    p = applyProfileAction(p, { type: 'upgradeHero', id: 'ranger' });
-    expect(p.heroLevels.ranger).toBe(2);
+    p = applyProfileAction(p, { type: 'upgradeHero', id: 'guardian' });
+    expect(p.heroLevels.guardian).toBe(2);
     expect(p.gold).toBe(150 - heroUpgradeCost(1));
-    p = applyProfileAction(p, { type: 'upgradeWeapon', id: 'bow' });
-    expect(p.weaponLevels.bow).toBe(2);
+    p = applyProfileAction(p, { type: 'upgradeWeapon', id: 'sunblade' });
+    expect(p.weaponLevels.sunblade).toBe(2);
     expect(p.gold).toBe(150 - heroUpgradeCost(1) - weaponUpgradeCost(1));
   });
   it('restores safe defaults for bad saves and discards unknown unlocks', () => {

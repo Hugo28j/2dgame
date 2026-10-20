@@ -65,6 +65,7 @@ describe('custom keyboard controls', () => {
   it('migrates prior v2 and legacy v1 saves without changing currency or unlocked heroes', () => {
     const previousSave = {
       ...defaultProfile(),
+      version: 2 as const,
       gold: 816, unlockedHeroes: ['ranger', 'mage'],
       settings: { musicEnabled: false, sfxEnabled: true },
     };

@@ -43,9 +43,9 @@ export const HEROES: Readonly<Record<HeroId, HeroConfig>> = {
       abilityCooldownModifier: 0.9, abilityDamageMultiplier: 1.2 },
   },
   guardian: {
-    id: 'guardian', name: 'Guardian', description: 'Gepantserde beschermer',
+    id: 'guardian', name: 'Guardian', description: 'Melee-startheld met zwaard en schild',
     passive: 'Extra HP en verdediging', textureKey: 'hero-guardian',
-    color: 0xfbbf24, unlockCost: 120, requiredWorld: 1,
+    color: 0xfbbf24, unlockCost: 0, requiredWorld: 1,
     stats: { maxHp: 145, damage: 2, attackSpeed: 0.92, movementSpeed: 170,
       criticalChance: 0.08, criticalMultiplier: 1.65, defense: 22,
       abilityCooldownModifier: 1.05, abilityDamageMultiplier: 1 },
