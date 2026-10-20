@@ -5,7 +5,7 @@ import {
 } from '../weapons/weaponConfig';
 import {
   defaultPermanentLevels, MAX_PERMANENT_LEVEL, PERMANENT_UPGRADE_IDS,
-  permanentUpgradeCost, type PermanentLevels, type PermanentUpgradeId,
+  type PermanentLevels, type PermanentUpgradeId,
 } from './economy';
 import type { RunReport } from './RunLedger';
 import { ARMOR_SLOTS, ARMOR_MAX_LEVEL, ARMOR_MAX_STARS, RARITY_CONFIG,
