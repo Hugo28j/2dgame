@@ -89,6 +89,7 @@ export class AdvancedEnemy extends Slime {
     coverTank?: Readonly<ShieldSurface>, summon?: EnemySummon): void {
     if (this.aiState === 'defeated') return;
     super.chase(targetX, targetY);
+    if (this.isStunned(now)) return;
     if (this.isFrostWitch) this.drawWitchHat(now);
     if (this.isTreantShield) {
       const dx = targetX - this.x, dy = targetY - this.y;
