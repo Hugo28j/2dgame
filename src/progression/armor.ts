@@ -64,12 +64,13 @@ export function validArmorItem(raw: unknown): raw is ArmorItem {
     Number.isInteger(item.stars) && item.stars! >= 0 && item.stars! <= ARMOR_MAX_STARS;
 }
 
-export function rollArmor(victory: boolean, dropRoll: number, rarityRoll: number,
-  kindRoll: number, runId: string, heroId: HeroId = 'guardian',
-  index = 0): ArmorItem | undefined {
-  if (![dropRoll, rarityRoll, kindRoll].every(n => Number.isFinite(n) && n >= 0 && n < 1)) return;
-  // Primary: guaranteed on victory / 40% on defeat. Secondary: 20% / 10%.
-  if (dropRoll >= (index === 0 ? (victory ? 1 : .4) : (victory ? .2 : .1))) return;
+/** Roll once for each unique defeated enemy. Armor is only gained on pickup. */
+export function rollEnemyArmor(kind: 'boss' | 'normal', chance: number,
+  rarityRoll: number, kindRoll: number, runId: string, enemyId: string,
+  heroId: HeroId): ArmorItem | undefined {
+  if (![chance, rarityRoll, kindRoll].every(n => Number.isFinite(n) && n >= 0 && n < 1))
+    return undefined;
+  if (chance >= (kind === 'boss' ? 0.05 : 0.005)) return undefined;
   let remaining = rarityRoll * 100;
   let rarity: ArmorRarity = 'common';
   for (const choice of ARMOR_RARITIES) {
@@ -78,19 +79,10 @@ export function rollArmor(victory: boolean, dropRoll: number, rarityRoll: number
   }
   const catalog = ARMOR_DEFINITIONS.filter(x => x.heroId === heroId);
   return {
-    id: 'armor-' + runId + '-' + index, heroId,
+    id: 'armor-' + runId + '-' + enemyId, heroId,
     kind: catalog[Math.floor(kindRoll * catalog.length)]!.kind,
     rarity, level: 1, stars: 0,
   };
-}
-
-export interface ArmorRoll { drop: number; rarity: number; kind: number }
-export function rollArmorRewards(victory: boolean, runId: string, heroId: HeroId,
-  rolls: readonly [ArmorRoll, ArmorRoll]): ArmorItem[] {
-  return rolls.flatMap((roll, index) => {
-    const item = rollArmor(victory, roll.drop, roll.rarity, roll.kind, runId, heroId, index);
-    return item ? [item] : [];
-  });
 }
 export function armorUpgradeCost(item: ArmorItem): number {
   return Math.round((30 + item.level * 20) * RARITY_CONFIG[item.rarity].multiplier);
