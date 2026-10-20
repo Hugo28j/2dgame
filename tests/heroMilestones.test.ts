@@ -8,7 +8,8 @@ describe('hero 50-level progression milestones', () => {
   it('applies weapon level 10 and ability 5/20/30 gates to all heroes', () => {
     expect(MAX_HERO_LEVEL).toBe(50);
     for (const hero of HERO_IDS) {
-      const [starter, alternate] = HERO_WEAPONS[hero];
+      const starter = HERO_WEAPONS[hero][0]!;
+      const alternate = HERO_WEAPONS[hero][1]!;
       const [one, two, three] = HERO_ABILITIES[hero];
       expect(isWeaponUnlockedForHero(starter, hero, 1)).toBe(true);
       expect(isWeaponUnlockedForHero(alternate, hero, 9)).toBe(false);
@@ -21,7 +22,7 @@ describe('hero 50-level progression milestones', () => {
   });
   it('unlocks the alternate automatically with XP, without gold spending or swapping weapons', () => {
     const initial = defaultProfile();
-    const alternate = HERO_WEAPONS.guardian[1];
+    const alternate = HERO_WEAPONS.guardian[1]!;
     expect(initial.unlockedWeapons).not.toContain(alternate);
     expect(applyProfileAction(initial, { type: 'unlockWeapon', id: alternate })).toEqual(initial);
     const totalXp = Array.from({ length: 9 }, (_, i) => heroXpRequirement(i + 1))
@@ -35,7 +36,7 @@ describe('hero 50-level progression milestones', () => {
   });
   it('honors the new gates when migrating existing saves', () => {
     const base = defaultProfile();
-    const alternate = HERO_WEAPONS.guardian[1];
+    const alternate = HERO_WEAPONS.guardian[1]!;
     const early = validateProfile({ ...base, unlockedWeapons: ['sunblade', alternate] });
     expect(early.unlockedWeapons).not.toContain(alternate);
     const advanced = validateProfile({
