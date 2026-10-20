@@ -739,6 +739,10 @@ export class GameScene extends Phaser.Scene {
   private readonly dropBossBombs = (enemy: AdvancedEnemy, targetX: number, targetY: number,
     count: number, radius: number, windupMs: number): void => {
     if (!this.player || this.gameOver || this.transitioning || this.roomProgress.doorOpen) return;
+    if (enemy.isPoisonAlchemist) {
+      this.throwPoisonBottles(enemy, targetX, targetY, count, radius);
+      return;
+    }
     const bounds = this.currentRoom?.layout.bounds;
     if (!bounds) return;
     for (let i = 0; i < count; i++) {
@@ -773,11 +777,91 @@ export class GameScene extends Phaser.Scene {
     }
   };
 
+  /** Each green bottle visibly arcs from the alchemist to its target before
+   * breaking. Impact creates a five-second damaging poison circle.
+   */
+  private throwPoisonBottles(enemy: AdvancedEnemy, targetX: number,
+    targetY: number, count: number, radius: number): void {
+    const bounds = this.currentRoom?.layout.bounds;
+    if (!bounds) return;
+    for (let i = 0; i < count; i++) {
+      const theta = i * Math.PI * 2 / Math.max(1, count);
+      const offset = i === 0 ? 0 : 90;
+      const x = Phaser.Math.Clamp(targetX + Math.cos(theta) * offset,
+        bounds.x + radius + 8, bounds.x + bounds.width - radius - 8);
+      const y = Phaser.Math.Clamp(targetY + Math.sin(theta) * offset,
+        bounds.y + radius + 8, bounds.y + bounds.height - radius - 8);
+      const glass = this.add.ellipse(0, 4, 17, 23, 0x4ade80)
+        .setStrokeStyle(2, 0xd9f99d);
+      const neck = this.add.rectangle(0, -10, 8, 10, 0x14532d)
+        .setStrokeStyle(1, 0xa3e635);
+      const cork = this.add.rectangle(0, -16, 11, 5, 0xc9a66b);
+      const shine = this.add.circle(-4, 1, 3, 0xecfccb, 0.85);
+      const bottle = this.add.container(enemy.x, enemy.y - 22, [glass, neck, cork, shine])
+        .setDepth(32);
+      this.poisonBottles.add(bottle);
+      const fromX = bottle.x, fromY = bottle.y;
+      this.tweens.addCounter({
+        from: 0, to: 1, duration: SPORE_POISON.bottleFlightMs + i * 55,
+        ease: 'Linear',
+        onUpdate: tween => {
+          if (!bottle.active) return;
+          const t = tween.getValue() ?? 0;
+          bottle.setPosition(
+            Phaser.Math.Linear(fromX, x, t),
+            Phaser.Math.Linear(fromY, y, t) - 74 * Math.sin(Math.PI * t),
+          );
+          bottle.setRotation(t * Math.PI * 1.5);
+        },
+        onComplete: () => {
+          if (!bottle.active) return;
+          this.poisonBottles.delete(bottle);
+          bottle.destroy();
+          if (this.gameOver || this.transitioning || this.chapterComplete ||
+              this.roomProgress.doorOpen || !enemy.active || enemy.aiState === 'defeated') return;
+          this.createPoisonPool(x, y, radius, enemy.stats.damage * SPORE_POISON.damageMultiplier);
+        },
+      });
+    }
+  }
+
+  private createPoisonPool(x: number, y: number, radius: number, damage: number): void {
+    const circle = this.add.circle(x, y, radius, 0x22c55e, 0.32)
+      .setStrokeStyle(4, 0x86efac, 0.93).setDepth(23);
+    const now = this.time.now;
+    this.poisonPools.add({ circle, x, y, radius, startAt: now,
+      nextTickAt: now, damage });
+  }
+
+  private updatePoisonPools(now: number): void {
+    for (const pool of this.poisonPools) {
+      if (!poisonActive(now, pool.startAt) || this.roomProgress.doorOpen) {
+        pool.circle.destroy();
+        this.poisonPools.delete(pool);
+        continue;
+      }
+      const progress = (now - pool.startAt) / SPORE_POISON.durationMs;
+      pool.circle.setAlpha(Math.min(1, (1 - progress) * 2.2));
+      pool.circle.setScale(1 + 0.035 * Math.sin(now / 120));
+      if (!this.player || !poisonTickDue(now, pool.nextTickAt)) continue;
+      if (!poisonCovers(pool.x, pool.y, pool.radius, this.player.x, this.player.y)) continue;
+      pool.nextTickAt = now + SPORE_POISON.tickMs;
+      this.damagePlayer({ damage: pool.damage, criticalChance: 0, criticalMultiplier: 1 }, 600);
+    }
+  }
+
   private clearBossBombs(): void {
     for (const timer of this.bombTimers) timer.remove(false);
     this.bombTimers.clear();
     for (const warning of this.bombWarnings) if (warning.active) warning.destroy();
     this.bombWarnings.clear();
+    for (const bottle of this.poisonBottles) {
+      this.tweens.killTweensOf(bottle);
+      bottle.destroy();
+    }
+    this.poisonBottles.clear();
+    for (const pool of this.poisonPools) pool.circle.destroy();
+    this.poisonPools.clear();
   }
 
   private readonly explodeEnemy = (enemy: AdvancedEnemy, radius: number): void => {
