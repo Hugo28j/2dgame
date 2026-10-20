@@ -87,7 +87,7 @@ export function validateProfile(raw: unknown): Profile {
   const worldOneProgress = Array.isArray(input.worldBestRooms)
     ? validLevel(input.worldBestRooms[0], 1, CHAPTER_ROOM_COUNT)
     : validLevel(input.highestRoom, 1, CHAPTER_ROOM_COUNT);
-  const heroes = HERO_IDS.filter(id => id === 'guardian' ||
+  const heroes = HERO_IDS.filter(id => id === 'guardian' || legacyHeroes.includes(id) ||
     (id === 'ranger' && worldOneProgress >= 10) ||
     (id === 'mage' && worldOneProgress >= 20) ||
     (id !== 'ranger' && id !== 'mage' && legacyHeroes.includes(id)));
