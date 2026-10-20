@@ -564,6 +564,13 @@ export class GameScene extends Phaser.Scene {
     const selected = new Set(chosen);
     this.pendingSpawnIndices = this.pendingSpawnIndices.filter(i => !selected.has(i));
     const spawned = this.enemySpawner.spawnRoom(this.currentRoom, chosen, this.worldId);
+    if (this.worldId === 2) {
+      for (const enemy of spawned) {
+        if (enemy instanceof AdvancedEnemy && enemy.kind === 'mage') {
+          this.summonFrozenMinions(enemy, 2);
+        }
+      }
+    }
     this.nextEnemyWaveAt = this.time.now + settings.intervalMs;
     return spawned;
   }
@@ -1255,7 +1262,7 @@ export class GameScene extends Phaser.Scene {
   /** Coin drops remain in the chamber until picked up, never grant gold
    * instantly, and are discarded at room exit / run end. */
   private spawnCoins(x: number, y: number, kind: Parameters<typeof coinDropsForEnemy>[0]): void {
-    const drops = coinDropsForEnemy(kind);
+    const drops = coinDropsForEnemy(kind, this.worldId, this.roomProgress.roomNumber);
     const bounds = this.currentRoom?.layout.bounds;
     if (!bounds) return;
     for (let i = 0; i < drops.length; i += 1) {
