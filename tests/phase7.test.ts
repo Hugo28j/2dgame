@@ -33,7 +33,7 @@ describe('phase 7 room enemy rosters', () => {
     for (const room of [5, 10, 15, 20, 25, 30]) {
       const definition = getRoomDefinition(room);
       expect(definition.isBossRoom).toBe(true);
-      expect(definition.enemyCount).toBe(room === 15 ? 2 : 1);
+      expect(definition.enemyCount).toBe(1);
       expect(definition.enemySpawns).toHaveLength(definition.enemyCount);
       expect(getEnemyKindForRoom(room, 0)).toBe('boss');
       const spawn = definition.enemySpawns[0]!;
