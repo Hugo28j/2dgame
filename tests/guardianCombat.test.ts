@@ -41,7 +41,7 @@ describe('Guardian Dawnblade', () => {
     expect(isInsideMeleeSwing(origin, aim, edgeEnemy, range, arc, 20)).toBe(true);
     // No change for other weapons, which still use centre-only geometry.
     expect(isInsideMeleeSwing(origin, aim, { x: 80, y: 0 },
-      WEAPONS.warhammer.meleeRange, WEAPONS.warhammer.meleeArc)).toBe(false);
+      WEAPONS.iceblade.meleeRange, WEAPONS.iceblade.meleeArc)).toBe(false);
   });
 
   it('has slightly longer range and a distinct knockback effect', () => {

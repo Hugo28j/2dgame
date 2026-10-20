@@ -44,10 +44,11 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponConfig>> = {
     damage: 42, fireRate: 1.75, projectileCount: 1, piercing: 0, criticalChanceModifier: 0.02,
     criticalMultiplier: 1.7, specialEffects: ['melee', 'knockback'], upgradeLevel: 1, unlockCost: 0,
     effect: 'none', textureKey: 'sun-slash', meleeRange: 96, meleeArc: 1.75, color: 0xfbbf24 }),
-  warhammer: melee({ id: 'warhammer', heroId: 'guardian', name: 'Bulwark Hammer', description: 'Trage slag rondom de Guardian',
-    damage: 70, fireRate: 0.95, projectileCount: 1, piercing: 0, criticalChanceModifier: 0,
-    criticalMultiplier: 1.65, specialEffects: ['melee', 'wide-swing'], upgradeLevel: 1, unlockCost: 160,
-    effect: 'none', textureKey: 'hammer-swing', meleeRange: 74, meleeArc: 3.65, color: 0xfde68a }),
+  warhammer: melee({ id: 'warhammer', heroId: 'guardian', name: 'Bulwark Hammer',
+    description: 'Zware, trage grondslag: grote rechthoek die vijanden beschadigt en vertraagt',
+    damage: 125, fireRate: 0.42, projectileCount: 1, piercing: 0, criticalChanceModifier: 0,
+    criticalMultiplier: 1.65, specialEffects: ['melee', 'ground-crack', 'slow'], upgradeLevel: 1, unlockCost: 160,
+    effect: 'none', textureKey: 'hammer-swing', meleeRange: 260, meleeArc: 0, color: 0xfde68a }),
   daggers: projectile({ id: 'daggers', heroId: 'frostblade', name: 'Ice Daggers', description: 'Twee snelle messen op korte afstand',
     damage: 14, fireRate: 5.1, projectileSpeed: 550, projectileCount: 2, piercing: 0,
     criticalChanceModifier: 0.09, criticalMultiplier: 1.75, specialEffects: ['spread'], upgradeLevel: 1,
@@ -96,6 +97,16 @@ export const HERO_STARTER_WEAPON: Readonly<Record<HeroId, WeaponId>> = {
 export function weaponBelongsToHero(weaponId: WeaponId, heroId: HeroId): boolean {
   return WEAPONS[weaponId].heroId === heroId;
 }
+
+/** The hammer uses the same forward rectangle geometry as Guardian's Wind Burst,
+ * but hits harder and inflicts slow instead of the ability's knockback.
+ */
+export const WARHAMMER_GROUND_SLAM = Object.freeze({
+  halfWidth: 85,
+  slowDurationMs: 2400,
+  slowFactor: 0.43,
+  crackAnimationMs: 650,
+});
 
 export const MAX_WEAPON_LEVEL = 20;
 export function weaponUpgradeCost(level: number): number {

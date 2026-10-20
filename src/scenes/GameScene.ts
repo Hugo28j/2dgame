@@ -433,6 +433,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.abilities?.cancelMotion();
+    this.weapon?.clearGroundEffects();
     this.clearBossBombs();
     this.clearCoins();
     this.activeBoss = undefined;
@@ -1182,6 +1183,7 @@ export class GameScene extends Phaser.Scene {
     this.upgradeReady = false;
     this.abilities?.destroy();
     this.abilities = undefined;
+    this.weapon?.clearGroundEffects();
     this.controls?.destroy();
     this.projectiles?.clear(true, true);
     this.enemies?.clear(true, true);
