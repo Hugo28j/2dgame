@@ -115,7 +115,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.text(23, 196, 'WERELD ' + profile.selectedWorld + ' / 5', 10, COLOR.secondary);
     this.text(367, 196, 'RECORD ' +
       profile.worldBestRooms[profile.selectedWorld - 1] + ' / ' + CHAPTER_ROOM_COUNT,
-      10, COLOR.secondary, true);
+      10, COLOR.secondary).setOrigin(1, 0.5);
   }
 
   private drawNavigation(): void {
@@ -200,17 +200,17 @@ export class MainMenuScene extends Phaser.Scene {
         selected ? 0x1b3844 : COLOR.card, selected ? hero.color : COLOR.border, 11);
       this.add.circle(61, y - 15, 24, hero.color, 0.15);
       this.add.image(61, y - 15, hero.textureKey).setDisplaySize(47, 47);
-      this.fittedText(93, y - 29, hero.name.toUpperCase(), 13, COLOR.white, 179, true);
+      this.fittedText(93, y - 29, hero.name.toUpperCase(), 13, COLOR.white, 169, true);
       this.fittedText(93, y - 10, 'LV.' + profile.heroLevels[id] +
-        '  ·  ' + hero.description, 10, COLOR.secondary, 228);
-      this.fittedText(44, y + 11, 'PASSIEF: ' + hero.passive, 10, '#fcd34d', 282);
+        '  ·  ' + hero.description, 10, COLOR.secondary, 168);
+      this.fittedText(44, y + 14, 'PASSIEF: ' + hero.passive, 10, '#fcd34d', 304);
       const stats = getHeroStats(id, profile.heroLevels[id]);
-      this.fittedText(44, y + 30, 'HP ' + stats.maxHp +
+      this.fittedText(44, y + 32, 'HP ' + stats.maxHp +
         '   ·   SCHADE ' + stats.damage + '   ·   DEF ' + stats.defense,
-        10, COLOR.secondary, 204);
+        10, COLOR.secondary, 302);
       const label = selected ? 'ACTIEF' : unlocked ? 'KIES' :
         !available ? 'WERELD ' + hero.requiredWorld : hero.unlockCost + ' G';
-      this.button(313, y + 26, 86, 31, label, () => this.runAction(
+      this.button(313, y - 10, 86, 34, label, () => this.runAction(
         unlocked ? { type: 'selectHero', id } : { type: 'unlockHero', id },
       ), selected ? 'selected' : 'normal',
       selected || (!unlocked && (!available || profile.gold < hero.unlockCost)), 10);
