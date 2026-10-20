@@ -62,7 +62,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.button(195, 766, 342, 60, '▶   START AVONTUUR',
       () => this.scene.start(GAME_SCENE_KEY), 'primary', false, 17);
     this.text(195, 810, getWorld(progressStore.current.selectedWorld).name.toUpperCase() +
-      '  ·  KAMER 1–50', 11, COLOR.secondary, true);
+      '  ·  KAMER 1–' + CHAPTER_ROOM_COUNT, 11, COLOR.secondary, true);
 
     this.input.keyboard?.on('keydown', this.captureBinding);
     // Capture before Phaser delivers game-object clicks; the click that opens
