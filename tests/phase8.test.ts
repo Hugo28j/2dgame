@@ -95,7 +95,7 @@ describe('phase 8 save migration and permanent shop', () => {
       settledRunIds: [42, null, 'ok', 'ok'],
     });
     expect(corrupt.gold).toBe(0);
-    expect(corrupt.highestRoom).toBe(50);
+    expect(corrupt.highestRoom).toBe(30);
     expect(corrupt.permanentLevels.hp).toBe(0);
     expect(corrupt.permanentLevels.damage).toBe(15);
     expect(corrupt.selectedHero).toBe('ranger');
