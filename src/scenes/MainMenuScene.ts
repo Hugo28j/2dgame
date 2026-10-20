@@ -269,7 +269,7 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   private drawUpgrades(): void {
-    this.section('VERBETER JE UITRUSTING', 'Besteed goud aan blijvende verbeteringen');
+    this.section('VERBETER JE UITRUSTING', 'Hero-levels via XP; uitrusting via goud');
     const choices: Array<['permanent' | 'equipment' | 'abilities', string]> = [
       ['permanent', 'PERMANENT'], ['equipment', 'HELD & WAPEN'], ['abilities', 'ABILITIES'],
     ];
@@ -312,7 +312,7 @@ export class MainMenuScene extends Phaser.Scene {
         : [
             {
               label: HEROES[equipment.heroId].name,
-              description: 'HP, schade en verdediging van je huidige held',
+              description: 'Level omhoog door blauwe XP-kristallen te verzamelen',
               summary: 'HELD  ·  ' + HEROES[equipment.heroId].name.toUpperCase(),
               level: profile.heroLevels[equipment.heroId],
               unlocked: profile.unlockedHeroes.includes(equipment.heroId),
@@ -343,8 +343,9 @@ export class MainMenuScene extends Phaser.Scene {
       }
       this.text(43, y + (roomy ? 34 : 20), 'LEVEL ' + row.level + ' / ' + row.max,
         10, COLOR.faint);
-      const available = row.unlocked && row.level < row.max && profile.gold >= row.cost;
-      const label = !row.unlocked ? 'SLOT' : row.level >= row.max ? 'MAX' :
+      const heroRow = row.action.type === 'upgradeHero';
+      const available = !heroRow && row.unlocked && row.level < row.max && profile.gold >= row.cost;
+      const label = heroRow ? 'XP' : !row.unlocked ? 'SLOT' : row.level >= row.max ? 'MAX' :
         row.cost.toLocaleString('nl-BE') + ' G';
       this.button(309, y + (roomy ? 33 : 12), 88, 31,
         label, () => this.runAction(row.action),
