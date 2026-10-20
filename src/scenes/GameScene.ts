@@ -1017,7 +1017,10 @@ export class GameScene extends Phaser.Scene {
         this.bombTimers.add(timer);
       },
     });
-    bomb.once(Phaser.GameObjects.Events.DESTROY, () => this.tweens.killTweensOf(bomb));
+    bomb.once(Phaser.GameObjects.Events.DESTROY, () => {
+      this.bombWarnings.delete(bomb);
+      this.tweens.killTweensOf(bomb);
+    });
     this.bombWarnings.add(bomb);
   }
 
