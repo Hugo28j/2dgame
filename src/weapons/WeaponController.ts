@@ -60,7 +60,7 @@ export class WeaponController {
         !isInsideMeleeSwing(this.owner, direction, target, config.meleeRange, config.meleeArc)) continue;
       this.onMeleeHit?.(target, attack);
       if (config.specialEffects.includes('knockback') &&
-        target.active && target.aiState !== 'defeated') {
+        target.active && target.healthRatio > 0) {
         // Enemy AI respects the timed knockback, so the next chase frame
         // cannot immediately cancel the push.
         target.applyKnockback(this.scene.time.now, 240,
