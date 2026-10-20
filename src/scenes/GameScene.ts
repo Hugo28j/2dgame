@@ -64,6 +64,8 @@ export class GameScene extends Phaser.Scene {
   private readonly coins = new Set<CoinPickup>();
   private readonly xpCrystals = new Set<XpPickup>();
   private xpHudText?: Phaser.GameObjects.Text;
+  private levelUpGlow?: Phaser.GameObjects.Container;
+  private levelUpGlowEndAt = 0;
   private projectiles?: Phaser.Physics.Arcade.Group;
   private enemies?: Phaser.Physics.Arcade.Group;
   private enemyProjectiles?: Phaser.Physics.Arcade.Group;
@@ -194,6 +196,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.player.move(this.controls.getMovement());
+    this.updateLevelUpGlow();
     this.drawFrostStatus();
     this.collectNearbyCoins(delta);
     this.collectNearbyXp(delta);
@@ -1459,6 +1462,7 @@ export class GameScene extends Phaser.Scene {
           this.player.applyHeroLevel(previous, current);
           this.abilities?.setHeroLevel(current);
           this.drawPlayerHealth();
+          this.showLevelUpGlow();
           const notice = this.add.text(this.player.x, this.player.y - 55,
             'LEVEL ' + current + '!  ' + (
               current >= 30 && previous < 30 ? 'ABILITY 3 UNLOCKED!' :
@@ -1476,6 +1480,44 @@ export class GameScene extends Phaser.Scene {
       this.xpCrystals.delete(crystal);
     }
     this.updateXpHud();
+  }
+
+  /** A soft, lightweight cyan-gold aura that follows the hero for ~2.5 seconds. */
+  private showLevelUpGlow(): void {
+    if (!this.player) return;
+    if (this.levelUpGlow) {
+      this.tweens.killTweensOf(this.levelUpGlow.list);
+      this.levelUpGlow.destroy();
+    }
+    const aura = this.add.container(this.player.x, this.player.y).setDepth(17);
+    const outer = this.add.circle(0, 0, 37, 0x67e8f9, 0.11)
+      .setStrokeStyle(3, 0x67e8f9, 0.75);
+    const inner = this.add.circle(0, 0, 28, 0xfde68a, 0.09)
+      .setStrokeStyle(2, 0xfef08a, 0.55);
+    // The circles have no collision body and never block pointer input.
+    aura.add([outer, inner]);
+    this.levelUpGlow = aura;
+    this.levelUpGlowEndAt = this.time.now + 2500;
+    this.tweens.add({
+      targets: outer, scale: 1.24, alpha: 0.42,
+      duration: 530, ease: 'Sine.easeInOut', yoyo: true, repeat: -1,
+    });
+    this.tweens.add({
+      targets: inner, scale: 1.14, alpha: 0.55,
+      duration: 420, ease: 'Sine.easeInOut', yoyo: true, repeat: -1,
+    });
+  }
+
+  private updateLevelUpGlow(): void {
+    const glow = this.levelUpGlow;
+    if (!glow || !this.player) return;
+    if (this.time.now >= this.levelUpGlowEndAt) {
+      this.tweens.killTweensOf(glow.list);
+      glow.destroy();
+      this.levelUpGlow = undefined;
+      return;
+    }
+    glow.setPosition(this.player.x, this.player.y);
   }
 
   private updateXpHud(): void {
@@ -1769,6 +1811,11 @@ export class GameScene extends Phaser.Scene {
   private shutdown(): void {
     this.physics.world.resume();
     this.clearCoins();
+    if (this.levelUpGlow) {
+      this.tweens.killTweensOf(this.levelUpGlow.list);
+      this.levelUpGlow.destroy();
+      this.levelUpGlow = undefined;
+    }
     this.clearBossBombs();
     this.upgradeHitAreas.forEach(hitArea => hitArea.destroy());
     this.upgradeHitAreas = [];
