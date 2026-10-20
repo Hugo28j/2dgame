@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { AbilityController } from '../abilities/AbilityController';
 
 import { DamageSystem, type DamageResult } from '../combat/damage';
+import { shouldParryHit } from '../combat/parry';
 import { addAndLaunch } from '../combat/launchProjectile';
 import { GAME_SCENE_KEY, GAME_TITLE, GAME_OVER_SCENE_KEY, GAME_WIDTH } from '../config/constants';
 import { EnemySpawner } from '../enemies/EnemySpawner';
@@ -813,6 +814,13 @@ export class GameScene extends Phaser.Scene {
 
   private damagePlayer(attack: Readonly<Projectile['attack']>, iframeMs = 650): void {
     if (!this.player || this.gameOver || !this.player.canReceiveContactDamage(this.time.now)) return;
+    if (shouldParryHit(this.player.heroId, Math.random())) {
+      // A parried hit deals zero damage and consumes the same i-frame window
+      // as a normal hit: overlapping melee enemies cannot repeatedly reroll.
+      this.player.beginInvulnerability(this.time.now, iframeMs);
+      this.showPlayerParry();
+      return;
+    }
     const result = this.damageSystem.apply(this.player, attack);
     this.player.beginInvulnerability(this.time.now, iframeMs);
     this.drawPlayerHealth();
@@ -986,6 +994,29 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(121).setScrollFactor(0);
     this.healthText.setText(`${this.player.currentHp} / ${this.player.maxHp}`);
+  }
+
+  private showPlayerParry(): void {
+    if (!this.player) return;
+    const { x, y } = this.player;
+    const shield = this.add.circle(x, y, 34, 0x67e8f9, 0.14)
+      .setStrokeStyle(4, 0xfef08a, 1).setDepth(31);
+    const label = this.add.text(x, y - 40, 'PARRY!', {
+      fontFamily: 'system-ui, sans-serif',
+      fontSize: '17px',
+      fontStyle: 'bold',
+      color: '#fef08a',
+      stroke: '#020617',
+      strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(51);
+    this.tweens.add({
+      targets: shield, scale: 1.4, alpha: 0, duration: 230,
+      ease: 'Quad.easeOut', onComplete: () => shield.destroy(),
+    });
+    this.tweens.add({
+      targets: label, y: y - 70, alpha: 0, duration: 390,
+      ease: 'Quad.easeOut', onComplete: () => label.destroy(),
+    });
   }
 
   private showPlayerHit(): void {
