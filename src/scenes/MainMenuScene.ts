@@ -5,7 +5,7 @@ import { WORLDS, isWorldUnlocked, getWorld } from '../worlds/worldConfig';
 import {
   HERO_IDS, HEROES, getHeroStats, heroUpgradeCost, MAX_HERO_LEVEL,
 } from '../heroes/heroConfig';
-import { progressStore, type ProfileAction } from '../progression/ProgressStore';
+import { progressStore, heroXpRequirement, type ProfileAction } from '../progression/ProgressStore';
 import {
   CONTROL_ACTIONS, CONTROL_LABELS, formatBinding, mouseButtonKey, normalizeBindKey, rebindKey,
   type ControlAction,
@@ -202,7 +202,8 @@ export class MainMenuScene extends Phaser.Scene {
       this.add.image(61, y - 15, hero.textureKey).setDisplaySize(47, 47);
       this.fittedText(93, y - 29, hero.name.toUpperCase(), 13, COLOR.white, 169, true);
       this.fittedText(93, y - 10, 'LV.' + profile.heroLevels[id] +
-        '  ·  ' + hero.description, 10, COLOR.secondary, 168);
+        ' · XP ' + profile.heroXp[id] + '/' + (profile.heroLevels[id] >= MAX_HERO_LEVEL
+          ? 'MAX' : heroXpRequirement(profile.heroLevels[id])), 10, COLOR.secondary, 168);
       this.fittedText(44, y + 14, 'PASSIEF: ' + hero.passive, 10, '#fcd34d', 304);
       const stats = getHeroStats(id, profile.heroLevels[id]);
       this.fittedText(44, y + 32, 'HP ' + stats.maxHp +
@@ -269,7 +270,7 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   private drawUpgrades(): void {
-    this.section('VERBETER JE UITRUSTING', 'Besteed goud aan blijvende verbeteringen');
+    this.section('VERBETER JE UITRUSTING', 'Hero-levels via XP; uitrusting via goud');
     const choices: Array<['permanent' | 'equipment' | 'abilities', string]> = [
       ['permanent', 'PERMANENT'], ['equipment', 'HELD & WAPEN'], ['abilities', 'ABILITIES'],
     ];
@@ -312,8 +313,10 @@ export class MainMenuScene extends Phaser.Scene {
         : [
             {
               label: HEROES[equipment.heroId].name,
-              description: 'HP, schade en verdediging van je huidige held',
-              summary: 'HELD  ·  ' + HEROES[equipment.heroId].name.toUpperCase(),
+              description: 'Level omhoog door blauwe XP-kristallen te verzamelen',
+              summary: 'XP ' + profile.heroXp[equipment.heroId] + '/' +
+                heroXpRequirement(profile.heroLevels[equipment.heroId]) +
+                '  ·  ' + HEROES[equipment.heroId].name.toUpperCase(),
               level: profile.heroLevels[equipment.heroId],
               unlocked: profile.unlockedHeroes.includes(equipment.heroId),
               max: MAX_HERO_LEVEL, cost: heroUpgradeCost(profile.heroLevels[equipment.heroId]),
@@ -343,8 +346,9 @@ export class MainMenuScene extends Phaser.Scene {
       }
       this.text(43, y + (roomy ? 34 : 20), 'LEVEL ' + row.level + ' / ' + row.max,
         10, COLOR.faint);
-      const available = row.unlocked && row.level < row.max && profile.gold >= row.cost;
-      const label = !row.unlocked ? 'SLOT' : row.level >= row.max ? 'MAX' :
+      const heroRow = row.action.type === 'upgradeHero';
+      const available = !heroRow && row.unlocked && row.level < row.max && profile.gold >= row.cost;
+      const label = heroRow ? 'XP' : !row.unlocked ? 'SLOT' : row.level >= row.max ? 'MAX' :
         row.cost.toLocaleString('nl-BE') + ' G';
       this.button(309, y + (roomy ? 33 : 12), 88, 31,
         label, () => this.runAction(row.action),

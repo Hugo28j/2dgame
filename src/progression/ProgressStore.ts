@@ -1,4 +1,4 @@
-import { HERO_IDS, HEROES, MAX_HERO_LEVEL, heroUpgradeCost, type HeroId } from '../heroes/heroConfig';
+import { HERO_IDS, HEROES, MAX_HERO_LEVEL, type HeroId } from '../heroes/heroConfig';
 import {
   HERO_STARTER_WEAPON, MAX_WEAPON_LEVEL, WEAPON_IDS, WEAPONS,
   weaponBelongsToHero, weaponUpgradeCost, type WeaponId,
@@ -24,6 +24,8 @@ const LEGACY_KEYS = [
   'dungeon-ascent:profile:v3', 'dungeon-ascent:profile:v2', 'dungeon-ascent:profile:v1',
 ] as const;
 const MAX_GOLD = 1_000_000_000;
+/** XP needed to go from the given hero level to the next one. */
+export const heroXpRequirement = (level: number): number => 30 + Math.max(0, level - 1) * 20;
 const MAX_SETTLED_RUNS = 64;
 
 export interface Profile {
@@ -35,6 +37,7 @@ export interface Profile {
   unlockedHeroes: HeroId[];
   unlockedWeapons: WeaponId[];
   heroLevels: Record<HeroId, number>;
+  heroXp: Record<HeroId, number>;
   weaponLevels: Record<WeaponId, number>;
   abilityLevels: Record<AbilityId, number>;
   permanentLevels: PermanentLevels;
@@ -53,6 +56,7 @@ export function defaultProfile(): Profile {
       pyromancer: 'emberstaff', stormstrider: 'lightning', voidwalker: 'voidorb' },
     unlockedHeroes: ['guardian'], unlockedWeapons: ['sunblade'],
     heroLevels: Object.fromEntries(HERO_IDS.map(id => [id, 1])) as Record<HeroId, number>,
+    heroXp: Object.fromEntries(HERO_IDS.map(id => [id, 0])) as Record<HeroId, number>,
     weaponLevels: Object.fromEntries(WEAPON_IDS.map(id => [id, 1])) as Record<WeaponId, number>,
     abilityLevels: Object.fromEntries(ABILITY_IDS.map(id => [id, 1])) as Record<AbilityId, number>,
     permanentLevels: defaultPermanentLevels(), highestRoom: 1,
@@ -80,6 +84,8 @@ export function validateProfile(raw: unknown): Profile {
   const weapons = WEAPON_IDS.filter(id => purchasedWeapons.includes(id) ||
     heroes.some(heroId => HERO_STARTER_WEAPON[heroId] === id));
   const heroLevels = { ...defaults.heroLevels };
+  const heroXp = { ...defaults.heroXp };
+  for (const id of HERO_IDS) heroXp[id] = validLevel((input as Partial<Profile>).heroXp?.[id], 0, 1_000_000_000);
   const weaponLevels = { ...defaults.weaponLevels };
   const abilityLevels = { ...defaults.abilityLevels };
   const permanentLevels = defaultPermanentLevels();
@@ -118,7 +124,7 @@ export function validateProfile(raw: unknown): Profile {
     gold: typeof input.gold === 'number' && Number.isFinite(input.gold)
       ? validLevel(input.gold, 0, MAX_GOLD) : 0,
     selectedHero, selectedWeapon, selectedWeapons, unlockedHeroes: heroes, unlockedWeapons: weapons,
-    heroLevels, weaponLevels, abilityLevels, permanentLevels,
+    heroLevels, heroXp, weaponLevels, abilityLevels, permanentLevels,
     highestRoom: validLevel(input.highestRoom, 1, CHAPTER_ROOM_COUNT),
     selectedWorld, completedWorlds, worldBestRooms,
     totalGoldEarned: validLevel(input.totalGoldEarned, 0, MAX_GOLD),
@@ -141,6 +147,7 @@ export type ProfileAction =
   | { type: 'unlockHero'; id: HeroId }
   | { type: 'unlockWeapon'; id: WeaponId }
   | { type: 'upgradeHero'; id: HeroId }
+  | { type: 'collectHeroXp'; id: HeroId; amount: number }
   | { type: 'upgradeWeapon'; id: WeaponId }
   | { type: 'upgradeAbility'; id: AbilityId }
   | { type: 'upgradePermanent'; id: PermanentUpgradeId }
@@ -190,12 +197,17 @@ export function applyProfileAction(profile: Profile, action: ProfileAction): Pro
         selectedWeapons: { ...p.selectedWeapons, [p.selectedHero]: action.id },
       };
     }
-    case 'upgradeHero': {
-      if (!p.unlockedHeroes.includes(action.id)) return p;
-      const level = p.heroLevels[action.id];
-      const cost = heroUpgradeCost(level);
-      if (level >= MAX_HERO_LEVEL || p.gold < cost) return p;
-      return { ...p, gold: p.gold - cost, heroLevels: { ...p.heroLevels, [action.id]: level + 1 } };
+    case 'upgradeHero': return p; // Hero levels can only be earned with XP.
+    case 'collectHeroXp': {
+      if (!p.unlockedHeroes.includes(action.id) || !Number.isSafeInteger(action.amount) || action.amount <= 0) return p;
+      let level = p.heroLevels[action.id];
+      let xp = Math.min(1_000_000_000, p.heroXp[action.id] + action.amount);
+      while (level < MAX_HERO_LEVEL && xp >= heroXpRequirement(level)) {
+        xp -= heroXpRequirement(level);
+        level++;
+      }
+      return { ...p, heroLevels: { ...p.heroLevels, [action.id]: level },
+        heroXp: { ...p.heroXp, [action.id]: level >= MAX_HERO_LEVEL ? 0 : xp } };
     }
     case 'upgradeWeapon': {
       if (!p.unlockedWeapons.includes(action.id) ||

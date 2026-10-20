@@ -58,12 +58,14 @@ describe('phase 5 progression and persistence', () => {
     let p = defaultProfile();
     const blocked = applyProfileAction(p, { type: 'upgradeWeapon', id: 'daggers' });
     expect(blocked.weaponLevels.daggers).toBe(1);
-    p = applyProfileAction(p, { type: 'upgradeHero', id: 'guardian' });
+    expect(applyProfileAction(p, { type: 'upgradeHero', id: 'guardian' })).toEqual(p);
+    p = applyProfileAction(p, { type: 'collectHeroXp', id: 'guardian', amount: 30 });
     expect(p.heroLevels.guardian).toBe(2);
-    expect(p.gold).toBe(150 - heroUpgradeCost(1));
+    expect(p.heroXp.guardian).toBe(0);
+    expect(p.gold).toBe(150);
     p = applyProfileAction(p, { type: 'upgradeWeapon', id: 'sunblade' });
     expect(p.weaponLevels.sunblade).toBe(2);
-    expect(p.gold).toBe(150 - heroUpgradeCost(1) - weaponUpgradeCost(1));
+    expect(p.gold).toBe(150 - weaponUpgradeCost(1));
   });
   it('restores safe defaults for bad saves and discards unknown unlocks', () => {
     expect(validateProfile(null)).toEqual(defaultProfile());

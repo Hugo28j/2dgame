@@ -23,6 +23,10 @@ import {
 } from '../enemies/Slime';
 import { Player } from '../entities/Player';
 import { CoinPickup } from '../entities/CoinPickup';
+import { XpPickup } from '../entities/XpPickup';
+import { xpDropsForEnemy } from '../progression/heroXp';
+import { heroXpRequirement } from '../progression/ProgressStore';
+import { MAX_HERO_LEVEL } from '../heroes/heroConfig';
 import { Projectile } from '../entities/Projectile';
 import { InputController } from '../input/InputController';
 import {
@@ -58,6 +62,8 @@ export class GameScene extends Phaser.Scene {
   private abilities?: AbilityController;
   private goldHudText?: Phaser.GameObjects.Text;
   private readonly coins = new Set<CoinPickup>();
+  private readonly xpCrystals = new Set<XpPickup>();
+  private xpHudText?: Phaser.GameObjects.Text;
   private projectiles?: Phaser.Physics.Arcade.Group;
   private enemies?: Phaser.Physics.Arcade.Group;
   private enemyProjectiles?: Phaser.Physics.Arcade.Group;
@@ -189,6 +195,7 @@ export class GameScene extends Phaser.Scene {
     this.player.move(this.controls.getMovement());
     this.drawFrostStatus();
     this.collectNearbyCoins(delta);
+    this.collectNearbyXp(delta);
     // All room enemies are spawned up front, leaving no reinforcement indices.
     this.updateEnemyWaves();
     this.updateCamera();
@@ -310,6 +317,10 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(10).setScrollFactor(0);
 
+    this.xpHudText = this.add.text(195, 715, '', {
+      color: '#67e8f9', fontFamily: 'system-ui, sans-serif', fontSize: '11px', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(10).setScrollFactor(0);
+    this.updateXpHud();
     this.goldHudText = this.add.text(107, 692, '', {
       color: '#fbbf24', fontFamily: 'system-ui, sans-serif',
       fontSize: '12px', fontStyle: 'bold',
@@ -1374,6 +1385,7 @@ export class GameScene extends Phaser.Scene {
     const kind = enemy instanceof AdvancedEnemy ? enemy.kind : 'slime';
     if (this.gameOver || !this.run.defeatEnemy(enemy.enemyId, kind)) return;
     this.spawnCoins(enemy.x, enemy.y, kind);
+    this.spawnXp(enemy.x, enemy.y, kind);
     if (this.worldId === 1 && this.roomProgress.roomNumber === 15 &&
         enemy instanceof AdvancedEnemy && enemy.isBoss && enemy.bossSlot === 0) {
       this.startWorldOneBossSplit(enemy);
@@ -1420,6 +1432,55 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private spawnXp(x: number, y: number, kind: Parameters<typeof xpDropsForEnemy>[0]): void {
+    const bounds = this.currentRoom?.layout.bounds;
+    if (!bounds) return;
+    const drops = xpDropsForEnemy(kind, this.worldId, this.roomProgress.roomNumber);
+    drops.forEach((value, i) => {
+      const angle = Math.PI * 2 * i / drops.length;
+      const dx = drops.length === 1 ? 20 : 36 * Math.cos(angle);
+      const dy = drops.length === 1 ? -20 : 36 * Math.sin(angle);
+      this.xpCrystals.add(new XpPickup(this,
+        Phaser.Math.Clamp(x + dx, bounds.x + 12, bounds.x + bounds.width - 12),
+        Phaser.Math.Clamp(y + dy, bounds.y + 12, bounds.y + bounds.height - 12), value));
+    });
+  }
+
+  private collectNearbyXp(deltaMs: number): void {
+    if (!this.player) return;
+    for (const crystal of this.xpCrystals) {
+      if (!crystal.tick(this.player, deltaMs)) continue;
+      const heroId = this.player.heroId;
+      const previous = progressStore.current.heroLevels[heroId];
+      if (progressStore.dispatch({ type: 'collectHeroXp', id: heroId, amount: crystal.value })) {
+        const current = progressStore.current.heroLevels[heroId];
+        if (current > previous) {
+          this.player.applyHeroLevel(previous, current);
+          this.abilities?.setHeroLevel(current);
+          this.drawPlayerHealth();
+          const notice = this.add.text(this.player.x, this.player.y - 55,
+            'LEVEL ' + current + '!  ' + (current >= 10 && previous < 10 || current >= 20 && previous < 20 ? 'ABILITY UNLOCKED!' : ''), {
+              color: '#67e8f9', fontFamily: 'system-ui, sans-serif', fontSize: '17px',
+              fontStyle: 'bold', stroke: '#020617', strokeThickness: 4,
+            }).setOrigin(0.5).setDepth(100);
+          this.tweens.add({ targets: notice, y: notice.y - 55, alpha: 0,
+            duration: 1100, onComplete: () => notice.destroy() });
+        }
+      }
+      crystal.destroy();
+      this.xpCrystals.delete(crystal);
+    }
+    this.updateXpHud();
+  }
+
+  private updateXpHud(): void {
+    const profile = progressStore.current;
+    const id = profile.selectedHero;
+    const level = profile.heroLevels[id];
+    this.xpHudText?.setText(level >= MAX_HERO_LEVEL ? 'HERO LV.20 · MAX' :
+      'HERO LV.' + level + '  ·  XP ' + profile.heroXp[id] + '/' + heroXpRequirement(level));
+  }
+
   private collectNearbyCoins(deltaMs: number): void {
     if (!this.player || this.coins.size === 0) return;
     let collected = 0;
@@ -1450,6 +1511,8 @@ export class GameScene extends Phaser.Scene {
   private clearCoins(): void {
     for (const coin of this.coins) coin.destroy();
     this.coins.clear();
+    for (const crystal of this.xpCrystals) crystal.destroy();
+    this.xpCrystals.clear();
     this.updateGoldHud();
   }
 
