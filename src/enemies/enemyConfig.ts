@@ -72,7 +72,12 @@ export const ENEMY_UNLOCK_ROOMS = {
 export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number,
   worldId: WorldId = 1): EnemyKind => {
   const room = Math.max(1, Math.floor(roomNumber));
-  if (room % 5 === 0) return worldId === 2 && room === 30 && spawnIndex === 1 ? 'charger' : 'boss';
+  if (room % 5 === 0) {
+    if (worldId === 2 && room === 15 && spawnIndex === 2) return 'tank';
+    if (worldId === 2 && room === 20 && spawnIndex === 1) return 'bomber';
+    if (worldId === 2 && room === 30 && spawnIndex === 1) return 'charger';
+    return 'boss';
+  }
   const index = Math.max(0, Math.floor(spawnIndex));
   if (worldId === FROZEN_EARLY.world && room <= FROZEN_EARLY.lastRoom) {
     return earlyFrozenEnemy(room, index);
