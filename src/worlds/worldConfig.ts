@@ -1,4 +1,4 @@
-/** Five self-contained, 50-room campaigns. Completing room 50 unlocks the next. */
+/** Five self-contained, 30-room campaigns. Clearing room 30 unlocks the next. */
 export const WORLD_COUNT = 5;
 export type WorldId = 1 | 2 | 3 | 4 | 5;
 
@@ -81,7 +81,9 @@ export function isWorldUnlocked(id: WorldId, completedWorlds: number): boolean {
   return id <= Math.max(0, Math.min(WORLD_COUNT, completedWorlds)) + 1;
 }
 
-export function getWorldBossName(id: WorldId, roomNumber: number): string {
-  const tier = Math.max(1, Math.min(10, Math.floor(roomNumber / 5)));
-  return getWorld(id).bossNames[tier - 1]!;
+export function getWorldBossName(id: WorldId, roomNumber: number, bossSlot = 0): string {
+  const tier = Math.max(1, Math.min(6, Math.floor(roomNumber / 5)));
+  const rosterIndices = [[0], [2], [4, 3], [6], [7], [9]] as const;
+  const index = rosterIndices[tier - 1]?.[bossSlot] ?? rosterIndices[tier - 1]![0];
+  return getWorld(id).bossNames[index]!;
 }
