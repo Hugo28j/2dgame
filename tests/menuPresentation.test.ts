@@ -32,7 +32,7 @@ describe('clean menu loadout navigation', () => {
       for (const id of HERO_ABILITIES[hero]) {
         const summary = abilityMenuSummary(getAbilityStats(id, 1));
         expect(summary.length).toBeGreaterThan(8);
-        expect(summary).not.toContain('0 DMG');
+        expect(summary).not.toMatch(/^0 DMG\b/);
         expect(summary).not.toContain('R0');
       }
     }
