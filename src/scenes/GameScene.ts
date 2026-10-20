@@ -24,6 +24,8 @@ import {
 import { Player } from '../entities/Player';
 import { CoinPickup } from '../entities/CoinPickup';
 import { XpPickup } from '../entities/XpPickup';
+import { ArmorPickup } from '../entities/ArmorPickup';
+import { rollEnemyArmor, armorDefinition, RARITY_CONFIG } from '../progression/armor';
 import { xpDropsForEnemy } from '../progression/heroXp';
 import { heroXpRequirement } from '../progression/ProgressStore';
 import { MAX_HERO_LEVEL } from '../heroes/heroConfig';
@@ -63,6 +65,7 @@ export class GameScene extends Phaser.Scene {
   private goldHudText?: Phaser.GameObjects.Text;
   private readonly coins = new Set<CoinPickup>();
   private readonly xpCrystals = new Set<XpPickup>();
+  private readonly armorDrops = new Set<ArmorPickup>();
   private xpHudText?: Phaser.GameObjects.Text;
   private levelUpGlow?: Phaser.GameObjects.Container;
   private levelUpGlowEndAt = 0;
@@ -200,6 +203,7 @@ export class GameScene extends Phaser.Scene {
     this.drawFrostStatus();
     this.collectNearbyCoins(delta);
     this.collectNearbyXp(delta);
+    this.collectNearbyArmor(delta);
     // All room enemies are spawned up front, leaving no reinforcement indices.
     this.updateEnemyWaves();
     this.updateCamera();
@@ -739,6 +743,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.fadeOut(180, 2, 6, 23);
     this.time.delayedCall(190, () => {
       this.loadRoom(getRoomDefinition(nextRoomNumber, this.worldId), true);
+      progressStore.dispatch({ type: 'reachRoom', worldId: this.worldId, room: nextRoomNumber });
       this.cameras.main.fadeIn(180, 2, 6, 23);
       this.transitioning = false;
     });
@@ -1390,6 +1395,7 @@ export class GameScene extends Phaser.Scene {
     if (this.gameOver || !this.run.defeatEnemy(enemy.enemyId, kind)) return;
     this.spawnCoins(enemy.x, enemy.y, kind);
     this.spawnXp(enemy.x, enemy.y, kind);
+    this.spawnArmor(enemy, kind);
     if (this.worldId === 1 && this.roomProgress.roomNumber === 15 &&
         enemy instanceof AdvancedEnemy && enemy.isBoss && enemy.bossSlot === 0) {
       this.startWorldOneBossSplit(enemy);
@@ -1448,6 +1454,40 @@ export class GameScene extends Phaser.Scene {
         Phaser.Math.Clamp(x + dx, bounds.x + 12, bounds.x + bounds.width - 12),
         Phaser.Math.Clamp(y + dy, bounds.y + 12, bounds.y + bounds.height - 12), value));
     });
+  }
+
+  private spawnArmor(enemy: Slime, kind: Parameters<typeof rollEnemyArmor>[0] | string): void {
+    if (!this.player || !this.currentRoom) return;
+    const item = rollEnemyArmor(kind === 'boss' ? 'boss' : 'normal',
+      Math.random(), Math.random(), Math.random(), this.run.runId, enemy.enemyId,
+      this.player.heroId);
+    if (!item) return;
+    const bounds = this.currentRoom.layout.bounds;
+    this.armorDrops.add(new ArmorPickup(this,
+      Phaser.Math.Clamp(enemy.x, bounds.x + 25, bounds.x + bounds.width - 25),
+      Phaser.Math.Clamp(enemy.y, bounds.y + 25, bounds.y + bounds.height - 25), item));
+  }
+
+  private collectNearbyArmor(deltaMs: number): void {
+    if (!this.player) return;
+    for (const drop of this.armorDrops) {
+      if (!drop.tick(this.player, deltaMs)) continue;
+      const item = drop.item;
+      const collected = progressStore.dispatch({ type: 'collectArmor', item });
+      if (collected) {
+        const name = armorDefinition(item).slot.toUpperCase();
+        const text = this.add.text(this.player.x, this.player.y - 48,
+          name + ' · ' + RARITY_CONFIG[item.rarity].label.toUpperCase(), {
+            color: '#' + RARITY_CONFIG[item.rarity].color.toString(16).padStart(6, '0'),
+            fontFamily: 'system-ui, sans-serif', fontSize: '13px', fontStyle: 'bold',
+            stroke: '#020617', strokeThickness: 4,
+          }).setOrigin(.5).setDepth(80);
+        this.tweens.add({ targets: text, y: text.y - 38, alpha: 0,
+          duration: 1100, onComplete: () => text.destroy() });
+      }
+      drop.destroy();
+      this.armorDrops.delete(drop);
+    }
   }
 
   private collectNearbyXp(deltaMs: number): void {
@@ -1560,6 +1600,8 @@ export class GameScene extends Phaser.Scene {
     this.coins.clear();
     for (const crystal of this.xpCrystals) crystal.destroy();
     this.xpCrystals.clear();
+    for (const drop of this.armorDrops) drop.destroy();
+    this.armorDrops.clear();
     this.updateGoldHud();
   }
 
