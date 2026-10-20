@@ -1328,6 +1328,32 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private startWorldOneBossSplit(enemy: AdvancedEnemy): void {
+    if (!this.currentRoom || !this.enemySpawner || !this.player) return;
+    // Reserve the two additional kills before counting the first boss's death.
+    this.roomProgress.addEnemies(2);
+    this.player.heal(this.player.maxHp * 0.5);
+    this.drawPlayerHealth();
+    this.enemyProjectiles?.clear(true, true);
+    this.clearBossBombs();
+    const bounds = this.currentRoom.layout.bounds;
+    const x = Phaser.Math.Clamp(enemy.x, bounds.x + 125, bounds.x + bounds.width - 125);
+    const y = Phaser.Math.Clamp(enemy.y, bounds.y + 90, bounds.y + bounds.height - 90);
+    const points = [{ x: x - 90, y }, { x: x + 90, y }];
+    const flash = this.add.circle(x, y, 34, 0xa78bfa, 0.5)
+      .setStrokeStyle(5, 0xf5d0fe).setDepth(32);
+    this.tweens.add({ targets: flash, scaleX: 4, scaleY: 4, alpha: 0,
+      duration: 450, ease: 'Cubic.easeOut', onComplete: () => flash.destroy() });
+    this.time.delayedCall(420, () => {
+      if (!this.currentRoom || this.currentRoom.number !== 15 ||
+          this.gameOver || this.transitioning) return;
+      const twins = this.enemySpawner?.spawnSplitBosses(points, 15) ?? [];
+      this.activeBosses = twins;
+      this.updateBossHud();
+      this.updateEnemyCount();
+    });
+  }
+
   private spawnSplitSnowPuffs(enemy: AdvancedEnemy): void {
     if (!this.currentRoom || !this.enemySpawner || this.roomProgress.doorOpen) return;
     const bounds = this.currentRoom.layout.bounds;
@@ -1348,6 +1374,10 @@ export class GameScene extends Phaser.Scene {
     const kind = enemy instanceof AdvancedEnemy ? enemy.kind : 'slime';
     if (this.gameOver || !this.run.defeatEnemy(enemy.enemyId, kind)) return;
     this.spawnCoins(enemy.x, enemy.y, kind);
+    if (this.worldId === 1 && this.roomProgress.roomNumber === 15 &&
+        enemy instanceof AdvancedEnemy && enemy.isBoss && enemy.bossSlot === 0) {
+      this.startWorldOneBossSplit(enemy);
+    }
     if (this.worldId === 2 && enemy instanceof AdvancedEnemy && enemy.kind === 'tank') {
       this.spawnSplitSnowPuffs(enemy);
     }
