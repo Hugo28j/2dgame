@@ -1150,21 +1150,54 @@ export class GameScene extends Phaser.Scene {
     this.damagePlayer(enemy.contactAttack);
   };
 
+  /** The Frost Witch's orb bursts both on the hero and arena obstacles.
+   * AoE collision is resolved once and immobilizes only a vulnerable hero.
+   */
+  private explodeFrostBolt(x: number, y: number, attack: Readonly<Projectile['attack']>): void {
+    const radius = FROZEN_EARLY.witchOrbRadius;
+    const blast = this.add.circle(x, y, radius, 0x67e8f9, 0.28)
+      .setStrokeStyle(5, 0xe0f2fe, 0.98).setDepth(30);
+    const crystal = this.add.circle(x, y, radius * 0.42, 0xcffafe, 0.42)
+      .setStrokeStyle(2, 0xffffff, 0.9).setDepth(31);
+    this.tweens.add({ targets: [blast, crystal], alpha: 0, scale: 1.2, duration: 300,
+      onComplete: () => { blast.destroy(); crystal.destroy(); } });
+    if (!this.player || this.gameOver || this.transitioning ||
+      !withinRadius(x, y, this.player.x, this.player.y, radius)) return;
+    const vulnerable = this.player.canReceiveContactDamage(this.time.now);
+    this.damagePlayer(attack);
+    if (vulnerable && !this.gameOver) this.player.freeze(this.time.now);
+  }
+
   private readonly handleEnemyBulletHit = (
     playerObject: ArcadeCollisionObject,
     bulletObject: ArcadeCollisionObject,
   ): void => {
-    if (!(playerObject instanceof Player) || !(bulletObject instanceof EnemyProjectile)) return;
-    // Destroy on first overlap, even during i-frames: no late/double contact.
+    if (!(playerObject instanceof Player) || !(bulletObject instanceof EnemyProjectile) ||
+        !bulletObject.active) return;
+    // Consume once on overlap (including i-frames), even for AoE ice impacts.
     const attack = bulletObject.attack;
+    const effect = bulletObject.effect;
+    const x = bulletObject.x, y = bulletObject.y;
     bulletObject.destroy();
-    this.damagePlayer(attack);
+    if (effect === 'frost-burst') {
+      this.explodeFrostBolt(x, y, attack);
+    } else {
+      const susceptible = playerObject.canReceiveContactDamage(this.time.now);
+      this.damagePlayer(attack);
+      if (effect === 'frost-chill' && susceptible && !this.gameOver)
+        playerObject.chill(this.time.now);
+    }
   };
 
   private readonly handleEnemyBulletObstacle = (
     projectileObject: ArcadeCollisionObject,
   ): void => {
-    if (projectileObject instanceof EnemyProjectile) projectileObject.destroy();
+    if (!(projectileObject instanceof EnemyProjectile) || !projectileObject.active) return;
+    const effect = projectileObject.effect;
+    const x = projectileObject.x, y = projectileObject.y;
+    const attack = projectileObject.attack;
+    projectileObject.destroy();
+    if (effect === 'frost-burst') this.explodeFrostBolt(x, y, attack);
   };
 
   private readonly handleProjectileObstacle = (
