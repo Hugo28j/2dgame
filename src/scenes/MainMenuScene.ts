@@ -149,7 +149,7 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   private drawWorlds(): void {
-    this.section('KIES JE WERELD', 'Voltooi kamer 50 om de volgende wereld te openen');
+    this.section('KIES JE WERELD', 'Voltooi kamer 30 om de volgende wereld te openen');
     const profile = progressStore.current;
     WORLDS.forEach(world => {
       const y = 346 + (world.id - 1) * 75;
