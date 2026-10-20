@@ -30,13 +30,13 @@ describe('30-room campaign and two distinct room-15 bosses', () => {
   });
 });
 describe('Spore Alchemist poison pools', () => {
-  it('last five seconds, cover only their visible circular area and obey damage intervals', () => {
-    expect(SPORE_POISON.durationMs).toBe(5000);
+  it('last 1.5 seconds, cover only their visible circular area and obey damage intervals', () => {
+    expect(SPORE_POISON.durationMs).toBe(1500);
     expect(SPORE_POISON.bottleFlightMs).toBeGreaterThan(300);
     expect(poisonActive(999, 1000)).toBe(false);
     expect(poisonActive(1000, 1000)).toBe(true);
-    expect(poisonActive(5999, 1000)).toBe(true);
-    expect(poisonActive(6000, 1000)).toBe(false);
+    expect(poisonActive(2499, 1000)).toBe(true);
+    expect(poisonActive(2500, 1000)).toBe(false);
     expect(poisonCovers(20, 20, 60, 80, 20)).toBe(true);
     expect(poisonCovers(20, 20, 60, 81, 20)).toBe(false);
     expect(poisonTickDue(100, 200)).toBe(false);

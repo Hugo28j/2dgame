@@ -101,8 +101,9 @@ describe('six boss arenas and seven original archetypes', () => {
     const rooms = [5, 10, 15, 20, 25, 30];
     const stats = rooms.map(room => getEnemyStatsForRoom('boss', room));
     for (let i = 1; i < stats.length; i++) {
-      // Bramble Gunner on room 15 is deliberately easier than the normal HP curve.
-      if (rooms[i] !== 15) expect(stats[i]!.maxHp).toBeGreaterThan(stats[i - 1]!.maxHp);
+      // Bramble Gunner has reduced HP; buffed Spore Alchemist can exceed the following Jade Matriarch.
+      if (rooms[i] !== 15 && rooms[i] !== 25)
+        expect(stats[i]!.maxHp).toBeGreaterThan(stats[i - 1]!.maxHp);
       expect(stats[i]!.damage).toBeGreaterThan(stats[i - 1]!.damage);
     }
     // Bloom Sentinel, the other room-15 boss, still follows regular scaling.
