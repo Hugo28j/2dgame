@@ -44,7 +44,9 @@ describe('hero-bound loadouts', () => {
 
   it('remembers one selected weapon for each hero', () => {
     let profile = applyProfileAction(defaultProfile(), { type: 'awardGold', amount: 1000 });
-    profile = applyProfileAction(profile, { type: 'unlockWeapon', id: 'warhammer' });
+    profile = validateProfile({ ...profile,
+      heroLevels: { ...profile.heroLevels, guardian: 10 } });
+    profile = applyProfileAction(profile, { type: 'selectWeapon', id: 'warhammer' });
     profile = applyProfileAction(profile, { type: 'unlockHero', id: 'mage' });
     profile = applyProfileAction(profile, { type: 'selectHero', id: 'guardian' });
     expect(profile.selectedWeapon).toBe('warhammer');
