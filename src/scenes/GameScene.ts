@@ -133,7 +133,7 @@ export class GameScene extends Phaser.Scene {
 
     const firstRoom = getRoomDefinition(1, this.worldId);
     const profile = progressStore.current;
-    const gear = armorBonuses(profile.armorInventory, profile.equippedArmor);
+    const gear = armorBonuses(profile.armorInventory, profile.equippedArmor[profile.selectedHero], profile.selectedHero);
     this.player = new Player(
       this,
       firstRoom.layout.playerSpawn.x,
@@ -1755,7 +1755,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.pause();
     this.pendingSpawnIndices = [];
     const report = this.run.report(victory);
-    progressStore.dispatch({ type: 'settleRun', report });
+    progressStore.dispatch({ type: 'settleRun', report, heroId: this.player?.heroId });
     this.scene.launch(GAME_OVER_SCENE_KEY, {
       report, chosenUpgrades: this.upgrades.chosen(),
     });
