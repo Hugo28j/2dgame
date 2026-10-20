@@ -1,8 +1,9 @@
 import type { EnemyKind } from '../enemies/enemyConfig';
+import type { WorldId } from '../worlds/worldConfig';
 
 /** Coins dropped per defeated enemy. No automatic gold from kills or rooms.
  * Deliberately far below the previous +5/+9/+90 per kill plus room bonuses.
- * Even the strongest enemy gives only 25 gold if all its coins are collected.
+ * Base values are scaled by world (exponentially) and by dungeon depth.
  */
 export const COIN_VALUES: Readonly<Record<EnemyKind, number>> = Object.freeze({
   slime: 2,
@@ -14,9 +15,14 @@ export const COIN_VALUES: Readonly<Record<EnemyKind, number>> = Object.freeze({
   boss: 25,
 });
 
-export function coinDropsForEnemy(kind: EnemyKind): readonly number[] {
-  if (kind === 'boss') return [5, 5, 5, 5, 5];
-  return [COIN_VALUES[kind]];
+/** World multiplier doubles each world; +2% per room within that world.
+ * World 1 room 1 retains existing drop values, preserving early balance.
+ */
+export function coinDropsForEnemy(kind: EnemyKind, worldId: WorldId = 1,
+  roomNumber = 1): readonly number[] {
+  const scale = Math.pow(2, worldId - 1) * (1 + 0.02 * Math.max(0, roomNumber - 1));
+  if (kind === 'boss') return Array(5).fill(Math.max(1, Math.round(5 * scale)));
+  return [Math.max(1, Math.round(COIN_VALUES[kind] * scale))];
 }
 
 export const COIN_MAGNET_RADIUS = 180;
