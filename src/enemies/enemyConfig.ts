@@ -52,7 +52,9 @@ export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number,
       // Only Bramble Gunner (first boss, world 1 room 15); Bloom Sentinel
       // in the same room and other world's gunner retain full HP.
       (kind === 'boss' && worldId === 1 && number === 15 && bossSlot === 0
-        ? BRAMBLE_GUNNER_HP_MULTIPLIER : 1)),
+        ? BRAMBLE_GUNNER_HP_MULTIPLIER : 1) *
+      (kind === 'boss' && worldId === 1 && number === 20 ? 1.5 :
+        kind === 'boss' && worldId === 1 && number === 30 ? 2 : 1)),
     damage: Math.round(base.damage * (worldId === 2 && kind === 'archer' ? 2 : 1) *
       (1 + completed * SLIME_DIFFICULTY.damagePerRoom) *
       (kind === 'boss' ? 1 + (getBossTier(number) - 1) * 0.05 : 1) * world.damageMultiplier),
