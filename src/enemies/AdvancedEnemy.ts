@@ -24,6 +24,8 @@ export class AdvancedEnemy extends Slime {
   public readonly stats: Readonly<SlimeRuntimeStats>;
   private nextShotAt = 0;
   public fasterTwin = false;
+  /** Index of the two split Void Sentinels (0 spins clockwise, 1 counterclockwise). */
+  public splitTwinIndex: 0 | 1 = 0;
   private bossVolleys = 0;
   private readonly roomNumber: number;
   private readonly worldId: WorldId;
