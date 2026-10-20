@@ -9,10 +9,9 @@ describe('30-room campaign and two distinct room-15 bosses', () => {
   it('has exactly seven themed bosses in six fights, and room 30 is the finale', () => {
     expect(CHAPTER_ROOM_COUNT).toBe(30);
     expect(Object.keys(BOSS_ENCOUNTER_ARCHETYPES)).toEqual(['5', '10', '15', '20', '25', '30']);
-    expect(getRoomDefinition(15).enemyCount).toBe(2);
-    expect(getRoomDefinition(15).enemySpawns).toHaveLength(2);
-    const [a, b] = getRoomDefinition(15).enemySpawns;
-    expect(Math.hypot(a!.x - b!.x, a!.y - b!.y)).toBeGreaterThan(120);
+    expect(getRoomDefinition(15).enemyCount).toBe(1);
+    expect(getRoomDefinition(15).enemySpawns).toHaveLength(1);
+    expect(getRoomDefinition(15, 2).enemySpawns).toHaveLength(3);
     expect(getWorldBossName(1, 15)).toBe('Bramble Gunner');
     expect(getWorldBossName(1, 15, 1)).toBe('Bloom Sentinel');
     expect(getWorldBossName(1, 30)).toBe('Heart of the Grove');
