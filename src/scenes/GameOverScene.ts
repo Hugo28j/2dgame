@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME_OVER_SCENE_KEY, GAME_SCENE_KEY, GAME_WIDTH, MENU_SCENE_KEY } from '../config/constants';
 import type { RunReport } from '../progression/RunLedger';
 import { progressStore } from '../progression/ProgressStore';
+import { armorDefinition, RARITY_CONFIG } from '../progression/armor';
 import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
 import { getWorld } from '../worlds/worldConfig';
 
@@ -78,6 +79,14 @@ export class GameOverScene extends Phaser.Scene {
         fontFamily, fontSize: '15px', fontStyle: 'bold', color: '#86efac',
       }).setOrigin(0.5);
     }
+    const armorDrop = profile.lastArmorDrop?.runId === report.runId
+      ? profile.lastArmorDrop.item : null;
+    this.add.text(195, 566, armorDrop
+      ? '✦ ARMOR: ' + RARITY_CONFIG[armorDrop.rarity].label.toUpperCase() + ' ' +
+        armorDefinition(armorDrop).name : 'Geen armor drop deze run',
+      { fontFamily, fontSize: '12px', fontStyle: 'bold',
+        color: armorDrop ? '#' + RARITY_CONFIG[armorDrop.rarity].color.toString(16).padStart(6, '0') : '#94a3b8' }
+    ).setOrigin(0.5);
     const upgrades = data.chosenUpgrades;
     this.add.text(43, 503, 'TIJDELIJKE UPGRADES', {
       fontFamily, fontSize: '13px', fontStyle: 'bold', color: '#7dd3fc',
