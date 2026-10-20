@@ -59,7 +59,12 @@ describe('five unique playable worlds', () => {
       for (let world = 2; world <= WORLD_COUNT; world++) {
         const oldStats = getEnemyStatsForRoom(kind, 24, (world - 1) as 1 | 2 | 3 | 4 | 5);
         const newStats = getEnemyStatsForRoom(kind, 24, world as 1 | 2 | 3 | 4 | 5);
-        expect(newStats.maxHp).toBeGreaterThan(oldStats.maxHp);
+        if (kind === 'mage' && world === 3) {
+          // Frozen Hollow witches have a deliberate x3 HP bonus.
+          expect(getEnemyStatsForRoom('mage', 24, 2).maxHp).toBeGreaterThan(newStats.maxHp);
+        } else {
+          expect(newStats.maxHp).toBeGreaterThan(oldStats.maxHp);
+        }
         expect(newStats.damage).toBeGreaterThan(oldStats.damage);
         if (kind === 'slime' && world === 2) {
           // World 1 Mosslings intentionally get +25% speed; Frozen Hollow
