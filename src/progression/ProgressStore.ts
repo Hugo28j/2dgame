@@ -138,7 +138,7 @@ export function validateProfile(raw: unknown): Profile {
   const lastArmorDrop = rawDrop && typeof rawDrop.runId === 'string' &&
     rawDrop.runId.length <= 100
     ? { runId: rawDrop.runId, items: (Array.isArray((rawDrop as { items?: unknown }).items)
-      ? (rawDrop as { items: unknown[] }).items : rawDrop.item ? [rawDrop.item] : [])
+      ? (rawDrop as { items: unknown[] }).items : (rawDrop as unknown as { item?: unknown }).item ? [(rawDrop as unknown as { item?: unknown }).item] : [])
       .filter(validArmorItem).slice(0, 2) }
     : null;
   const selectedHero = heroes.includes(input.selectedHero as HeroId) ? input.selectedHero as HeroId : fallbackHero;
