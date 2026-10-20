@@ -13,23 +13,21 @@ describe('hero ability progression', () => {
     expect(new Set(assigned)).toEqual(new Set(ABILITY_IDS));
   });
 
-  it('blocks slot two before hero level 10 and slot three before level 20', () => {
+  it('unlocks ability slots at levels 5, 20 and 30', () => {
     const base = { ...defaultProfile(), gold: 10000 };
-    const [, second, third] = HERO_ABILITIES.guardian;
-    expect(applyProfileAction(base, { type: 'upgradeAbility', id: second })).toEqual(base);
-    expect(applyProfileAction(base, { type: 'upgradeAbility', id: third })).toEqual(base);
-
-    const level10 = validateProfile({ ...base,
-      heroLevels: { ...base.heroLevels, guardian: 10 } });
-    const upgradedSecond = applyProfileAction(level10, { type: 'upgradeAbility', id: second });
-    expect(upgradedSecond.abilityLevels[second]).toBe(2);
-    expect(upgradedSecond.gold).toBe(level10.gold - abilityUpgradeCost(1));
-    expect(applyProfileAction(level10, { type: 'upgradeAbility', id: third })).toEqual(level10);
-
-    const level20 = validateProfile({ ...base,
-      heroLevels: { ...base.heroLevels, guardian: 20 } });
-    expect(applyProfileAction(level20, { type: 'upgradeAbility', id: third })
-      .abilityLevels[third]).toBe(2);
+    const [first, second, third] = HERO_ABILITIES.guardian;
+    for (const id of [first, second, third])
+      expect(applyProfileAction(base, { type: 'upgradeAbility', id })).toEqual(base);
+    for (const [level, active, locked] of [
+      [5, first, second], [20, second, third], [30, third, undefined],
+    ] as const) {
+      const profile = validateProfile({ ...base,
+        heroLevels: { ...base.heroLevels, guardian: level } });
+      const upgraded = applyProfileAction(profile, { type: 'upgradeAbility', id: active });
+      expect(upgraded.abilityLevels[active]).toBe(2);
+      expect(upgraded.gold).toBe(profile.gold - abilityUpgradeCost(1));
+      if (locked) expect(applyProfileAction(profile, { type: 'upgradeAbility', id: locked })).toEqual(profile);
+    }
   });
 
   it('improves power and cooldown while respecting the maximum level', () => {
