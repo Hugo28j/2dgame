@@ -122,7 +122,7 @@ describe('world unlocking and persistent selection', () => {
       worldBestRooms: undefined, completedWorlds: undefined, totalGoldEarned: undefined };
     const saved = validateProfile(original);
     expect(saved.gold).toBe(945);
-    expect(saved.selectedHero).toBe('ranger'); // Locked heroes are still validated.
+    expect(saved.selectedHero).toBe('guardian'); // Locked heroes are still validated.
     expect(saved.highestRoom).toBe(33);
     expect(saved.worldBestRooms).toEqual([33, 1, 1, 1, 1]);
     expect(saved.selectedWorld).toBe(1);

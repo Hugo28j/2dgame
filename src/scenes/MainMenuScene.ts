@@ -14,7 +14,8 @@ import {
   MAX_PERMANENT_LEVEL, PERMANENT_UPGRADE_IDS, PERMANENT_UPGRADES, permanentUpgradeCost,
 } from '../progression/economy';
 import {
-  WEAPON_IDS, WEAPONS, getWeaponStats, weaponUpgradeCost, MAX_WEAPON_LEVEL,
+  HERO_WEAPONS, WEAPON_IDS, WEAPONS, getWeaponStats,
+  weaponUpgradeCost, MAX_WEAPON_LEVEL,
 } from '../weapons/weaponConfig';
 
 type MenuTab = 'worlds' | 'heroes' | 'weapons' | 'upgrades' | 'settings';
@@ -98,7 +99,8 @@ export class MainMenuScene extends Phaser.Scene {
     this.plate(195, 148, 354, 66, 0x14243a, 0x39506b, 13);
     this.add.circle(52, 148, 17, HEROES[profile.selectedHero].color);
     this.text(81, 136, 'ACTIEVE HELD', 9, COLOR.faint);
-    this.text(81, 151, HEROES[profile.selectedHero].name.toUpperCase(), 15, COLOR.white, false, true);
+    this.text(81, 148, HEROES[profile.selectedHero].name.toUpperCase(), 14, COLOR.white, false, true);
+    this.text(81, 164, WEAPONS[profile.selectedWeapon].name, 9, '#7dd3fc');
     this.add.rectangle(234, 148, 1, 36, 0x415772, 0.85);
     this.text(260, 135, 'GOUD', 10, COLOR.faint);
     this.text(260, 151, profile.gold.toLocaleString('nl-BE') + '  G', 17, '#fde68a', false, true);
@@ -162,7 +164,7 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   private drawHeroes(): void {
-    this.section('KIES JE HELD', '4 nieuwe helden uit de ontgrendelbare werelden');
+    this.section('KIES JE HELD', 'Elke held heeft een eigen, exclusieve wapenset');
     const profile = progressStore.current;
     const pageSize = 4;
     const pages = Math.ceil(HERO_IDS.length / pageSize);
@@ -203,26 +205,32 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   private drawWeapons(): void {
-    this.section('BEWAPENING', 'Ontgrendel en selecteer je favoriete wapen');
+    const hero = HEROES[progressStore.current.selectedHero];
+    this.section(hero.name.toUpperCase() + ' · WAPENS', 'Wapens zijn exclusief voor deze held');
     const profile = progressStore.current;
-    WEAPON_IDS.forEach((id, index) => {
+    HERO_WEAPONS[profile.selectedHero].forEach((id, index) => {
       const weapon = WEAPONS[id];
-      const y = 313 + index * 76;
+      const y = 345 + index * 126;
       const unlocked = profile.unlockedWeapons.includes(id);
       const selected = profile.selectedWeapon === id;
-      this.plate(195, y, 330, 70, selected ? 0x173447 : COLOR.card,
+      this.plate(195, y, 330, 112, selected ? 0x173447 : COLOR.card,
         selected ? COLOR.accent : COLOR.border, 10);
-      this.text(43, y - 24, weapon.name.toUpperCase(), 13, COLOR.white, false, true);
-      this.text(43, y - 5, weapon.description, 10, COLOR.secondary);
+      this.add.circle(63, y - 28, 21, weapon.color, 0.22).setStrokeStyle(2, weapon.color);
+      this.text(63, y - 31, weapon.attackMode === 'melee' ? '⚔' : '➶', 18, COLOR.white, true, true);
+      this.text(94, y - 42, weapon.name.toUpperCase(), 13, COLOR.white, false, true);
+      this.text(94, y - 21, weapon.description, 10, COLOR.secondary);
       const stats = getWeaponStats(id, profile.weaponLevels[id]);
-      this.text(43, y + 16, 'LV.' + profile.weaponLevels[id] + '  ·  ' +
-        stats.damage + ' DMG  ·  ' + stats.fireRate + '/S', 10, '#fcd34d');
+      this.text(43, y + 12, 'LV.' + profile.weaponLevels[id] + '  ·  ' +
+        stats.damage + ' DMG  ·  ' + stats.fireRate + '/S  ·  ' +
+        (weapon.attackMode === 'melee' ? 'MELEE' : 'AFSTAND'), 10, '#fcd34d');
       const label = selected ? 'ACTIEF' : unlocked ? 'KIEZEN' : weapon.unlockCost + ' G';
-      this.button(311, y + 20, 87, 29, label, () => this.runAction(
+      this.button(285, y + 38, 126, 31, label, () => this.runAction(
         unlocked ? { type: 'selectWeapon', id } : { type: 'unlockWeapon', id },
       ), selected ? 'selected' : 'normal',
       selected || (!unlocked && profile.gold < weapon.unlockCost), 10);
+      if (weapon.unlockCost === 0) this.text(43, y + 38, 'INBEGREPEN BIJ HELD', 9, '#86efac');
     });
+    this.text(195, 635, 'Kies een andere held om zijn wapens te bekijken', 10, COLOR.faint, true);
   }
 
   private drawUpgrades(): void {
@@ -248,8 +256,9 @@ export class MainMenuScene extends Phaser.Scene {
             action: { type: 'upgradeHero', id } as const,
           })),
           ...WEAPON_IDS.map(id => ({
-            label: WEAPONS[id].name, description: 'Wapen verbeteren', level: profile.weaponLevels[id],
-            unlocked: profile.unlockedWeapons.includes(id), max: MAX_WEAPON_LEVEL,
+            label: WEAPONS[id].name, description: HEROES[WEAPONS[id].heroId].name + ' · wapen verbeteren', level: profile.weaponLevels[id],
+            unlocked: profile.unlockedWeapons.includes(id) &&
+              profile.unlockedHeroes.includes(WEAPONS[id].heroId), max: MAX_WEAPON_LEVEL,
             cost: weaponUpgradeCost(profile.weaponLevels[id]),
             action: { type: 'upgradeWeapon', id } as const,
           })),

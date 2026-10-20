@@ -1,5 +1,8 @@
 import { HERO_IDS, HEROES, MAX_HERO_LEVEL, heroUpgradeCost, type HeroId } from '../heroes/heroConfig';
-import { MAX_WEAPON_LEVEL, WEAPON_IDS, WEAPONS, weaponUpgradeCost, type WeaponId } from '../weapons/weaponConfig';
+import {
+  HERO_STARTER_WEAPON, MAX_WEAPON_LEVEL, WEAPON_IDS, WEAPONS,
+  weaponBelongsToHero, weaponUpgradeCost, type WeaponId,
+} from '../weapons/weaponConfig';
 import {
   defaultPermanentLevels, MAX_PERMANENT_LEVEL, PERMANENT_UPGRADE_IDS,
   permanentUpgradeCost, type PermanentLevels, type PermanentUpgradeId,
@@ -12,16 +15,17 @@ import {
   type ControlAction, type KeyBindings,
 } from '../input/keyBindings';
 
-const STORAGE_KEY = 'dungeon-ascent:profile:v2';
-const LEGACY_KEY = 'dungeon-ascent:profile:v1';
+const STORAGE_KEY = 'dungeon-ascent:profile:v3';
+const LEGACY_KEYS = ['dungeon-ascent:profile:v2', 'dungeon-ascent:profile:v1'] as const;
 const MAX_GOLD = 1_000_000_000;
 const MAX_SETTLED_RUNS = 64;
 
 export interface Profile {
-  version: 2;
+  version: 3;
   gold: number;
   selectedHero: HeroId;
   selectedWeapon: WeaponId;
+  selectedWeapons: Record<HeroId, WeaponId>;
   unlockedHeroes: HeroId[];
   unlockedWeapons: WeaponId[];
   heroLevels: Record<HeroId, number>;
@@ -37,10 +41,12 @@ export interface Profile {
 }
 export function defaultProfile(): Profile {
   return {
-    version: 2, gold: 150, selectedHero: 'ranger', selectedWeapon: 'bow',
-    unlockedHeroes: ['ranger'], unlockedWeapons: ['bow'],
+    version: 3, gold: 150, selectedHero: 'guardian', selectedWeapon: 'sunblade',
+    selectedWeapons: { ranger: 'bow', mage: 'staff', guardian: 'sunblade', frostblade: 'iceblade',
+      pyromancer: 'emberstaff', stormstrider: 'lightning', voidwalker: 'voidorb' },
+    unlockedHeroes: ['guardian'], unlockedWeapons: ['sunblade'],
     heroLevels: Object.fromEntries(HERO_IDS.map(id => [id, 1])) as Record<HeroId, number>,
-    weaponLevels: { bow: 1, crossbow: 1, staff: 1, daggers: 1, lightning: 1 },
+    weaponLevels: Object.fromEntries(WEAPON_IDS.map(id => [id, 1])) as Record<WeaponId, number>,
     permanentLevels: defaultPermanentLevels(), highestRoom: 1,
     selectedWorld: 1, completedWorlds: 0, worldBestRooms: [1, 1, 1, 1, 1],
     totalGoldEarned: 0,
@@ -53,14 +59,18 @@ const validLevel = (n: unknown, min: number, max: number): number =>
 export function validateProfile(raw: unknown): Profile {
   const defaults = defaultProfile();
   if (!raw || typeof raw !== 'object' ||
-    ![1, 2].includes((raw as { version?: number }).version ?? -1)) return defaults;
+    ![1, 2, 3].includes((raw as { version?: number }).version ?? -1)) return defaults;
   const input = raw as Partial<Profile>;
+  const fallbackHero: HeroId = input.version === 3 ? 'guardian' : 'ranger';
   const heroes = Array.isArray(input.unlockedHeroes)
-    ? HERO_IDS.filter(id => id === 'ranger' || input.unlockedHeroes?.includes(id))
-    : ['ranger' as HeroId];
-  const weapons = Array.isArray(input.unlockedWeapons)
-    ? WEAPON_IDS.filter(id => id === 'bow' || input.unlockedWeapons?.includes(id))
-    : ['bow' as WeaponId];
+    ? HERO_IDS.filter(id => id === fallbackHero || input.unlockedHeroes?.includes(id))
+    : [fallbackHero];
+  const purchasedWeapons = Array.isArray(input.unlockedWeapons)
+    ? WEAPON_IDS.filter(id => input.unlockedWeapons?.includes(id)) : [];
+  // Every owned hero includes its free signature weapon. This also migrates
+  // existing saves to the new hero-bound loadout system without lost heroes.
+  const weapons = WEAPON_IDS.filter(id => purchasedWeapons.includes(id) ||
+    heroes.some(heroId => HERO_STARTER_WEAPON[heroId] === id));
   const heroLevels = { ...defaults.heroLevels };
   const weaponLevels = { ...defaults.weaponLevels };
   const permanentLevels = defaultPermanentLevels();
@@ -69,8 +79,16 @@ export function validateProfile(raw: unknown): Profile {
   for (const id of PERMANENT_UPGRADE_IDS) {
     permanentLevels[id] = validLevel(input.permanentLevels?.[id], 0, MAX_PERMANENT_LEVEL);
   }
-  const selectedHero = heroes.includes(input.selectedHero as HeroId) ? input.selectedHero as HeroId : 'ranger';
-  const selectedWeapon = weapons.includes(input.selectedWeapon as WeaponId) ? input.selectedWeapon as WeaponId : 'bow';
+  const selectedHero = heroes.includes(input.selectedHero as HeroId) ? input.selectedHero as HeroId : fallbackHero;
+  const requestedSelections = input.selectedWeapons as Partial<Record<HeroId, WeaponId>> | undefined;
+  const selectedWeapons = { ...defaults.selectedWeapons };
+  for (const heroId of HERO_IDS) {
+    const requested = requestedSelections?.[heroId] ??
+      (heroId === selectedHero ? input.selectedWeapon : undefined);
+    selectedWeapons[heroId] = requested && weapons.includes(requested) &&
+      weaponBelongsToHero(requested, heroId) ? requested : HERO_STARTER_WEAPON[heroId];
+  }
+  const selectedWeapon = selectedWeapons[selectedHero];
   const settings = input.settings;
   const completedWorlds = validLevel(input.completedWorlds, 0, WORLD_COUNT);
   const requestedWorld = toWorldId(input.selectedWorld);
@@ -85,10 +103,10 @@ export function validateProfile(raw: unknown): Profile {
       validLevel(input.highestRoom, 1, CHAPTER_ROOM_COUNT));
   }
   return {
-    version: 2,
+    version: 3,
     gold: typeof input.gold === 'number' && Number.isFinite(input.gold)
       ? validLevel(input.gold, 0, MAX_GOLD) : 0,
-    selectedHero, selectedWeapon, unlockedHeroes: heroes, unlockedWeapons: weapons,
+    selectedHero, selectedWeapon, selectedWeapons, unlockedHeroes: heroes, unlockedWeapons: weapons,
     heroLevels, weaponLevels, permanentLevels,
     highestRoom: validLevel(input.highestRoom, 1, CHAPTER_ROOM_COUNT),
     selectedWorld, completedWorlds, worldBestRooms,
@@ -127,19 +145,38 @@ export function applyProfileAction(profile: Profile, action: ProfileAction): Pro
     case 'selectWorld':
       return isWorldUnlocked(action.id, p.completedWorlds) ? { ...p, selectedWorld: action.id } : p;
     case 'selectHero':
-      return p.unlockedHeroes.includes(action.id) ? { ...p, selectedHero: action.id } : p;
+      return p.unlockedHeroes.includes(action.id) ? {
+        ...p, selectedHero: action.id, selectedWeapon: p.selectedWeapons[action.id],
+      } : p;
     case 'selectWeapon':
-      return p.unlockedWeapons.includes(action.id) ? { ...p, selectedWeapon: action.id } : p;
+      return p.unlockedWeapons.includes(action.id) && weaponBelongsToHero(action.id, p.selectedHero)
+        ? { ...p, selectedWeapon: action.id,
+            selectedWeapons: { ...p.selectedWeapons, [p.selectedHero]: action.id } }
+        : p;
     case 'unlockHero': {
       const cost = HEROES[action.id].unlockCost;
       if (p.unlockedHeroes.includes(action.id) || p.gold < cost ||
         !isWorldUnlocked(HEROES[action.id].requiredWorld, p.completedWorlds)) return p;
-      return { ...p, gold: p.gold - cost, unlockedHeroes: [...p.unlockedHeroes, action.id], selectedHero: action.id };
+      const starter = HERO_STARTER_WEAPON[action.id];
+      return {
+        ...p, gold: p.gold - cost,
+        unlockedHeroes: [...p.unlockedHeroes, action.id],
+        unlockedWeapons: p.unlockedWeapons.includes(starter)
+          ? p.unlockedWeapons : [...p.unlockedWeapons, starter],
+        selectedHero: action.id, selectedWeapon: starter,
+        selectedWeapons: { ...p.selectedWeapons, [action.id]: starter },
+      };
     }
     case 'unlockWeapon': {
       const cost = WEAPONS[action.id].unlockCost;
-      if (p.unlockedWeapons.includes(action.id) || p.gold < cost) return p;
-      return { ...p, gold: p.gold - cost, unlockedWeapons: [...p.unlockedWeapons, action.id], selectedWeapon: action.id };
+      if (p.unlockedWeapons.includes(action.id) || p.gold < cost ||
+        WEAPONS[action.id].heroId !== p.selectedHero ||
+        !p.unlockedHeroes.includes(WEAPONS[action.id].heroId)) return p;
+      return {
+        ...p, gold: p.gold - cost, unlockedWeapons: [...p.unlockedWeapons, action.id],
+        selectedWeapon: action.id,
+        selectedWeapons: { ...p.selectedWeapons, [p.selectedHero]: action.id },
+      };
     }
     case 'upgradeHero': {
       if (!p.unlockedHeroes.includes(action.id)) return p;
@@ -149,7 +186,8 @@ export function applyProfileAction(profile: Profile, action: ProfileAction): Pro
       return { ...p, gold: p.gold - cost, heroLevels: { ...p.heroLevels, [action.id]: level + 1 } };
     }
     case 'upgradeWeapon': {
-      if (!p.unlockedWeapons.includes(action.id)) return p;
+      if (!p.unlockedWeapons.includes(action.id) ||
+        !p.unlockedHeroes.includes(WEAPONS[action.id].heroId)) return p;
       const level = p.weaponLevels[action.id];
       const cost = weaponUpgradeCost(level);
       if (level >= MAX_WEAPON_LEVEL || p.gold < cost) return p;
@@ -209,7 +247,8 @@ export class SaveManager {
     try {
       // Accessing localStorage itself may throw on restrictive mobile browsers.
       const store = storage ?? (typeof window === 'undefined' ? undefined : window.localStorage);
-      const raw = store?.getItem(STORAGE_KEY) ?? store?.getItem(LEGACY_KEY);
+      const raw = store?.getItem(STORAGE_KEY) ?? LEGACY_KEYS
+        .map(key => store?.getItem(key)).find(value => value !== null && value !== undefined);
       loaded = raw ? JSON.parse(raw) : null;
     } catch { loaded = null; }
     this.profile = validateProfile(loaded);
@@ -232,7 +271,7 @@ export class SaveManager {
     this.profile = defaultProfile();
     try {
       const store = this.storage ?? (typeof window === 'undefined' ? undefined : window.localStorage);
-      store?.removeItem(LEGACY_KEY);
+      for (const key of LEGACY_KEYS) store?.removeItem(key);
     } catch { /* Ignore unavailable storage. */ }
     this.save();
   }

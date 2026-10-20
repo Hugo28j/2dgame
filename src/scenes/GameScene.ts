@@ -126,6 +126,8 @@ export class GameScene extends Phaser.Scene {
       profile.selectedWeapon, profile.weaponLevels[profile.selectedWeapon],
       permanentBonuses(profile.permanentLevels).weaponDamage,
       permanentBonuses(profile.permanentLevels).weaponSpeed,
+      this.enemies,
+      this.handleMeleeHit,
     );
     this.enemySpawner = new EnemySpawner(this, this.enemies);
 
@@ -648,6 +650,17 @@ export class GameScene extends Phaser.Scene {
     if (projectileObject.effect === 'chain-lightning') {
       this.applyChainLightning(targetObject, projectileObject.attack);
     }
+  };
+
+  private readonly handleMeleeHit = (
+    target: Slime,
+    attack: Readonly<Projectile['attack']>,
+  ): void => {
+    if (!target.active || target.aiState === 'defeated') return;
+    const result = this.damageSystem.apply(target, attack);
+    this.showDamageNumber(target.x, target.y, result);
+    if (result.defeated) target.playDefeat();
+    else target.showHit();
   };
 
   private applyChainLightning(primary: Slime, attack: Readonly<Projectile['attack']>): void {

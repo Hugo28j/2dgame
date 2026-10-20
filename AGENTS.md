@@ -23,5 +23,5 @@
 
 ## Huidige status
 
-- Actieve ontwikkelfase: **fase 8 – Progressie en economie**.
-- Volgende fase na afzonderlijke goedkeuring: **fase 9 – Visuele afwerking**.
+- Actieve status: **fase 8 afgerond + heldgebonden loadouts en melee-combat**.
+- Volgende geplande fase na afzonderlijke goedkeuring: **fase 9 – Visuele afwerking**.

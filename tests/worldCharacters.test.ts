@@ -70,7 +70,7 @@ describe('four world-specific playable heroes', () => {
     for (const id of ['frostblade', 'pyromancer', 'stormstrider', 'voidwalker'] as const) {
       expect(applyProfileAction(profile, { type: 'unlockHero', id })).toEqual(profile);
     }
-    expect(profile.unlockedHeroes).toEqual(['ranger']);
+    expect(profile.unlockedHeroes).toEqual(['guardian']);
 
     for (let world = 1; world <= 4; world++) {
       const w = world as WorldId;
