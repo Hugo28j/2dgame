@@ -24,6 +24,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
     permanent: Readonly<{ hp: number; damage: number; defense: number }> = { hp: 0, damage: 0, defense: 0 },
   ) {
     super(scene, x, y, HEROES[heroId].textureKey);
+    this.setDisplaySize(56, 56);
     const stats = getHeroStats(heroId, level);
     this.maxHp = stats.maxHp + permanent.hp;
     this.currentHp = this.maxHp;
@@ -40,7 +41,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
     this.setDepth(20);
     const body = this.body;
     if (body instanceof Phaser.Physics.Arcade.Body) {
-      body.setCircle(16, 8, 8);
+      body.setCircle(15, 17, 17);
       body.setCollideWorldBounds(true);
     }
   }

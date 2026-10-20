@@ -23,5 +23,5 @@
 
 ## Huidige status
 
-- Actieve status: **fase 8 afgerond + heldgebonden loadouts en melee-combat**.
+- Actieve status: **fase 8 afgerond + heldgebonden loadouts, abilities en vernieuwde hero-art**.
 - Volgende geplande fase na afzonderlijke goedkeuring: **fase 9 – Visuele afwerking**.

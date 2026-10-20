@@ -1,39 +1,64 @@
 import { describe, expect, it } from 'vitest';
 
 import { AbilityCooldowns } from '../src/abilities/AbilityCooldowns';
-import { ABILITIES, ABILITY_SLOTS } from '../src/abilities/abilityConfig';
+import {
+  ABILITIES, ABILITY_IDS, HERO_ABILITIES, getAbilityStats, isAbilityUnlocked,
+} from '../src/abilities/abilityConfig';
+import { HERO_IDS } from '../src/heroes/heroConfig';
 import { targetsInRadius } from '../src/abilities/areaTargets';
 import { DashState } from '../src/abilities/DashState';
 
 describe('phase 6 ability rules', () => {
-  it('provides precisely three available abilities with independently configured cooldowns', () => {
-    expect(ABILITY_SLOTS).toEqual(['dash', 'fire-nova', 'ice-blast']);
-    for (const id of ABILITY_SLOTS) {
-      expect(ABILITIES[id].available).toBe(true);
+  it('provides precisely three unique abilities for every hero', () => {
+    expect(ABILITY_IDS).toHaveLength(21);
+    for (const heroId of HERO_IDS) {
+      expect(HERO_ABILITIES[heroId]).toHaveLength(3);
+      for (const id of HERO_ABILITIES[heroId]) {
+        expect(ABILITIES[id].heroId).toBe(heroId);
+        expect(ABILITIES[id].slot).toBeGreaterThanOrEqual(1);
+        expect(ABILITIES[id].cooldownMs).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('unlocks personal ability slots at hero levels 1, 10 and 20', () => {
+    for (const heroId of HERO_IDS) {
+      const [first, second, third] = HERO_ABILITIES[heroId];
+      expect(isAbilityUnlocked(first, 1)).toBe(true);
+      expect(isAbilityUnlocked(second, 9)).toBe(false);
+      expect(isAbilityUnlocked(second, 10)).toBe(true);
+      expect(isAbilityUnlocked(third, 19)).toBe(false);
+      expect(isAbilityUnlocked(third, 20)).toBe(true);
+      expect(getAbilityStats(first, 20).cooldownMs).toBeLessThan(ABILITIES[first].cooldownMs);
+    }
+  });
+
+  it('keeps every configured ability valid', () => {
+    for (const id of ABILITY_IDS) {
       expect(ABILITIES[id].cooldownMs).toBeGreaterThan(0);
     }
   });
 
   it('starts abilities ready, locks them after casting and prevents repeated casts', () => {
     const cooldowns = new AbilityCooldowns();
-    expect(cooldowns.ready('dash', 0)).toBe(true);
-    expect(cooldowns.activate('dash', 1000, 1)).toBe(true);
-    expect(cooldowns.activate('dash', 1001, 1)).toBe(false);
-    expect(cooldowns.remainingMs('dash', 1001)).toBe(4799);
-    expect(cooldowns.ready('fire-nova', 1001)).toBe(true);
-    expect(cooldowns.ready('dash', 5800)).toBe(true);
-    expect(cooldowns.activate('dash', 5800, 1)).toBe(true);
+    expect(cooldowns.ready('guardian-charge', 0)).toBe(true);
+    expect(cooldowns.activate('guardian-charge', 1000, 4800, 1)).toBe(true);
+    expect(cooldowns.activate('guardian-charge', 1001, 4800, 1)).toBe(false);
+    expect(cooldowns.remainingMs('guardian-charge', 1001)).toBe(4799);
+    expect(cooldowns.ready('guardian-slam', 1001)).toBe(true);
+    expect(cooldowns.ready('guardian-charge', 5800)).toBe(true);
+    expect(cooldowns.activate('guardian-charge', 5800, 4800, 1)).toBe(true);
   });
 
   it('uses hero cooldown modifier without allowing invalid values', () => {
     const cooldowns = new AbilityCooldowns();
-    expect(cooldowns.activate('ice-blast', 300, 0)).toBe(false);
-    expect(cooldowns.activate('ice-blast', 300, Number.NaN)).toBe(false);
-    expect(cooldowns.activate('ice-blast', 300, 0.9)).toBe(true);
-    expect(cooldowns.remainingMs('ice-blast', 300)).toBe(9900);
-    expect(cooldowns.remainingMs('ice-blast', 10200)).toBe(0);
+    expect(cooldowns.activate('frost-ring', 300, 11000, 0)).toBe(false);
+    expect(cooldowns.activate('frost-ring', 300, 11000, Number.NaN)).toBe(false);
+    expect(cooldowns.activate('frost-ring', 300, 11000, 0.9)).toBe(true);
+    expect(cooldowns.remainingMs('frost-ring', 300)).toBe(9900);
+    expect(cooldowns.remainingMs('frost-ring', 10200)).toBe(0);
     cooldowns.clear();
-    expect(cooldowns.ready('ice-blast', 300)).toBe(true);
+    expect(cooldowns.ready('frost-ring', 300)).toBe(true);
   });
 
   it('dashes along a normalized movement vector and stops after its duration', () => {

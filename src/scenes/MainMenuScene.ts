@@ -17,6 +17,10 @@ import {
   HERO_WEAPONS, WEAPON_IDS, WEAPONS, getWeaponStats,
   weaponUpgradeCost, MAX_WEAPON_LEVEL,
 } from '../weapons/weaponConfig';
+import {
+  ABILITIES, HERO_ABILITIES, MAX_ABILITY_LEVEL, abilityUpgradeCost, getAbilityStats,
+  isAbilityUnlocked,
+} from '../abilities/abilityConfig';
 
 type MenuTab = 'worlds' | 'heroes' | 'weapons' | 'upgrades' | 'settings';
 type ButtonStyle = 'normal' | 'selected' | 'primary' | 'danger' | 'quiet';
@@ -31,7 +35,7 @@ export class MainMenuScene extends Phaser.Scene {
   private tab: MenuTab = 'worlds';
   private heroPage = 0;
   private upgradePage = 0;
-  private upgradeCategory: 'equipment' | 'permanent' = 'permanent';
+  private upgradeCategory: 'equipment' | 'abilities' | 'permanent' = 'permanent';
   private settingsView: 'general' | 'controls' = 'general';
   private resetRequested = false;
   private awaitingKey?: ControlAction;
@@ -234,10 +238,12 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   private drawUpgrades(): void {
-    this.button(112, 276, 158, 34, 'PERMANENT', () => this.setUpgradeCategory('permanent'),
+    this.button(72, 276, 105, 34, 'PERMANENT', () => this.setUpgradeCategory('permanent'),
       this.upgradeCategory === 'permanent' ? 'selected' : 'quiet', false, 11);
-    this.button(279, 276, 158, 34, 'HELD & WAPEN', () => this.setUpgradeCategory('equipment'),
+    this.button(195, 276, 132, 34, 'HELD & WAPEN', () => this.setUpgradeCategory('equipment'),
       this.upgradeCategory === 'equipment' ? 'selected' : 'quiet', false, 11);
+    this.button(320, 276, 108, 34, 'ABILITIES', () => this.setUpgradeCategory('abilities'),
+      this.upgradeCategory === 'abilities' ? 'selected' : 'quiet', false, 11);
 
     const profile = progressStore.current;
     const rows: Array<{ label: string; description: string; level: number; unlocked: boolean;
@@ -248,6 +254,21 @@ export class MainMenuScene extends Phaser.Scene {
           cost: permanentUpgradeCost(id, profile.permanentLevels[id]),
           action: { type: 'upgradePermanent', id } as const,
         }))
+      : this.upgradeCategory === 'abilities'
+      ? HERO_ABILITIES[profile.selectedHero].map(id => {
+          const ability = ABILITIES[id];
+          const unlocked = isAbilityUnlocked(id, profile.heroLevels[profile.selectedHero]);
+          const stats = getAbilityStats(id, profile.abilityLevels[id]);
+          return {
+            label: ability.name,
+            description: unlocked ? ability.description + ' · ' +
+              (ability.damage > 0 ? stats.damage + ' DMG' : stats.heal + ' HP') :
+              'Ontgrendelt op heldlevel ' + ability.unlockLevel,
+            level: profile.abilityLevels[id], unlocked, max: MAX_ABILITY_LEVEL,
+            cost: abilityUpgradeCost(profile.abilityLevels[id]),
+            action: { type: 'upgradeAbility', id } as const,
+          };
+        })
       : [
           ...HERO_IDS.map(id => ({
             label: HEROES[id].name, description: 'Held verbeteren', level: profile.heroLevels[id],
@@ -296,7 +317,7 @@ export class MainMenuScene extends Phaser.Scene {
     }
   }
 
-  private setUpgradeCategory(category: 'equipment' | 'permanent'): void {
+  private setUpgradeCategory(category: 'equipment' | 'abilities' | 'permanent'): void {
     this.upgradeCategory = category;
     this.upgradePage = 0;
     this.scene.restart();
