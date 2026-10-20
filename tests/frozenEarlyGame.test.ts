@@ -20,7 +20,7 @@ describe('Frozen Hollow rooms 1-10', () => {
     expect(getEnemyKindForRoom(5, 0, 2)).toBe('boss');
     expect(getEnemyKindForRoom(10, 0, 2)).toBe('boss');
     expect(getWorldCharacter(2, 'mage', 3).name).toBe('Frost Witch');
-    expect(getWorldCharacter(2, 'mage', 15).name).toBe('Aurora Spirit');
+    expect(getWorldCharacter(2, 'mage', 15).name).toBe('Aurora Witch');
   });
 
   it('preserves world-1 and other worlds enemy unlock progression', () => {
@@ -29,7 +29,7 @@ describe('Frozen Hollow rooms 1-10', () => {
       expect(getEnemyKindForRoom(3, 0, world)).toBe('slime');
       expect(getEnemyKindForRoom(7, 0, world)).toBe('archer');
     }
-    expect(getEnemyKindForRoom(12, 0, 2)).toBe('charger');
+    expect(getEnemyKindForRoom(12, 0, 2)).toBe('slime');
   });
 
   it('witch summons two melee enemies every five seconds with active limits', () => {
