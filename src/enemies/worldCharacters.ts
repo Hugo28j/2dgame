@@ -64,7 +64,7 @@ export function getWorldCharacter(worldId: WorldId, kind: EnemyKind, roomNumber 
   }
   const index = minionOrder.indexOf(kind);
   return {
-    name: names[worldId][kind],
+    name: worldId === 2 && kind === 'mage' && roomNumber <= 10 ? 'Frost Witch' : names[worldId][kind],
     textureKey: `world-${worldId}-${kind}`,
     primary: primaryColors[worldId][index]!,
     secondary: world.obstacleBorder,
