@@ -58,6 +58,7 @@ export class AdvancedEnemy extends Slime {
     fire: EnemyFire, explode: EnemyExplosion, dropBombs?: EnemyBomb): void {
     if (this.aiState === 'defeated') return;
     super.chase(targetX, targetY);
+    if (this.isKnockedBack(now)) return;
     const distance = Phaser.Math.Distance.Between(this.x, this.y, targetX, targetY);
     const speed = this.stats.movementSpeed * this.slowMultiplier;
 
