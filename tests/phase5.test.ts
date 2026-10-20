@@ -20,7 +20,7 @@ describe('phase 5 heroes and weapons', () => {
   });
   it('progressively increases hero stats without exceeding the maximum level', () => {
     expect(getHeroStats('ranger', 3).maxHp).toBeGreaterThan(getHeroStats('ranger', 1).maxHp);
-    expect(getHeroStats('ranger', 99)).toEqual(getHeroStats('ranger', 20));
+    expect(getHeroStats('ranger', 999)).toEqual(getHeroStats('ranger', 50));
     expect(heroUpgradeCost(2)).toBeGreaterThan(heroUpgradeCost(1));
   });
   it('defines two hero-bound weapons per hero with ranged and melee combat', () => {
@@ -78,7 +78,7 @@ describe('phase 5 progression and persistence', () => {
     expect(malformed.gold).toBe(0);
     expect(malformed.selectedHero).toBe('ranger');
     expect(malformed.selectedWeapon).toBe('bow');
-    expect(malformed.heroLevels.ranger).toBe(20);
+    expect(malformed.heroLevels.ranger).toBe(50);
   });
   it('awards nonnegative gold without duplicates from invalid values', () => {
     const p = defaultProfile();
