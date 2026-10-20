@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 
 import type { Damageable } from '../combat/damage';
 import { InvulnerabilityWindow } from '../combat/InvulnerabilityWindow';
+import { SHIELD_MAX_HP, absorbWithShield } from '../abilities/ShieldHealth';
 import { HEROES, getHeroStats, type HeroId } from '../heroes/heroConfig';
 import type { Vector2Value } from '../input/vectorMath';
 
@@ -16,6 +17,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   public abilityCooldownModifier: number;
   public readonly abilityDamageMultiplier: number;
   public currentHp: number;
+  public shieldHp = 0;
+  public readonly maxShieldHp = SHIELD_MAX_HP;
   private readonly invulnerability = new InvulnerabilityWindow();
   private rapidFireUntil = 0;
   private sprintUntil = 0;
@@ -96,9 +99,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
     return this.currentHp - previous;
   }
 
+  /** Reapplying the bubble restores 50 HP; it never stacks above its maximum. */
+  public restoreShield(): void { this.shieldHp = this.maxShieldHp; }
+
   public receiveDamage(amount: number): boolean {
-    this.currentHp = Math.max(0, this.currentHp - amount);
-    return this.currentHp === 0;
+    const result = absorbWithShield(this.currentHp, this.shieldHp, amount);
+    this.currentHp = result.health;
+    this.shieldHp = result.shield;
+    return result.defeated;
   }
 
   public canReceiveContactDamage(now: number): boolean {
