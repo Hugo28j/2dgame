@@ -43,13 +43,18 @@ export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number,
   const world = getWorld(worldId);
   return {
     ...base, roomNumber: number,
-    maxHp: Math.round(base.maxHp * (worldId === 2 && kind === 'mage' ? 3 : 1) * (1 + completed * SLIME_DIFFICULTY.hpPerRoom) *
+    maxHp: Math.round(base.maxHp *
+      (worldId === 2 && kind === 'mage' ? 3 :
+        worldId === 2 && kind === 'archer' ? 1.5 :
+        worldId === 1 && kind === 'mage' ? 2 : 1) *
+      (1 + completed * SLIME_DIFFICULTY.hpPerRoom) *
       (kind === 'boss' ? 1 + (getBossTier(number) - 1) * 0.09 : 1) * world.hpMultiplier *
       // Only Bramble Gunner (first boss, world 1 room 15); Bloom Sentinel
       // in the same room and other world's gunner retain full HP.
       (kind === 'boss' && worldId === 1 && number === 15 && bossSlot === 0
         ? BRAMBLE_GUNNER_HP_MULTIPLIER : 1)),
-    damage: Math.round(base.damage * (1 + completed * SLIME_DIFFICULTY.damagePerRoom) *
+    damage: Math.round(base.damage * (worldId === 2 && kind === 'archer' ? 2 : 1) *
+      (1 + completed * SLIME_DIFFICULTY.damagePerRoom) *
       (kind === 'boss' ? 1 + (getBossTier(number) - 1) * 0.05 : 1) * world.damageMultiplier),
     movementSpeed: Math.round(base.movementSpeed * world.speedMultiplier *
       (kind === 'slime' && worldId === 1 ? WORLD1_MOSSLING_SPEED_MULTIPLIER : 1)),
