@@ -24,9 +24,9 @@ describe('hero-bound loadouts', () => {
     expect(WEAPONS[profile.selectedWeapon].attackMode).toBe('melee');
   });
 
-  it('unlocks and equips the signature weapon with a purchased hero', () => {
-    let profile = applyProfileAction(defaultProfile(), { type: 'awardGold', amount: 500 });
-    profile = applyProfileAction(profile, { type: 'unlockHero', id: 'mage' });
+  it('unlocks the Mage starter weapon on reaching world-one room 20', () => {
+    let profile = applyProfileAction(defaultProfile(), { type: 'reachRoom', worldId: 1, room: 20 });
+    profile = applyProfileAction(profile, { type: 'selectHero', id: 'mage' });
     expect(profile.unlockedWeapons).toContain(HERO_STARTER_WEAPON.mage);
     expect(profile.selectedWeapon).toBe('staff');
     expect(profile.selectedWeapons.mage).toBe('staff');
