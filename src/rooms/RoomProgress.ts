@@ -23,6 +23,10 @@ export class RoomProgress {
     this.doorOpen = this.plannedEnemies === 0;
   }
 
+  public addRequiredEnemies(count: number): void {
+    if (!this.doorOpen && Number.isSafeInteger(count) && count > 0) this.plannedEnemies += count;
+  }
+
   public registerEnemyDefeated(): boolean {
     if (this.doorOpen) {
       return true;

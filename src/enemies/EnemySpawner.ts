@@ -28,7 +28,7 @@ export class EnemySpawner {
     return toSpawn.map(index => {
       const point = room.enemySpawns[index];
       if (!point) throw new Error('Missing enemy spawn point for index ' + index);
-      const kind = getEnemyKindForRoom(room.number, index);
+      const kind = getEnemyKindForRoom(room.number, index, worldId);
       const enemy = kind === 'slime'
         ? new Slime(this.scene, `slime-${this.nextEnemyNumber++}`, point.x, point.y,
             { ...getSlimeStatsForRoom(room.number, worldId) },

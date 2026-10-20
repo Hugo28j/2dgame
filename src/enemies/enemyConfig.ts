@@ -58,17 +58,21 @@ export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number,
 export const getSlimeStatsForRoom = (roomNumber: number, worldId: WorldId = 1): SlimeRuntimeStats =>
   getEnemyStatsForRoom('slime', roomNumber, worldId);
 
+export const WORLD2_UNLOCK_ROOMS = {
+  archer: 1, slime: 2, mage: 6, tank: 15, bomber: 20, charger: 30,
+} as const;
+
 /** First rooms contain only slimes. New enemies unlock gradually, then become
  * more frequent as the dungeon gets deeper. Deterministic for reproducible runs. */
 export const ENEMY_UNLOCK_ROOMS = {
   slime: 1, archer: 7, charger: 12, tank: 17, mage: 23, bomber: 29,
 } as const;
 
-export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number): EnemyKind => {
+export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number, worldId: WorldId = 1): EnemyKind => {
   const room = Math.max(1, Math.floor(roomNumber));
   if (room % 5 === 0) return 'boss';
   const index = Math.max(0, Math.floor(spawnIndex));
-  const entries = Object.entries(ENEMY_UNLOCK_ROOMS) as Array<
+  const entries = Object.entries(worldId === 2 ? WORLD2_UNLOCK_ROOMS : ENEMY_UNLOCK_ROOMS) as Array<
     [Exclude<EnemyKind, 'boss'>, number]>;
   // A new enemy always appears when its type is first introduced.
   const newKind = entries.find(([, unlock]) => unlock === room);

@@ -3,6 +3,7 @@ import type { AttackData } from '../combat/damage';
 
 export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
   public readonly attack: Readonly<AttackData>;
+  public statusEffect?: 'slow' | 'freeze';
   private readonly baseVelocity: { x: number; y: number };
   public constructor(
     scene: Phaser.Scene, x: number, y: number,
