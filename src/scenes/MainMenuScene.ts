@@ -152,63 +152,77 @@ export class MainMenuScene extends Phaser.Scene {
     this.section('KIES JE WERELD', 'Voltooi kamer 50 om de volgende wereld te openen');
     const profile = progressStore.current;
     WORLDS.forEach(world => {
-      const y = 329 + (world.id - 1) * 77;
+      const y = 346 + (world.id - 1) * 75;
       const unlocked = isWorldUnlocked(world.id, profile.completedWorlds);
       const selected = world.id === profile.selectedWorld;
-      this.plate(195, y, 328, 70, selected ? 0x21374a : COLOR.card,
+      const best = profile.worldBestRooms[world.id - 1] ?? 1;
+      this.plate(195, y, 328, 70, selected ? 0x1a3944 : COLOR.card,
         selected ? world.accent : COLOR.border, 11);
-      this.add.circle(50, y - 10, 12, world.accent, unlocked ? 0.9 : 0.25);
-      this.text(72, y - 21, world.id + '. ' + world.name.toUpperCase(), 12,
-        unlocked ? COLOR.white : COLOR.faint, false, true);
-      this.text(72, y - 2, world.subtitle, 9, COLOR.secondary);
-      this.text(72, y + 19, unlocked ?
-        ('RECORD ' + profile.worldBestRooms[world.id - 1] + '/50  ·  ' +
-          (world.id <= profile.completedWorlds ? 'VOLTOOID' : 'NOG TE VERSLAAN')) :
-        'VERGRENDELD  ·  SPEEL VORIGE WERELD UIT', 9,
-        unlocked ? '#86efac' : COLOR.faint);
-      this.button(311, y - 1, 62, 32, selected ? 'ACTIEF' : unlocked ? 'KIES' : '🔒',
+      this.add.circle(52, y - 15, 13, world.accent, unlocked ? 0.95 : 0.23);
+      this.text(52, y - 15, String(world.id), 12,
+        unlocked ? '#07131f' : COLOR.faint, true, true);
+      this.fittedText(75, y - 20, world.name.toUpperCase(), 13,
+        unlocked ? COLOR.white : COLOR.faint, 194, true);
+      this.fittedText(75, y - 2, world.subtitle, 10,
+        unlocked ? COLOR.secondary : COLOR.faint, 193);
+      if (unlocked) {
+        this.text(75, y + 17, (best >= CHAPTER_ROOM_COUNT ? 'VOLTOOID' :
+          'BESTE KAMER ' + best + '/' + CHAPTER_ROOM_COUNT), 9,
+        best >= CHAPTER_ROOM_COUNT ? '#86efac' : COLOR.secondary);
+        this.add.rectangle(161, y + 29, 173, 4, 0x304459);
+        this.add.rectangle(74, y + 29, 173 * Math.min(1, best / CHAPTER_ROOM_COUNT), 4,
+          world.accent).setOrigin(0, 0.5);
+      } else {
+        this.text(75, y + 18, 'EERST VORIGE WERELD VOLTOOIEN', 9, COLOR.faint);
+      }
+      this.button(317, y + 5, 70, 36, selected ? 'ACTIEF' : unlocked ? 'KIES' : 'SLOT',
         () => this.runAction({ type: 'selectWorld', id: world.id }),
         selected ? 'selected' : 'normal', selected || !unlocked, 10);
     });
-    this.text(195, 695, 'TOTAAL VERDIEND: ' + profile.totalGoldEarned.toLocaleString('nl-BE') + ' G',
-      11, '#fde68a', true, true);
+    this.text(195, 705, 'TOTAAL VERDIEND  ·  ' +
+      profile.totalGoldEarned.toLocaleString('nl-BE') + ' G',
+      11, '#fcd34d', true, true);
   }
 
   private drawHeroes(): void {
-    this.section('KIES JE HELD', 'Elke held heeft een eigen, exclusieve wapenset');
+    this.section('KIES JE HELD', 'Bekijk vaardigheden en kies met wie je speelt');
     const profile = progressStore.current;
     const pageSize = 4;
     const pages = Math.ceil(HERO_IDS.length / pageSize);
     this.heroPage = Math.max(0, Math.min(this.heroPage, pages - 1));
     HERO_IDS.slice(this.heroPage * pageSize, (this.heroPage + 1) * pageSize).forEach((id, index) => {
       const hero = HEROES[id];
-      const y = 324 + index * 94;
+      const y = 347 + index * 91;
       const unlocked = profile.unlockedHeroes.includes(id);
       const available = isWorldUnlocked(hero.requiredWorld, profile.completedWorlds);
       const selected = profile.selectedHero === id;
-      this.plate(195, y, 330, 88,
-        selected ? 0x173447 : COLOR.card, selected ? hero.color : COLOR.border, 10);
-      this.add.image(63, y - 19, hero.textureKey).setDisplaySize(42, 42);
-      this.text(89, y - 31, hero.name.toUpperCase(), 13, COLOR.white, false, true);
-      this.text(89, y - 13, 'LV.' + profile.heroLevels[id] + ' · ' + hero.description, 9, COLOR.secondary);
-      this.text(44, y + 8, hero.passive, 10, '#fcd34d');
+      this.plate(195, y, 328, 85,
+        selected ? 0x1b3844 : COLOR.card, selected ? hero.color : COLOR.border, 11);
+      this.add.circle(61, y - 15, 24, hero.color, 0.15);
+      this.add.image(61, y - 15, hero.textureKey).setDisplaySize(47, 47);
+      this.fittedText(93, y - 29, hero.name.toUpperCase(), 13, COLOR.white, 179, true);
+      this.fittedText(93, y - 10, 'LV.' + profile.heroLevels[id] +
+        '  ·  ' + hero.description, 10, COLOR.secondary, 228);
+      this.fittedText(44, y + 11, 'PASSIEF: ' + hero.passive, 10, '#fcd34d', 282);
       const stats = getHeroStats(id, profile.heroLevels[id]);
-      this.text(44, y + 28, 'HP ' + stats.maxHp + ' · DMG ' + stats.damage + ' · DEF ' +
-        stats.defense, 10, COLOR.secondary);
-      const label = selected ? 'ACTIEF' : unlocked ? 'KIEZEN' :
+      this.fittedText(44, y + 30, 'HP ' + stats.maxHp +
+        '   ·   SCHADE ' + stats.damage + '   ·   DEF ' + stats.defense,
+        10, COLOR.secondary, 204);
+      const label = selected ? 'ACTIEF' : unlocked ? 'KIES' :
         !available ? 'WERELD ' + hero.requiredWorld : hero.unlockCost + ' G';
-      this.button(309, y + 24, 90, 32, label, () => this.runAction(
+      this.button(313, y + 26, 86, 31, label, () => this.runAction(
         unlocked ? { type: 'selectHero', id } : { type: 'unlockHero', id },
       ), selected ? 'selected' : 'normal',
       selected || (!unlocked && (!available || profile.gold < hero.unlockCost)), 10);
     });
     if (pages > 1) {
-      this.button(95, 703, 111, 27, '‹ VORIGE', () => {
+      this.button(100, 700, 107, 34, '‹ VORIGE', () => {
         this.heroPage = Math.max(0, this.heroPage - 1);
         this.scene.restart();
       }, 'quiet', this.heroPage === 0, 10);
-      this.text(195, 703, (this.heroPage + 1) + ' / ' + pages, 11, COLOR.secondary, true, true);
-      this.button(295, 703, 111, 27, 'VOLGENDE ›', () => {
+      this.text(195, 700, (this.heroPage + 1) + ' / ' + pages,
+        12, COLOR.secondary, true, true);
+      this.button(290, 700, 107, 34, 'VOLGENDE ›', () => {
         this.heroPage = Math.min(pages - 1, this.heroPage + 1);
         this.scene.restart();
       }, 'quiet', this.heroPage === pages - 1, 10);
@@ -216,32 +230,42 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   private drawWeapons(): void {
-    const hero = HEROES[progressStore.current.selectedHero];
-    this.section(hero.name.toUpperCase() + ' · WAPENS', 'Wapens zijn exclusief voor deze held');
     const profile = progressStore.current;
+    const hero = HEROES[profile.selectedHero];
+    this.section('WAPENS VAN ' + hero.name.toUpperCase(),
+      'Kies een wapen. Beide zijn exclusief voor deze held.');
     HERO_WEAPONS[profile.selectedHero].forEach((id, index) => {
       const weapon = WEAPONS[id];
-      const y = 345 + index * 126;
+      const y = 392 + index * 161;
       const unlocked = profile.unlockedWeapons.includes(id);
       const selected = profile.selectedWeapon === id;
-      this.plate(195, y, 330, 112, selected ? 0x173447 : COLOR.card,
-        selected ? COLOR.accent : COLOR.border, 10);
-      this.add.circle(63, y - 28, 21, weapon.color, 0.22).setStrokeStyle(2, weapon.color);
-      this.text(63, y - 31, weapon.attackMode === 'melee' ? '⚔' : '➶', 18, COLOR.white, true, true);
-      this.text(94, y - 42, weapon.name.toUpperCase(), 13, COLOR.white, false, true);
-      this.text(94, y - 21, weapon.description, 10, COLOR.secondary);
       const stats = getWeaponStats(id, profile.weaponLevels[id]);
-      this.text(43, y + 12, 'LV.' + profile.weaponLevels[id] + '  ·  ' +
-        stats.damage + ' DMG  ·  ' + stats.fireRate + '/S  ·  ' +
-        (weapon.attackMode === 'melee' ? 'MELEE' : 'AFSTAND'), 10, '#fcd34d');
-      const label = selected ? 'ACTIEF' : unlocked ? 'KIEZEN' : weapon.unlockCost + ' G';
-      this.button(285, y + 38, 126, 31, label, () => this.runAction(
+      this.plate(195, y, 328, 140, selected ? 0x193744 : COLOR.card,
+        selected ? COLOR.accent : COLOR.border, 12);
+      this.add.circle(62, y - 42, 25, weapon.color, 0.15)
+        .setStrokeStyle(2, weapon.color, 0.9);
+      this.text(62, y - 45, weapon.attackMode === 'melee' ? '⚔' : '➶', 22,
+        COLOR.white, true, true);
+      this.fittedText(100, y - 54, weapon.name.toUpperCase(), 14, COLOR.white, 222, true);
+      this.fittedText(100, y - 32, weapon.description, 10, COLOR.secondary, 219);
+      this.add.rectangle(195, y - 10, 300, 1, COLOR.border, 0.8);
+      this.text(44, y + 9, 'LEVEL ' + profile.weaponLevels[id] +
+        '  ·  ' + (weapon.attackMode === 'melee' ? 'SLAGWAPEN' : 'AFSTANDSWAPEN'),
+        10, COLOR.faint);
+      this.text(44, y + 31, 'SCHADE ' + stats.damage, 12, '#fde68a', false, true);
+      this.text(158, y + 31, 'TEMPO ' + stats.fireRate.toFixed(2) + '/S',
+        10, COLOR.secondary);
+      const label = selected ? 'ACTIEF' : unlocked ? 'KIES WAPEN' : weapon.unlockCost + ' G';
+      this.button(290, y + 54, 112, 30, label, () => this.runAction(
         unlocked ? { type: 'selectWeapon', id } : { type: 'unlockWeapon', id },
       ), selected ? 'selected' : 'normal',
       selected || (!unlocked && profile.gold < weapon.unlockCost), 10);
-      if (weapon.unlockCost === 0) this.text(43, y + 38, 'INBEGREPEN BIJ HELD', 9, '#86efac');
+      if (weapon.unlockCost === 0) this.text(44, y + 56, 'STARTWAPEN', 10, '#86efac');
+      else if (!unlocked) this.text(44, y + 56, 'ONTGRENDEL VOOR ' + weapon.unlockCost + ' G',
+        9, COLOR.faint);
     });
-    this.text(195, 635, 'Kies een andere held om zijn wapens te bekijken', 10, COLOR.faint, true);
+    this.text(195, 705, 'Andere wapens? Kies eerst een held bij HELDEN.',
+      10, COLOR.secondary, true);
   }
 
   private drawUpgrades(): void {
