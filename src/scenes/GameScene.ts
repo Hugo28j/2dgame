@@ -13,6 +13,7 @@ import { EnemyProjectile } from '../enemies/EnemyProjectile';
 import { HomingEnemyProjectile } from '../enemies/HomingEnemyProjectile';
 import { coverIsClose, firstShieldOnPath, type ShieldPoint } from '../enemies/treantShield';
 import { ICE_WALL, HOMING_ORB, wallGapCenter, wallHitsCircle, wallXAt } from '../enemies/frozenBossAttacks';
+import { FROZEN_EARLY, canSummonFrostMinions } from '../enemies/frozenEarlyGame';
 import { withinRadius } from '../enemies/enemyMovement';
 import { shotAngles } from '../enemies/projectilePatterns';
 import {
@@ -68,6 +69,8 @@ export class GameScene extends Phaser.Scene {
     gapY: number; warnAt: number; launchAt: number; hit: boolean;
     damage: number; owner: AdvancedEnemy;
   }>();
+  private readonly witchSummons = new Map<AdvancedEnemy, Set<Slime>>();
+  private frostStatusVisual?: Phaser.GameObjects.Graphics;
   private readonly poisonBottles = new Set<Phaser.GameObjects.Container>();
   private readonly poisonPools = new Set<{
     circle: Phaser.GameObjects.Arc; x: number; y: number;
@@ -184,6 +187,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.player.move(this.controls.getMovement());
+    this.drawFrostStatus();
     this.collectNearbyCoins(delta);
     // All room enemies are spawned up front, leaving no reinforcement indices.
     this.updateEnemyWaves();
@@ -191,6 +195,7 @@ export class GameScene extends Phaser.Scene {
     const aim = this.controls.getAim(this.player.x, this.player.y);
     this.player.face(aim);
     this.abilities?.update(this.time.now, delta);
+    if (this.player.isFrozen) this.player.setVelocity(0, 0);
     this.updatePoisonPools(this.time.now);
     this.updateFrozenWalls(this.time.now);
     this.weapon.update(this.time.now, this.controls.isShooting(), aim);
@@ -206,7 +211,7 @@ export class GameScene extends Phaser.Scene {
           : undefined;
         child.updateAI(this.player.x, this.player.y, this.time.now,
           this.fireEnemyProjectiles, this.explodeEnemy, this.dropBossBombs,
-          nearestCover?.shieldSurface);
+          nearestCover?.shieldSurface, this.summonFrostMinions);
       } else if (child instanceof Slime) {
         child.chase(this.player.x, this.player.y);
       }
@@ -476,6 +481,7 @@ export class GameScene extends Phaser.Scene {
     this.weapon?.clearGroundEffects();
     this.clearBossBombs();
     this.clearCoins();
+    this.witchSummons.clear();
     this.activeBosses = [];
     this.enemyProjectiles?.clear(true, true);
     this.enemies.clear(true, true);
@@ -782,14 +788,19 @@ export class GameScene extends Phaser.Scene {
     const angles = shotAngles(pattern, angle, volley);
     const speed = (enemy.kind === 'boss' ? 220 + getBossTier(enemy.stats.roomNumber) * 8 :
       enemy.kind === 'mage' ? 220 : 320) * speedFactor;
-    const color = enemy.isBoss ? getBossProfile(enemy.stats.roomNumber, enemy.bossSlot).color :
+    const frostArcher = this.worldId === 2 && enemy.kind === 'archer' &&
+      enemy.stats.roomNumber <= FROZEN_EARLY.lastRoom;
+    const frostWitch = enemy.isFrostWitch;
+    const effect = frostWitch ? 'frost-burst' : frostArcher ? 'frost-chill' : 'none';
+    const color = frostWitch ? 0x93c5fd : frostArcher ? 0x38bdf8 :
+      enemy.isBoss ? getBossProfile(enemy.stats.roomNumber, enemy.bossSlot).color :
       enemy.kind === 'mage' ? 0xa78bfa : 0xfb7185;
     for (const direction of angles) {
       const bullet = new EnemyProjectile(
         this, enemy.x + Math.cos(direction) * 30,
         enemy.y + Math.sin(direction) * 30,
         Math.cos(direction), Math.sin(direction),
-        speed, enemy.stats.damage * (enemy.isBoss ? 0.57 : 1), color,
+        speed, enemy.stats.damage * (enemy.isBoss ? 0.57 : frostWitch ? FROZEN_EARLY.witchOrbDamageFactor : 1), color, effect,
       );
       addAndLaunch(bullet, () => this.enemyProjectiles!.add(bullet),
         { x: Math.cos(direction), y: Math.sin(direction) }, speed);
@@ -805,7 +816,7 @@ export class GameScene extends Phaser.Scene {
   };
 
   /** Blizzard Tyrant's frosty seeker pursues the player's *current* position
-   * for at most fifteen seconds and obeys normal projectile hit/slow rules.
+   * for at most eight seconds and obeys normal projectile hit/slow rules.
    */
   private launchHomingOrb(enemy: AdvancedEnemy): void {
     if (!this.player || !this.enemyProjectiles) return;
