@@ -57,7 +57,10 @@ export class WeaponController {
     for (const child of this.meleeTargets?.getChildren() ?? []) {
       const target = child as Slime;
       if (!target.active || target.aiState === 'defeated' ||
-        !isInsideMeleeSwing(this.owner, direction, target, config.meleeRange, config.meleeArc)) continue;
+        !isInsideMeleeSwing(this.owner, direction, target, config.meleeRange, config.meleeArc,
+          // Dawnblade's wide whoosh can graze a mob even when its centre
+          // lies just beyond the painted slash. Other weapons stay unchanged.
+          this.weaponId === 'sunblade' ? 20 : 0)) continue;
       this.onMeleeHit?.(target, attack);
       if (config.specialEffects.includes('knockback') &&
         target.active && target.healthRatio > 0) {
