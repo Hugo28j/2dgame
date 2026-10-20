@@ -346,9 +346,9 @@ export class AbilityController {
     ];
     const flash = this.scene.add.graphics().setDepth(27);
     flash.fillStyle(stats.color, 0.24);
-    flash.fillPoints(points, true);
+    flash.fillPoints(points.map(point => new Phaser.Math.Vector2(point.x, point.y)), true);
     flash.lineStyle(3, stats.color, 0.85);
-    flash.strokePoints(points, true);
+    flash.strokePoints(points.map(point => new Phaser.Math.Vector2(point.x, point.y)), true);
     this.scene.tweens.add({ targets: flash, alpha: 0, duration: 300,
       onComplete: () => flash.destroy() });
   }
