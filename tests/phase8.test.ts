@@ -85,7 +85,8 @@ describe('phase 8 save migration and permanent shop', () => {
     expect(first.current.gold).toBe(500);
     const report = new RunLedger('persist-armor').report(true);
     expect(first.dispatch({ type: 'settleRun', report,
-      rolls: { drop: 0, rarity: 0, kind: 0 } })).toBe(true);
+      rolls: { drop: 0, rarity: 0, kind: 0 },
+      secondRoll: { drop: .9, rarity: 0, kind: 0 } })).toBe(true);
     const second = new SaveManager(local);
     expect(second.current.gold).toBe(500);
     expect(second.current.armorInventory).toHaveLength(1);
