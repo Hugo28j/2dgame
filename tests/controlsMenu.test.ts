@@ -71,7 +71,7 @@ describe('custom keyboard controls', () => {
     };
     const migrated = validateProfile(previousSave);
     expect(migrated.gold).toBe(816);
-    expect(migrated.unlockedHeroes).toEqual(['ranger', 'mage']);
+    expect(migrated.unlockedHeroes).toEqual(['guardian', 'ranger', 'mage']);
     expect(migrated.settings.musicEnabled).toBe(false);
     expect(migrated.settings.keyBindings).toEqual(defaultKeyBindings());
 
