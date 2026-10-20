@@ -145,6 +145,7 @@ export class GameScene extends Phaser.Scene {
       () => this.drawPlayerHealth(),
       () => this.gameOver || this.transitioning || this.chapterComplete || this.choosingUpgrade,
       this.enemyProjectiles,
+      () => this.currentRoom?.layout,
     );
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
@@ -450,6 +451,9 @@ export class GameScene extends Phaser.Scene {
       bounds.y + bounds.height + 204);
     this.drawArena(room);
     this.roomProgress.startRoom(room.enemyCount);
+    // The cooldown clock only advances while enemies are active in a room.
+    if (this.roomProgress.doorOpen) this.abilities?.pauseCooldowns(this.time.now);
+    else this.abilities?.resumeCooldowns(this.time.now);
     this.run.enterRoom(room.number);
     if (this.door) {
       this.door.setPosition(bounds.x + bounds.width / 2, bounds.y + 16);
@@ -856,6 +860,7 @@ export class GameScene extends Phaser.Scene {
     this.aliveEnemies = Math.max(0, this.aliveEnemies - 1);
     this.updateEnemyCount();
     if (this.roomProgress.registerEnemyDefeated()) {
+      this.abilities?.pauseCooldowns(this.time.now);
       // All scheduled enemies are dead; residual bullets must not harm the player.
       this.enemyProjectiles?.clear(true, true);
       this.clearBossBombs();

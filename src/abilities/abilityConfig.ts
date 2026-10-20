@@ -8,7 +8,7 @@ export type AbilityId =
   | 'pyro-dash' | 'pyro-nova' | 'pyro-inferno'
   | 'storm-step' | 'storm-pulse' | 'storm-tempest'
   | 'void-rift' | 'void-collapse' | 'void-drain';
-export type AbilityKind = 'dash' | 'area' | 'slow' | 'heal' | 'drain' | 'wind' | 'shotgun' | 'bomb' | 'timewarp' | 'rapidFire' | 'companion' | 'sprint';
+export type AbilityKind = 'dash' | 'teleport' | 'shield' | 'area' | 'slow' | 'heal' | 'drain' | 'wind' | 'shotgun' | 'bomb' | 'timewarp' | 'rapidFire' | 'companion' | 'sprint';
 
 /** Abilities with a directional, hold-and-release aiming gesture. */
 export const isAimedAbility = (kind: AbilityKind): boolean =>
@@ -37,9 +37,9 @@ export interface AbilityConfig {
 const ability = (config: AbilityConfig): AbilityConfig => config;
 export const ABILITIES: Readonly<Record<AbilityId, AbilityConfig>> = {
   'guardian-charge': ability({ id: 'guardian-charge', heroId: 'guardian', slot: 1, unlockLevel: 1,
-    kind: 'dash', name: 'Shield Charge', description: 'Beschermde stormloop', symbol: '➜', color: 0xfbbf24,
-    cooldownMs: 5200, radius: 0, damage: 0, heal: 0, durationMs: 240, dashSpeed: 650,
-    invulnerabilityMs: 190, slowFactor: 1 }),
+    kind: 'shield', name: 'Shield Bubble', description: '50 schild-HP; hergebruik vult aan zonder te stapelen', symbol: '⬡', color: 0xfbbf24,
+    cooldownMs: 30000, radius: 0, damage: 0, heal: 0, durationMs: 0, dashSpeed: 0,
+    invulnerabilityMs: 0, slowFactor: 1 }),
   'guardian-slam': ability({ id: 'guardian-slam', heroId: 'guardian', slot: 2, unlockLevel: 10,
     kind: 'wind', name: 'Wind Burst', description: 'Rechthoekige windstoot die vijanden wegduwt', symbol: '➠', color: 0xf59e0b,
     cooldownMs: 10000, radius: 225, damage: 37, heal: 0, durationMs: 320, dashSpeed: 0,
@@ -63,11 +63,11 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityConfig>> = {
     invulnerabilityMs: 0, slowFactor: 1 }),
 
   'mage-blink': ability({ id: 'mage-blink', heroId: 'mage', slot: 1, unlockLevel: 1,
-    kind: 'dash', name: 'Arcane Blink', description: 'Teleportachtige magische dash', symbol: '◇', color: 0xc084fc,
-    cooldownMs: 4700, radius: 0, damage: 0, heal: 0, durationMs: 150, dashSpeed: 900,
-    invulnerabilityMs: 150, slowFactor: 1 }),
+    kind: 'teleport', name: 'Arcane Blink', description: 'Onmiddellijke veilige teleport, geen dash', symbol: '◇', color: 0xc084fc,
+    cooldownMs: 4700, radius: 0, damage: 0, heal: 0, durationMs: 0, dashSpeed: 0,
+    invulnerabilityMs: 200, slowFactor: 1 }),
   'mage-burst': ability({ id: 'mage-burst', heroId: 'mage', slot: 2, unlockLevel: 10,
-    kind: 'bomb', name: 'Arcane Bomb', description: 'Gooi een bom in de gekozen richting', symbol: '●', color: 0xd8b4fe,
+    kind: 'bomb', name: 'Arcane Bomb', description: 'Vliegend projectiel dat op afstand explodeert', symbol: '●', color: 0xd8b4fe,
     cooldownMs: 10000, radius: 115, damage: 70, heal: 0, durationMs: 330, dashSpeed: 0,
     invulnerabilityMs: 0, slowFactor: 1 }),
   'mage-timewarp': ability({ id: 'mage-timewarp', heroId: 'mage', slot: 3, unlockLevel: 20,
