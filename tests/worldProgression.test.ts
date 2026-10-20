@@ -135,7 +135,7 @@ describe('world unlocking and persistent selection', () => {
       worldBestRooms: undefined, completedWorlds: undefined, totalGoldEarned: undefined };
     const saved = validateProfile(original);
     expect(saved.gold).toBe(945);
-    expect(saved.selectedHero).toBe('guardian'); // Locked heroes are still validated.
+    expect(saved.selectedHero).toBe('mage'); // Prior W1 room progress unlocks Mage.
     expect(saved.highestRoom).toBe(30);
     expect(saved.worldBestRooms).toEqual([30, 1, 1, 1, 1]);
     expect(saved.selectedWorld).toBe(1);
