@@ -101,6 +101,17 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
     }
   }
 
+  /** Apply permanent hero level changes immediately without losing run bonuses or current HP. */
+  public applyHeroLevel(previousLevel: number, nextLevel: number): void {
+    const before = getHeroStats(this.heroId, previousLevel);
+    const after = getHeroStats(this.heroId, nextLevel);
+    const hpGain = after.maxHp - before.maxHp;
+    this.maxHp += hpGain;
+    this.currentHp = Math.min(this.maxHp, this.currentHp + hpGain);
+    this.damage += after.damage - before.damage;
+    this.defense += after.defense - before.defense;
+  }
+
   public move(direction: Readonly<Vector2Value>): void {
     const speed = this.movementSpeedAt(this.scene.time.now);
     this.setVelocity(direction.x * speed, direction.y * speed);
