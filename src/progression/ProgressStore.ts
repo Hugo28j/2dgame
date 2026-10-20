@@ -8,6 +8,9 @@ import {
   permanentUpgradeCost, type PermanentLevels, type PermanentUpgradeId,
 } from './economy';
 import type { RunReport } from './RunLedger';
+import { ARMOR_SLOTS, ARMOR_MAX_LEVEL, ARMOR_MAX_STARS, RARITY_CONFIG,
+  armorDefinition, armorUpgradeCost, rollArmor, validArmorItem,
+  type ArmorItem, type ArmorSlot } from './armor';
 import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
 import { WORLD_COUNT, isWorldUnlocked, toWorldId, type WorldId } from '../worlds/worldConfig';
 import {
@@ -41,6 +44,9 @@ export interface Profile {
   weaponLevels: Record<WeaponId, number>;
   abilityLevels: Record<AbilityId, number>;
   permanentLevels: PermanentLevels;
+  armorInventory: ArmorItem[];
+  equippedArmor: Record<ArmorSlot, string | null>;
+  lastArmorDrop: { runId: string; item: ArmorItem | null } | null;
   highestRoom: number;
   selectedWorld: WorldId;
   completedWorlds: number;
@@ -59,7 +65,9 @@ export function defaultProfile(): Profile {
     heroXp: Object.fromEntries(HERO_IDS.map(id => [id, 0])) as Record<HeroId, number>,
     weaponLevels: Object.fromEntries(WEAPON_IDS.map(id => [id, 1])) as Record<WeaponId, number>,
     abilityLevels: Object.fromEntries(ABILITY_IDS.map(id => [id, 1])) as Record<AbilityId, number>,
-    permanentLevels: defaultPermanentLevels(), highestRoom: 1,
+    permanentLevels: defaultPermanentLevels(),
+    armorInventory: [], equippedArmor: { helm: null, body: null, boots: null },
+    lastArmorDrop: null, highestRoom: 1,
     selectedWorld: 1, completedWorlds: 0, worldBestRooms: [1, 1, 1, 1, 1],
     totalGoldEarned: 0,
     settledRunIds: [], settings: { musicEnabled: true, sfxEnabled: true, keyBindings: defaultKeyBindings() },
@@ -95,6 +103,25 @@ export function validateProfile(raw: unknown): Profile {
   for (const id of PERMANENT_UPGRADE_IDS) {
     permanentLevels[id] = validLevel(input.permanentLevels?.[id], 0, MAX_PERMANENT_LEVEL);
   }
+  const armorInventory: ArmorItem[] = [];
+  const seenArmorIds = new Set<string>();
+  if (Array.isArray(input.armorInventory)) {
+    for (const entry of input.armorInventory) {
+      if (!validArmorItem(entry) || seenArmorIds.has(entry.id) || armorInventory.length >= 250) continue;
+      seenArmorIds.add(entry.id);
+      armorInventory.push({ ...entry });
+    }
+  }
+  const equippedArmor = { ...defaults.equippedArmor };
+  for (const slot of ARMOR_SLOTS) {
+    const id = input.equippedArmor?.[slot];
+    if (id && armorInventory.some(item => item.id === id && armorDefinition(item).slot === slot))
+      equippedArmor[slot] = id;
+  }
+  const lastArmorDrop = input.lastArmorDrop && typeof input.lastArmorDrop.runId === 'string' &&
+    input.lastArmorDrop.runId.length <= 100 &&
+    (input.lastArmorDrop.item === null || validArmorItem(input.lastArmorDrop.item))
+    ? { runId: input.lastArmorDrop.runId, item: input.lastArmorDrop.item } : null;
   const selectedHero = heroes.includes(input.selectedHero as HeroId) ? input.selectedHero as HeroId : fallbackHero;
   const requestedSelections = input.selectedWeapons as Partial<Record<HeroId, WeaponId>> | undefined;
   const selectedWeapons = { ...defaults.selectedWeapons };
@@ -124,6 +151,7 @@ export function validateProfile(raw: unknown): Profile {
       ? validLevel(input.gold, 0, MAX_GOLD) : 0,
     selectedHero, selectedWeapon, selectedWeapons, unlockedHeroes: heroes, unlockedWeapons: weapons,
     heroLevels, heroXp, weaponLevels, abilityLevels, permanentLevels,
+    armorInventory, equippedArmor, lastArmorDrop,
     highestRoom: validLevel(input.highestRoom, 1, CHAPTER_ROOM_COUNT),
     selectedWorld, completedWorlds, worldBestRooms,
     totalGoldEarned: validLevel(input.totalGoldEarned, 0, MAX_GOLD),
@@ -150,10 +178,15 @@ export type ProfileAction =
   | { type: 'upgradeWeapon'; id: WeaponId }
   | { type: 'upgradeAbility'; id: AbilityId }
   | { type: 'upgradePermanent'; id: PermanentUpgradeId }
+  | { type: 'equipArmor'; id: string }
+  | { type: 'unequipArmor'; slot: ArmorSlot }
+  | { type: 'upgradeArmor'; id: string }
+  | { type: 'fuseArmor'; id: string }
+  | { type: 'sellArmor'; id: string }
   | { type: 'setSetting'; key: 'musicEnabled' | 'sfxEnabled'; value: boolean }
   | { type: 'rebindKey'; action: ControlAction; key: string }
   | { type: 'resetKeyBindings' }
-  | { type: 'settleRun'; report: RunReport }
+  | { type: 'settleRun'; report: RunReport; rolls?: { drop: number; rarity: number; kind: number } }
   // Retained for compatibility with phase-5 tests; gameplay uses settleRun only.
   | { type: 'awardGold'; amount: number };
 
@@ -222,15 +255,48 @@ export function applyProfileAction(profile: Profile, action: ProfileAction): Pro
       return { ...p, gold: p.gold - cost,
         abilityLevels: { ...p.abilityLevels, [action.id]: level + 1 } };
     }
-    case 'upgradePermanent': {
-      const level = p.permanentLevels[action.id];
-      const cost = permanentUpgradeCost(action.id, level);
-      if (level >= MAX_PERMANENT_LEVEL || p.gold < cost) return p;
-      return {
-        ...p, gold: p.gold - cost,
-        permanentLevels: { ...p.permanentLevels, [action.id]: level + 1 },
-      };
+    case 'equipArmor': {
+      const item = p.armorInventory.find(x => x.id === action.id);
+      if (!item) return p;
+      const slot = armorDefinition(item).slot;
+      return { ...p, equippedArmor: { ...p.equippedArmor, [slot]: item.id } };
     }
+    case 'unequipArmor':
+      return ARMOR_SLOTS.includes(action.slot) && p.equippedArmor[action.slot] !== null
+        ? { ...p, equippedArmor: { ...p.equippedArmor, [action.slot]: null } } : p;
+    case 'upgradeArmor': {
+      const item = p.armorInventory.find(x => x.id === action.id);
+      if (!item || item.level >= ARMOR_MAX_LEVEL) return p;
+      const cost = armorUpgradeCost(item);
+      if (p.gold < cost) return p;
+      return { ...p, gold: p.gold - cost, armorInventory: p.armorInventory.map(x =>
+        x.id === item.id ? { ...x, level: x.level + 1 } : x) };
+    }
+    case 'fuseArmor': {
+      const item = p.armorInventory.find(x => x.id === action.id);
+      if (!item || item.stars >= ARMOR_MAX_STARS) return p;
+      const duplicate = p.armorInventory.find(x => x.id !== item.id &&
+        x.kind === item.kind && x.rarity === item.rarity && x.stars === item.stars);
+      if (!duplicate) return p;
+      const equippedArmor = { ...p.equippedArmor };
+      for (const slot of ARMOR_SLOTS) {
+        if (equippedArmor[slot] === duplicate.id) equippedArmor[slot] = item.id;
+      }
+      return { ...p, equippedArmor, armorInventory: p.armorInventory
+        .filter(x => x.id !== duplicate.id).map(x =>
+          x.id === item.id ? { ...x, stars: x.stars + 1 } : x) };
+    }
+    case 'sellArmor': {
+      const item = p.armorInventory.find(x => x.id === action.id);
+      if (!item) return p;
+      const equippedArmor = { ...p.equippedArmor };
+      for (const slot of ARMOR_SLOTS) {
+        if (equippedArmor[slot] === item.id) equippedArmor[slot] = null;
+      }
+      return { ...p, gold: Math.min(MAX_GOLD, p.gold + RARITY_CONFIG[item.rarity].sell),
+        equippedArmor, armorInventory: p.armorInventory.filter(x => x.id !== item.id) };
+    }
+    case 'upgradePermanent': return p; // Replaced by armor.
     case 'setSetting': return { ...p, settings: { ...p.settings, [action.key]: action.value } };
     case 'rebindKey': {
       const result = rebindKey(p.settings.keyBindings, action.action, action.key);
@@ -257,8 +323,13 @@ export function applyProfileAction(profile: Profile, action: ProfileAction): Pro
         worldId <= p.completedWorlds + 1;
       const completedWorlds = completesWorld ?
         Math.max(p.completedWorlds, worldId) : p.completedWorlds;
+      const random = action.rolls ?? { drop: Math.random(), rarity: Math.random(), kind: Math.random() };
+      const item = p.armorInventory.length >= 250 ? undefined :
+        rollArmor(report.victory, random.drop, random.rarity, random.kind, report.runId);
       return {
         ...p, gold: Math.min(MAX_GOLD, p.gold + reward),
+        armorInventory: item ? [...p.armorInventory, item] : p.armorInventory,
+        lastArmorDrop: { runId: report.runId, item: item ?? null },
         totalGoldEarned: Math.min(MAX_GOLD, p.totalGoldEarned + reward),
         highestRoom: Math.max(p.highestRoom, reached),
         worldBestRooms, completedWorlds,
