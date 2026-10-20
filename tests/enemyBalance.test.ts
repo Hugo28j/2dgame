@@ -25,11 +25,11 @@ describe('world-1 Bramble Gunner health balance', () => {
 });
 
 describe('Mossling movement speed', () => {
-  it('increases ordinary slimes by exactly 25% in world 1 but not in later worlds', () => {
-    expect(WORLD1_MOSSLING_SPEED_MULTIPLIER).toBe(1.25);
-    expect(getSlimeStatsForRoom(1, 1).movementSpeed).toBe(140);
-    expect(getSlimeStatsForRoom(4, 1).movementSpeed).toBe(140);
-    expect(getSlimeStatsForRoom(12, 1).movementSpeed).toBe(140);
+  it('increases ordinary slimes by another 25% in world 1 but not in later worlds', () => {
+    expect(WORLD1_MOSSLING_SPEED_MULTIPLIER).toBe(1.5625);
+    expect(getSlimeStatsForRoom(1, 1).movementSpeed).toBe(175);
+    expect(getSlimeStatsForRoom(4, 1).movementSpeed).toBe(175);
+    expect(getSlimeStatsForRoom(12, 1).movementSpeed).toBe(175);
     expect(getSlimeStatsForRoom(1, 2).movementSpeed).toBe(116);
     expect(getEnemyStatsForRoom('charger', 12, 1).movementSpeed).toBe(94);
   });

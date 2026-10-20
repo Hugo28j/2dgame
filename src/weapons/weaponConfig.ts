@@ -25,7 +25,7 @@ const melee = (config: Omit<WeaponConfig, 'attackMode' | 'projectileSpeed' | 'pr
 
 export const WEAPONS: Readonly<Record<WeaponId, WeaponConfig>> = {
   bow: projectile({ id: 'bow', heroId: 'ranger', name: 'Ascent Bow', description: 'Snelle, precieze pijlen',
-    damage: 24, fireRate: 3.5, projectileSpeed: 470, projectileCount: 1, piercing: 0,
+    damage: 12, fireRate: 3.5, projectileSpeed: 470, projectileCount: 1, piercing: 0,
     criticalChanceModifier: 0.05, criticalMultiplier: 1.75, specialEffects: [], upgradeLevel: 1,
     unlockCost: 0, projectileRange: 700, effect: 'none', textureKey: 'arrow-placeholder', color: 0x7dd3fc }),
   crossbow: projectile({ id: 'crossbow', heroId: 'ranger', name: 'Hunter Crossbow', description: 'Traag, krachtig en doorborend',

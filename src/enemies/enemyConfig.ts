@@ -1,6 +1,9 @@
 import { getWorld, type WorldId } from '../worlds/worldConfig';
 import { BOSSES, getBossProfile, getBossTier } from './bossProfiles';
-import { BRAMBLE_GUNNER_HP_MULTIPLIER, WORLD1_MOSSLING_SPEED_MULTIPLIER } from './enemyBalance';
+import { BRAMBLE_GUNNER_HP_MULTIPLIER, WORLD1_MOSSLING_SPEED_MULTIPLIER,
+  WORLD1_BRIAR_DAMAGE_MULTIPLIER, WORLD1_WISP_HP_MULTIPLIER,
+  WORLD1_WISP_FIRE_RATE_MULTIPLIER, WORLD1_SPORECAP_HP_MULTIPLIER,
+  WORLD1_SPORECAP_SPEED_MULTIPLIER } from './enemyBalance';
 import { FROZEN_EARLY, earlyFrozenEnemy } from './frozenEarlyGame';
 
 export type EnemyKind = 'slime' | 'archer' | 'charger' | 'mage' | 'tank' | 'bomber' | 'boss';
@@ -46,7 +49,8 @@ export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number,
     maxHp: Math.round(base.maxHp *
       (worldId === 2 && kind === 'mage' ? 3 :
         worldId === 2 && kind === 'archer' ? 1.5 :
-        worldId === 1 && kind === 'mage' ? 2 : 1) *
+        worldId === 1 && kind === 'mage' ? WORLD1_WISP_HP_MULTIPLIER :
+        worldId === 1 && kind === 'bomber' ? WORLD1_SPORECAP_HP_MULTIPLIER : 1) *
       (1 + completed * SLIME_DIFFICULTY.hpPerRoom) *
       (kind === 'boss' ? 1 + (getBossTier(number) - 1) * 0.09 : 1) * world.hpMultiplier *
       // Only Bramble Gunner (first boss, world 1 room 15); Bloom Sentinel
@@ -55,12 +59,15 @@ export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number,
         ? BRAMBLE_GUNNER_HP_MULTIPLIER : 1) *
       (kind === 'boss' && worldId === 1 && number === 20 ? 1.5 :
         kind === 'boss' && worldId === 1 && number === 30 ? 2 : 1)),
-    damage: Math.round(base.damage * (worldId === 2 && kind === 'archer' ? 2 : 1) *
+    damage: Math.round(base.damage * (worldId === 2 && kind === 'archer' ? 2 :
+      worldId === 1 && kind === 'archer' ? WORLD1_BRIAR_DAMAGE_MULTIPLIER : 1) *
       (1 + completed * SLIME_DIFFICULTY.damagePerRoom) *
       (kind === 'boss' ? 1 + (getBossTier(number) - 1) * 0.05 : 1) * world.damageMultiplier),
     movementSpeed: Math.round(base.movementSpeed * world.speedMultiplier *
-      (kind === 'slime' && worldId === 1 ? WORLD1_MOSSLING_SPEED_MULTIPLIER : 1)),
-    attackIntervalMs: Math.round(base.attackIntervalMs / world.attackSpeedMultiplier),
+      (worldId === 1 && kind === 'slime' ? WORLD1_MOSSLING_SPEED_MULTIPLIER :
+        worldId === 1 && kind === 'bomber' ? WORLD1_SPORECAP_SPEED_MULTIPLIER : 1)),
+    attackIntervalMs: Math.round(base.attackIntervalMs / (world.attackSpeedMultiplier *
+      (worldId === 1 && kind === 'mage' ? WORLD1_WISP_FIRE_RATE_MULTIPLIER : 1))),
   };
 };
 export const getSlimeStatsForRoom = (roomNumber: number, worldId: WorldId = 1): SlimeRuntimeStats =>
@@ -73,7 +80,7 @@ export const WORLD2_UNLOCK_ROOMS = {
 /** First rooms contain only slimes. New enemies unlock gradually, then become
  * more frequent as the dungeon gets deeper. Deterministic for reproducible runs. */
 export const ENEMY_UNLOCK_ROOMS = {
-  slime: 1, archer: 7, charger: 12, tank: 17, mage: 23, bomber: 29,
+  slime: 1, archer: 7, charger: 11, tank: 16, mage: 21, bomber: 26,
 } as const;
 
 export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number,
@@ -98,14 +105,17 @@ export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number,
   const weighted: EnemyKind[] = [];
   for (const [kind, unlock] of entries) {
     if (room < unlock) continue;
-    const weight = kind === 'slime'
-      ? Math.max(2, 7 - Math.floor(room / 9))
-      : Math.min(6, 2 + Math.floor((room - unlock) / 5));
+    if (worldId === 1 && ((kind === 'archer' && room >= 21) ||
+      (kind === 'slime' && room >= 26))) continue;
+    const weight = worldId === 1 && kind === 'mage' && room >= 21 ? 7 :
+      worldId === 1 && kind === 'bomber' && room >= 26 ? 12 :
+      kind === 'slime' ? Math.max(2, 7 - Math.floor(room / 9)) :
+      Math.min(6, 2 + Math.floor((room - unlock) / 5));
     for (let i = 0; i < weight; i++) weighted.push(kind);
   }
   // Alternate deterministic pseudo-random slots so consecutive rooms do not
   // have identical mixes while types never spawn before their unlock room.
   const position = ((Math.imul(index + 13, 41) ^ Math.imul(room + 11, 31)) >>> 0) % weighted.length;
-  return weighted[position] ?? 'slime';
+  return weighted[position] ?? (worldId === 1 && room >= 26 ? 'bomber' : 'slime');
 };
 export const getBossName = (roomNumber: number): string => getBossProfile(roomNumber).name;

@@ -427,7 +427,12 @@ export class MainMenuScene extends Phaser.Scene {
     const profile = progressStore.current;
     this.drawUpgradeRows(HERO_WEAPONS[this.armorHero].map(id => ({
       label: WEAPONS[id].name,
-      description: WEAPONS[id].description,
+      description: (() => {
+        const stats = getWeaponStats(id, profile.weaponLevels[id]);
+        return 'DMG ' + stats.damage.toFixed(1) +
+          ' · ' + (1 / stats.fireRate).toFixed(2) + ' SEC/AANVAL' +
+          ' · ' + stats.projectileCount + (stats.attackMode === 'melee' ? ' SLAG' : ' SCHOTEN');
+      })(),
       level: profile.weaponLevels[id], max: MAX_WEAPON_LEVEL,
       cost: weaponUpgradeCost(profile.weaponLevels[id]),
       unlocked: profile.unlockedWeapons.includes(id),

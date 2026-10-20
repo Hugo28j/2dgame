@@ -15,10 +15,10 @@ describe('phase 7 room enemy rosters', () => {
     expect(getEnemyKindForRoom(4, 0)).toBe('slime');
     expect(getEnemyKindForRoom(6, 0)).toBe('slime');
     expect(getEnemyKindForRoom(7, 0)).toBe('archer');
-    expect(getEnemyKindForRoom(12, 0)).toBe('charger');
-    expect(getEnemyKindForRoom(17, 0)).toBe('tank');
-    expect(getEnemyKindForRoom(23, 0)).toBe('mage');
-    expect(getEnemyKindForRoom(29, 0)).toBe('bomber');
+    expect(getEnemyKindForRoom(11, 0)).toBe('charger');
+    expect(getEnemyKindForRoom(16, 0)).toBe('tank');
+    expect(getEnemyKindForRoom(21, 0)).toBe('mage');
+    expect(getEnemyKindForRoom(26, 0)).toBe('bomber');
     const seen = new Set<string>();
     for (let room = 1; room <= CHAPTER_ROOM_COUNT; room++) {
       const definition = getRoomDefinition(room);

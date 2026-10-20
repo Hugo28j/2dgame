@@ -13,8 +13,8 @@ describe('progressive enemy unlocks', () => {
       for (let i = 0; i < 60; i++) expect(getEnemyKindForRoom(room, i)).toBe('slime');
     }
     const unlocks = [
-      ['archer', 7], ['charger', 12], ['tank', 17],
-      ['mage', 23], ['bomber', 29],
+      ['archer', 7], ['charger', 11], ['tank', 16],
+      ['mage', 21], ['bomber', 26],
     ] as const;
     for (const [kind, firstRoom] of unlocks) {
       expect(ENEMY_UNLOCK_ROOMS[kind]).toBe(firstRoom);
@@ -32,7 +32,7 @@ describe('progressive enemy unlocks', () => {
     const early = new Set(Array.from({ length: 100 }, (_, i) => getEnemyKindForRoom(8, i)));
     const late = new Set(Array.from({ length: 100 }, (_, i) => getEnemyKindForRoom(29, i)));
     expect(early).toEqual(new Set(['slime', 'archer']));
-    expect(late).toEqual(new Set(['slime', 'archer', 'charger', 'tank', 'mage', 'bomber']));
+    expect(late).toEqual(new Set(['charger', 'tank', 'mage', 'bomber']));
     expect(getEnemyCountForRoom(29)).toBeGreaterThan(getEnemyCountForRoom(10));
     expect(getEnemyCountForRoom(29)).toBeLessThanOrEqual(32);
     for (let room = 1; room < CHAPTER_ROOM_COUNT; room++) {
