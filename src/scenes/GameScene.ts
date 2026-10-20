@@ -7,6 +7,7 @@ import { addAndLaunch } from '../combat/launchProjectile';
 import { GAME_SCENE_KEY, GAME_TITLE, GAME_OVER_SCENE_KEY, GAME_WIDTH } from '../config/constants';
 import { EnemySpawner } from '../enemies/EnemySpawner';
 import { getBossProfile, getBossTier } from '../enemies/bossProfiles';
+import { SPORE_POISON, poisonActive, poisonCovers, poisonTickDue } from '../enemies/poisonHazard';
 import { AdvancedEnemy, type BulletPattern } from '../enemies/AdvancedEnemy';
 import { EnemyProjectile } from '../enemies/EnemyProjectile';
 import { withinRadius } from '../enemies/enemyMovement';
@@ -58,9 +59,14 @@ export class GameScene extends Phaser.Scene {
   private enemyProjectiles?: Phaser.Physics.Arcade.Group;
   private readonly bombTimers = new Set<Phaser.Time.TimerEvent>();
   private readonly bombWarnings = new Set<Phaser.GameObjects.Arc>();
-  private activeBoss?: AdvancedEnemy;
-  private bossHealthBar?: Phaser.GameObjects.Graphics;
-  private bossNameText?: Phaser.GameObjects.Text;
+  private readonly poisonBottles = new Set<Phaser.GameObjects.Container>();
+  private readonly poisonPools = new Set<{
+    circle: Phaser.GameObjects.Arc; x: number; y: number;
+    radius: number; startAt: number; nextTickAt: number; damage: number;
+  }>();
+  private activeBosses: AdvancedEnemy[] = [];
+  private readonly bossHealthBars: Phaser.GameObjects.Graphics[] = [];
+  private readonly bossNameTexts: Phaser.GameObjects.Text[] = [];
   private obstacles?: Phaser.Physics.Arcade.StaticGroup;
   private enemySpawner?: EnemySpawner;
   private door?: Phaser.GameObjects.Rectangle;
@@ -175,6 +181,7 @@ export class GameScene extends Phaser.Scene {
     const aim = this.controls.getAim(this.player.x, this.player.y);
     this.player.face(aim);
     this.abilities?.update(this.time.now, delta);
+    this.updatePoisonPools(this.time.now);
     this.weapon.update(this.time.now, this.controls.isShooting(), aim);
 
     for (const child of this.enemies.getChildren()) {
@@ -279,11 +286,16 @@ export class GameScene extends Phaser.Scene {
       color: '#86efac', fontFamily: 'system-ui, sans-serif',
       fontSize: '11px', fontStyle: 'bold', stroke: '#020617', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(43).setScrollFactor(0).setVisible(false);
-    this.bossHealthBar = this.add.graphics().setDepth(41).setScrollFactor(0).setVisible(false);
-    this.bossNameText = this.add.text(GAME_WIDTH / 2, 137, '', {
-      color: '#fde68a', fontFamily: 'system-ui, sans-serif',
-      fontSize: '13px', fontStyle: 'bold', stroke: '#020617', strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(42).setScrollFactor(0).setVisible(false);
+    // Two dedicated HUD slots: the room-15 double encounter never overlaps.
+    for (let slot = 0; slot < 2; slot++) {
+      const y = 135 + slot * 44;
+      this.bossHealthBars.push(this.add.graphics().setDepth(41)
+        .setScrollFactor(0).setVisible(false));
+      this.bossNameTexts.push(this.add.text(GAME_WIDTH / 2, y, '', {
+        color: '#fde68a', fontFamily: 'system-ui, sans-serif',
+        fontSize: '12px', fontStyle: 'bold', stroke: '#020617', strokeThickness: 3,
+      }).setOrigin(0.5).setDepth(42).setScrollFactor(0).setVisible(false));
+    }
   }
 
   private updateCamera(): void {
@@ -436,7 +448,7 @@ export class GameScene extends Phaser.Scene {
     this.weapon?.clearGroundEffects();
     this.clearBossBombs();
     this.clearCoins();
-    this.activeBoss = undefined;
+    this.activeBosses = [];
     this.enemyProjectiles?.clear(true, true);
     this.enemies.clear(true, true);
     this.projectiles.clear(true, true);
@@ -476,9 +488,9 @@ export class GameScene extends Phaser.Scene {
     this.waveSettings = spawnWaveSettings(room.number, room.enemyCount);
     this.pendingSpawnIndices = room.enemySpawns.map((_, index) => index);
     const spawned = this.spawnEnemyWave(this.waveSettings.initial);
-    this.activeBoss = spawned.find(
+    this.activeBosses = spawned.filter(
       (enemy): enemy is AdvancedEnemy => enemy instanceof AdvancedEnemy && enemy.isBoss,
-    );
+    ).sort((a, b) => a.bossSlot - b.bossSlot);
     this.updateRoomHud(room);
     this.updateBossHud();
     this.updateEnemyCount();
@@ -609,7 +621,7 @@ export class GameScene extends Phaser.Scene {
       .text(
         GAME_WIDTH / 2,
         350,
-        room.isBossRoom ? `BOSS: ${getWorldBossName(this.worldId, room.number)}` :
+        room.isBossRoom ? `BOSS: ${room.enemyCount === 2 ? 'DUBBEL GEVECHT' : getWorldBossName(this.worldId, room.number)}` :
           `WERELD ${this.worldId} · KAMER ${room.number}`,
         {
           color: room.isBossRoom ? '#fbbf24' : '#bae6fd',
@@ -709,7 +721,7 @@ export class GameScene extends Phaser.Scene {
     const angles = shotAngles(pattern, angle, volley);
     const speed = (enemy.kind === 'boss' ? 220 + getBossTier(enemy.stats.roomNumber) * 8 :
       enemy.kind === 'mage' ? 220 : 320) * speedFactor;
-    const color = enemy.isBoss ? getBossProfile(enemy.stats.roomNumber).color :
+    const color = enemy.isBoss ? getBossProfile(enemy.stats.roomNumber, enemy.bossSlot).color :
       enemy.kind === 'mage' ? 0xa78bfa : 0xfb7185;
     for (const direction of angles) {
       const bullet = new EnemyProjectile(
@@ -834,19 +846,23 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateBossHud(): void {
-    if (!this.bossHealthBar || !this.bossNameText) return;
-    const boss = this.activeBoss;
-    const visible = !!boss && boss.active && boss.aiState !== 'defeated';
-    this.bossHealthBar.setVisible(visible);
-    this.bossNameText.setVisible(visible);
-    this.bossHealthBar.clear();
-    if (!visible || !boss) return;
-    this.bossNameText.setText(getWorldBossName(this.worldId, this.roomProgress.roomNumber) +
-      (boss.healthRatio <= 0.5 ? ' · FASE 2' : ' · FASE 1'));
-    this.bossHealthBar.fillStyle(0x020617, 0.95);
-    this.bossHealthBar.fillRoundedRect((GAME_WIDTH - 270) / 2, 154, 270, 14, 4);
-    this.bossHealthBar.fillStyle(boss.healthRatio <= 0.5 ? 0xef4444 : 0xf59e0b);
-    this.bossHealthBar.fillRoundedRect((GAME_WIDTH - 270) / 2 + 2, 156, 266 * boss.healthRatio, 10, 3);
+    for (let slot = 0; slot < 2; slot++) {
+      const boss = this.activeBosses[slot];
+      const bar = this.bossHealthBars[slot];
+      const name = this.bossNameTexts[slot];
+      if (!bar || !name) continue;
+      const visible = !!boss && boss.active && boss.aiState !== 'defeated';
+      bar.setVisible(visible).clear();
+      name.setVisible(visible);
+      if (!visible || !boss) continue;
+      name.setText(getWorldBossName(this.worldId, this.roomProgress.roomNumber, boss.bossSlot) +
+        (boss.healthRatio <= 0.5 ? ' · FASE 2' : ' · FASE 1'));
+      const y = 153 + slot * 44;
+      bar.fillStyle(0x020617, 0.95);
+      bar.fillRoundedRect((GAME_WIDTH - 270) / 2, y, 270, 14, 4);
+      bar.fillStyle(boss.healthRatio <= 0.5 ? 0xef4444 : 0xf59e0b);
+      bar.fillRoundedRect((GAME_WIDTH - 270) / 2 + 2, y + 2, 266 * boss.healthRatio, 10, 3);
+    }
   }
 
   private readonly handleEnemySpawned = (): void => {
@@ -1201,9 +1217,9 @@ export class GameScene extends Phaser.Scene {
     this.projectiles = undefined;
     this.enemies = undefined;
     this.enemyProjectiles = undefined;
-    this.activeBoss = undefined;
-    this.bossHealthBar = undefined;
-    this.bossNameText = undefined;
+    this.activeBosses = [];
+    this.bossHealthBars.length = 0;
+    this.bossNameTexts.length = 0;
     this.obstacles = undefined;
     this.enemySpawner = undefined;
     this.door = undefined;
