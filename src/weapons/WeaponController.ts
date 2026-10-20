@@ -69,7 +69,7 @@ export class WeaponController {
           // lies just beyond the painted slash. Other weapons stay unchanged.
           this.weaponId === 'sunblade' ? 20 : 0)) continue;
       this.onMeleeHit?.(target, attack);
-      if (this.meleeStunMs > 0 && target.active && target.aiState !== 'defeated') {
+      if (this.meleeStunMs > 0 && target.active) {
         target.applyStun(this.scene.time.now, this.meleeStunMs);
       }
       if (config.specialEffects.includes('knockback') &&
@@ -152,7 +152,7 @@ export class WeaponController {
       if (!(child instanceof Slime) || !child.active || child.aiState === 'defeated') continue;
       if (!inForwardRectangle(x, y, aim, child.x, child.y, range, halfWidth)) continue;
       this.onMeleeHit?.(child, attack);
-      if (this.meleeStunMs > 0 && child.active && child.aiState !== 'defeated') child.applyStun(time, this.meleeStunMs);
+      if (this.meleeStunMs > 0 && child.active) child.applyStun(time, this.meleeStunMs);
       if (child.active && child.healthRatio > 0) {
         child.applySlow(time, slowDurationMs, slowFactor);
       }
