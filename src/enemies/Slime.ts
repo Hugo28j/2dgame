@@ -81,13 +81,13 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
       this.slowFactor = 1;
       this.clearTint();
     }
-    if (now < this.stunnedUntil) {
-      this.setVelocity(0, 0);
+    if (this.isKnockedBack(now)) {
+      this.setVelocity(this.knockbackX, this.knockbackY);
       this.drawHealthBar();
       return;
     }
-    if (this.isKnockedBack(now)) {
-      this.setVelocity(this.knockbackX, this.knockbackY);
+    if (now < this.stunnedUntil) {
+      this.setVelocity(0, 0);
       this.drawHealthBar();
       return;
     }
