@@ -10,6 +10,8 @@ import { getBossProfile, getBossTier } from '../enemies/bossProfiles';
 import { SPORE_POISON, poisonActive, poisonCovers, poisonTickDue } from '../enemies/poisonHazard';
 import { AdvancedEnemy, type BulletPattern } from '../enemies/AdvancedEnemy';
 import { EnemyProjectile } from '../enemies/EnemyProjectile';
+import { HomingEnemyProjectile } from '../enemies/HomingEnemyProjectile';
+import { ICE_WALL, HOMING_ORB, wallGapCenter, wallHitsCircle, wallXAt } from '../enemies/frozenBossAttacks';
 import { withinRadius } from '../enemies/enemyMovement';
 import { shotAngles } from '../enemies/projectilePatterns';
 import {
@@ -59,6 +61,12 @@ export class GameScene extends Phaser.Scene {
   private enemyProjectiles?: Phaser.Physics.Arcade.Group;
   private readonly bombTimers = new Set<Phaser.Time.TimerEvent>();
   private readonly bombWarnings = new Set<Phaser.GameObjects.Arc>();
+  private readonly frozenWalls = new Set<{
+    warning: Phaser.GameObjects.Graphics; ice: Phaser.GameObjects.Graphics;
+    bounds: { x: number; y: number; width: number; height: number };
+    gapY: number; warnAt: number; launchAt: number; hit: boolean;
+    damage: number; owner: AdvancedEnemy;
+  }>();
   private readonly poisonBottles = new Set<Phaser.GameObjects.Container>();
   private readonly poisonPools = new Set<{
     circle: Phaser.GameObjects.Arc; x: number; y: number;
@@ -182,6 +190,7 @@ export class GameScene extends Phaser.Scene {
     this.player.face(aim);
     this.abilities?.update(this.time.now, delta);
     this.updatePoisonPools(this.time.now);
+    this.updateFrozenWalls(this.time.now);
     this.weapon.update(this.time.now, this.controls.isShooting(), aim);
 
     for (const child of this.enemies.getChildren()) {
@@ -194,6 +203,10 @@ export class GameScene extends Phaser.Scene {
     }
     for (const child of this.enemyProjectiles?.getChildren() ?? []) {
       if (child instanceof EnemyProjectile) {
+        if (child instanceof HomingEnemyProjectile) {
+          child.updateHoming(this.time.now, delta, this.player);
+        }
+        if (!child.active) continue;
         child.setSlowMotion(this.abilities?.enemyProjectileFactor(this.time.now) ?? 1);
         if (child.isOutsideArena()) child.destroy();
       }
@@ -733,6 +746,14 @@ export class GameScene extends Phaser.Scene {
       addAndLaunch(bullet, () => this.enemyProjectiles!.add(bullet),
         { x: Math.cos(direction), y: Math.sin(direction) }, speed);
     }
+    if (this.worldId === 2 && enemy.isBoss && !this.roomProgress.doorOpen) {
+      if (enemy.stats.roomNumber === ICE_WALL.room && volley % ICE_WALL.everyVolleys === 0) {
+        this.launchFrozenWall(enemy, volley);
+      }
+      if (enemy.stats.roomNumber === HOMING_ORB.room && volley % HOMING_ORB.everyVolleys === 0) {
+        this.launchHomingOrb(enemy);
+      }
+    }
   };
 
   /** Telegraph targeted bombs well before detonation. All timers are cancelled on room exit. */
@@ -855,6 +876,7 @@ export class GameScene extends Phaser.Scene {
     this.bombTimers.clear();
     for (const warning of this.bombWarnings) if (warning.active) warning.destroy();
     this.bombWarnings.clear();
+    this.clearFrozenWalls();
     for (const bottle of this.poisonBottles) {
       this.tweens.killTweensOf(bottle);
       bottle.destroy();
