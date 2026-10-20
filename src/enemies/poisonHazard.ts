@@ -2,7 +2,7 @@
  * normal boss telegraphs, so hazard duration is consistent at any FPS.
  */
 export const SPORE_POISON = Object.freeze({
-  durationMs: 5000,
+  durationMs: 1500,
   tickMs: 820,
   damageMultiplier: 0.24,
   bottleFlightMs: 530,
