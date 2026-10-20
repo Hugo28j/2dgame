@@ -75,7 +75,7 @@ describe('five unique playable worlds', () => {
         if (kind === 'slime' && world === 2) {
           // World 1 Mosslings intentionally get +25% speed; Frozen Hollow
           // slimes retain their pre-existing speed rather than being buffed too.
-          expect(oldStats.movementSpeed).toBe(140);
+          expect(oldStats.movementSpeed).toBe(175);
           expect(newStats.movementSpeed).toBe(116);
         } else {
           expect(newStats.movementSpeed).toBeGreaterThanOrEqual(oldStats.movementSpeed);
