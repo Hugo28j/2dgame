@@ -1059,6 +1059,57 @@ export class GameScene extends Phaser.Scene {
     }
   };
 
+  /** The long-range ice bomb visibly flies to its target before leaving a slow field. */
+  private throwFrozenSlowBomb(enemy: AdvancedEnemy, targetX: number, targetY: number,
+    radius: number, windupMs: number): void {
+    const bounds = this.currentRoom?.layout.bounds;
+    if (!bounds) return;
+    const x = Phaser.Math.Clamp(targetX, bounds.x + radius, bounds.x + bounds.width - radius);
+    const y = Phaser.Math.Clamp(targetY, bounds.y + radius, bounds.y + bounds.height - radius);
+    const bomb = this.add.circle(enemy.x, enemy.y, 11, 0x67e8f9, 0.95)
+      .setStrokeStyle(3, 0xffffff).setDepth(30);
+    const target = this.add.circle(x, y, radius, 0x67e8f9, 0.12)
+      .setStrokeStyle(2, 0xbae6fd, 0.75).setDepth(24);
+    this.bombWarnings.add(bomb);
+    this.bombWarnings.add(target);
+    const startY = enemy.y;
+    this.tweens.add({
+      targets: bomb, x, y, duration: windupMs, ease: 'Linear',
+      onUpdate: tween => bomb.setY(Phaser.Math.Linear(startY, y, tween.progress) -
+        75 * Math.sin(Math.PI * tween.progress)),
+      onComplete: () => {
+        this.bombWarnings.delete(bomb);
+        this.bombWarnings.delete(target);
+        bomb.destroy();
+        target.destroy();
+        if (this.gameOver || this.transitioning || this.roomProgress.doorOpen) return;
+        const patch = this.add.circle(x, y, radius, 0x7dd3fc, 0.28)
+          .setStrokeStyle(2, 0xbae6fd, 0.75).setDepth(22);
+        this.bombWarnings.add(patch);
+        let damageAt = 0;
+        let ticks = 0;
+        const timer = this.time.addEvent({ delay: 100, repeat: 24, callback: () => {
+          ticks++;
+          if (patch.active && this.player && !this.roomProgress.doorOpen &&
+              withinRadius(x, y, this.player.x, this.player.y, radius)) {
+            this.player.chill(this.time.now);
+            if (this.time.now >= damageAt) {
+              damageAt = this.time.now + 850;
+              this.damagePlayer({ damage: enemy.stats.damage * 0.23,
+                criticalChance: 0, criticalMultiplier: 1 });
+            }
+          }
+          if (ticks >= 25) {
+            this.bombWarnings.delete(patch);
+            patch.destroy();
+            this.bombTimers.delete(timer);
+          }
+        } });
+        this.bombTimers.add(timer);
+      },
+    });
+  }
+
   /** Each green bottle visibly arcs from the alchemist to its target before
    * breaking. Impact creates a five-second damaging poison circle.
    */
