@@ -164,6 +164,11 @@ export class AbilityController {
     this.refresh(now);
   }
 
+  public shortenActiveCooldowns(now: number, factor: number): void {
+    this.cooldowns.shortenRemaining(now, factor);
+    this.refresh(now);
+  }
+
   /** Freezes all ability cooldowns as soon as the last enemy dies. */
   public pauseCooldowns(now: number): void {
     this.cooldowns.pause(now);
