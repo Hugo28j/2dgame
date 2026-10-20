@@ -149,7 +149,7 @@ export function abilityUpgradeCost(level: number): number {
 export function getAbilityStats(id: AbilityId, level: number): AbilityStats {
   const base = ABILITIES[id];
   const extra = Math.max(0, Math.min(MAX_ABILITY_LEVEL, Math.floor(level)) - 1);
-  const cooldownScale = id === 'ranger-step' ? Math.max(0.55, 1 - extra * 0.025) :
+  const cooldownScale = id === 'ranger-step' ? Math.max(0.5, 1 - extra * 0.025) :
     Math.max(0.7, 1 - extra * 0.015);
   return {
     ...base, upgradeLevel: extra + 1,
