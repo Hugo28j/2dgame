@@ -30,11 +30,11 @@ describe('progressive enemy unlocks', () => {
 
   it('provides increasingly varied and difficult rosters in late rooms', () => {
     const early = new Set(Array.from({ length: 100 }, (_, i) => getEnemyKindForRoom(8, i)));
-    const late = new Set(Array.from({ length: 100 }, (_, i) => getEnemyKindForRoom(49, i)));
+    const late = new Set(Array.from({ length: 100 }, (_, i) => getEnemyKindForRoom(29, i)));
     expect(early).toEqual(new Set(['slime', 'archer']));
     expect(late).toEqual(new Set(['slime', 'archer', 'charger', 'tank', 'mage', 'bomber']));
-    expect(getEnemyCountForRoom(49)).toBeGreaterThan(getEnemyCountForRoom(10));
-    expect(getEnemyCountForRoom(49)).toBeLessThanOrEqual(32);
+    expect(getEnemyCountForRoom(29)).toBeGreaterThan(getEnemyCountForRoom(10));
+    expect(getEnemyCountForRoom(29)).toBeLessThanOrEqual(32);
     for (let room = 1; room < CHAPTER_ROOM_COUNT; room++) {
       expect(getEnemyCountForRoom(room + 1)).toBeGreaterThanOrEqual(getEnemyCountForRoom(room));
     }
@@ -52,11 +52,11 @@ describe('scrollable procedural arenas', () => {
       expect(getArenaBounds(room).height).toBeGreaterThanOrEqual(getArenaBounds(room - 1).height);
     }
     expect(getArenaBounds(1).height).toBeLessThan(844);
-    expect(getArenaBounds(50).height).toBeGreaterThan(1300);
-    expect(getArenaBounds(50).width).toBeGreaterThan(700);
+    expect(getArenaBounds(30).height).toBeGreaterThan(1100);
+    expect(getArenaBounds(30).width).toBeGreaterThan(680);
   });
 
-  it('places every player, obstacle and enemy spawn safely across all fifty chambers', () => {
+  it('places every player, obstacle and enemy spawn safely across all thirty chambers', () => {
     for (let room = 1; room <= CHAPTER_ROOM_COUNT; room++) {
       const definition = getRoomDefinition(room);
       const { bounds, playerSpawn, obstacles } = definition.layout;
@@ -88,7 +88,7 @@ describe('scrollable procedural arenas', () => {
     const first = getRoomDefinition(1).layout;
     expect(targetArenaScroll(first.playerSpawn.x, first.playerSpawn.y, first.bounds))
       .toEqual({ x: 0, y: 0 });
-    const large = getRoomDefinition(50).layout.bounds;
+    const large = getRoomDefinition(CHAPTER_ROOM_COUNT).layout.bounds;
     const start = targetArenaScroll(large.x + 55, large.y + 65, large);
     const middle = targetArenaScroll(large.x + large.width / 2,
       large.y + large.height / 2, large);
@@ -103,11 +103,11 @@ describe('scrollable procedural arenas', () => {
     expect(end.y).toBeLessThanOrEqual(large.y + large.height + 204 - 844);
   });
 
-  it('keeps ten boss rooms with room-filling arenas', () => {
-    for (let room = 5; room <= 50; room += 5) {
+  it('keeps six boss rooms with room-filling arenas', () => {
+    for (let room = 5; room <= CHAPTER_ROOM_COUNT; room += 5) {
       const definition = getRoomDefinition(room);
       expect(definition.isBossRoom).toBe(true);
-      expect(definition.enemySpawns).toHaveLength(1);
+      expect(definition.enemySpawns).toHaveLength(room === 15 ? 2 : 1);
       expect(definition.layout.bounds).toEqual(getArenaBounds(room));
     }
   });

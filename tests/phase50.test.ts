@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BOSSES, getBossPlan, getBossProfile, getBossTier } from '../src/enemies/bossProfiles';
+import { BOSSES, BOSS_ENCOUNTER_ARCHETYPES, getBossPlan, getBossProfile, getBossTier } from '../src/enemies/bossProfiles';
 import { getBossName, getEnemyStatsForRoom } from '../src/enemies/enemyConfig';
 import { shotAngles } from '../src/enemies/projectilePatterns';
 import { mouseButtonKey, defaultKeyBindings, formatBinding, rebindKey,
@@ -55,42 +55,50 @@ describe('mouse and keyboard bindings', () => {
   });
 });
 
-describe('ten unique escalating bosses', () => {
-  it('builds exactly 50 rooms and 10 bosses, one after every five rooms', () => {
-    expect(CHAPTER_ROOM_COUNT).toBe(50);
+describe('six boss arenas and seven original archetypes', () => {
+  it('builds 30 rooms, with two bosses on room 15', () => {
+    expect(CHAPTER_ROOM_COUNT).toBe(30);
     expect(BOSSES).toHaveLength(10);
-    const bossRooms = Array.from({ length: 50 }, (_, i) => i + 1)
+    const bossRooms = Array.from({ length: CHAPTER_ROOM_COUNT }, (_, i) => i + 1)
       .filter(room => getRoomDefinition(room).isBossRoom);
-    expect(bossRooms).toEqual([5, 10, 15, 20, 25, 30, 35, 40, 45, 50]);
+    expect(bossRooms).toEqual([5, 10, 15, 20, 25, 30]);
     for (const room of bossRooms) {
-      expect(getRoomDefinition(room).enemyCount).toBe(1);
+      expect(getRoomDefinition(room).enemyCount).toBe(room === 15 ? 2 : 1);
       expect(getBossProfile(room).name).toBe(getBossName(room));
       expect(getBossTier(room)).toBe(room / 5);
+      expect(BOSS_ENCOUNTER_ARCHETYPES[room]).toHaveLength(room === 15 ? 2 : 1);
     }
+    expect(getBossProfile(5)).toBe(BOSSES[0]);
+    expect(getBossProfile(10)).toBe(BOSSES[2]);
+    expect(getBossProfile(15)).toBe(BOSSES[4]);
+    expect(getBossProfile(15, 1)).toBe(BOSSES[3]);
+    expect(getBossProfile(20)).toBe(BOSSES[6]);
+    expect(getBossProfile(25)).toBe(BOSSES[7]);
+    expect(getBossProfile(30)).toBe(BOSSES[9]);
   });
 
-  it('every boss uses a different attack signature and distinctly changes at half HP', () => {
+  it('preserves unique phase-two attacks and speeds up Jade Matriarch', () => {
     const signatures = new Set<string>();
-    BOSSES.forEach((profile, i) => {
-      expect(profile.phaseOne).not.toEqual(profile.phaseTwo);
-      const room = (i + 1) * 5;
-      const first = getBossPlan(room, 1, 0);
-      const second = getBossPlan(room, 2, 0);
-      expect(first.pattern).toBeDefined();
-      expect(second.pattern).toBeDefined();
-      const signature = JSON.stringify([profile.phaseOne, profile.phaseTwo]);
-      expect(signatures.has(signature)).toBe(false);
-      signatures.add(signature);
-    });
-    expect(signatures.size).toBe(10);
-    expect(getBossPlan(25, 1, 1).pattern).toBe('machinegun');
-    expect(getBossPlan(25, 2, 0).pattern).toBe('ring');
-    expect(getBossPlan(10, 1, 0).bombs).toBeGreaterThan(0);
-    expect(getBossPlan(35, 2, 0).bombs).toBeGreaterThan(3);
+    for (const room of [5, 10, 15, 20, 25, 30]) {
+      const bossSlots = getRoomDefinition(room).enemyCount;
+      for (let slot = 0; slot < bossSlots; slot++) {
+        const profile = getBossProfile(room, slot);
+        expect(profile.phaseOne).not.toEqual(profile.phaseTwo);
+        expect(getBossPlan(room, 1, 0, slot).pattern).toBeDefined();
+        expect(getBossPlan(room, 2, 0, slot).pattern).toBeDefined();
+        signatures.add(JSON.stringify([profile.phaseOne, profile.phaseTwo]));
+      }
+    }
+    expect(signatures.size).toBe(7);
+    expect(getBossPlan(15, 1, 0).pattern).toBe('machinegun');
+    expect(getBossPlan(15, 1, 0, 1).pattern).toBe('spiral');
+    expect(getBossPlan(25, 1, 0).tempo).toBeLessThan(0.6);
+    expect(getBossPlan(25, 2, 0).tempo).toBeLessThan(0.4);
+    expect(getBossPlan(20, 2, 0).bombs).toBeGreaterThan(3);
   });
 
-  it('boss health and damage increase strictly from boss one to boss ten', () => {
-    const stats = Array.from({ length: 10 }, (_, i) => getEnemyStatsForRoom('boss', (i + 1) * 5));
+  it('scales health and damage across the six boss encounters', () => {
+    const stats = [5, 10, 15, 20, 25, 30].map(room => getEnemyStatsForRoom('boss', room));
     for (let i = 1; i < stats.length; i++) {
       expect(stats[i]!.maxHp).toBeGreaterThan(stats[i - 1]!.maxHp);
       expect(stats[i]!.damage).toBeGreaterThan(stats[i - 1]!.damage);
@@ -110,12 +118,12 @@ describe('ten unique escalating bosses', () => {
   });
 
   it('tracks runs and persisted personal records beyond room twenty', () => {
-    const ledger = new RunLedger('50-rooms');
-    ledger.enterRoom(50);
-    expect(ledger.clearRoom(50)).toBe(true);
-    expect(ledger.report(true).reachedRoom).toBe(50);
+    const ledger = new RunLedger('30-rooms');
+    ledger.enterRoom(30);
+    expect(ledger.clearRoom(30)).toBe(true);
+    expect(ledger.report(true).reachedRoom).toBe(30);
     const saved = applyProfileAction(defaultProfile(),
       { type: 'settleRun', report: ledger.report(true) });
-    expect(saved.highestRoom).toBe(50);
+    expect(saved.highestRoom).toBe(30);
   });
 });

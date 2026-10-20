@@ -2,7 +2,7 @@ import { ARENA_BOUNDS } from '../config/gameplay';
 import type { SpawnPoint } from '../enemies/EnemySpawner';
 import type { WorldId } from '../worlds/worldConfig';
 
-export const CHAPTER_ROOM_COUNT = 50;
+export const CHAPTER_ROOM_COUNT = 30;
 export const BOSS_ROOM_INTERVAL = 5;
 export const SAFE_SPAWN_DISTANCE = 140;
 
@@ -161,16 +161,16 @@ export const getRoomDefinition = (roomNumber: number, worldId: WorldId = 1): Roo
   // Each world visits the same 21 hand-designed patterns in a different order.
   const index = (regularIndex + (worldId - 1) * 4) % TEMPLATES.length;
   const layout = makeLayout(room, index);
-  const enemyCount = isBossRoom ? 1 : getEnemyCountForRoom(room);
+  const enemyCount = isBossRoom ? (room === 15 ? 2 : 1) : getEnemyCountForRoom(room);
   // Bosses receive an open arena: mobility and projectile patterns remain fair.
   const bossLayout = isBossRoom ? makeLayout(room, 0) : layout;
-  const bossSpawn = {
-    x: bossLayout.bounds.x + bossLayout.bounds.width / 2,
+  const bossSpawns = Array.from({ length: enemyCount }, (_, index) => ({
+    x: bossLayout.bounds.x + bossLayout.bounds.width * (enemyCount === 1 ? 0.5 : index === 0 ? 0.32 : 0.68),
     y: bossLayout.bounds.y + Math.min(190, bossLayout.bounds.height * 0.21),
-  };
+  }));
   return {
     number: room, isBossRoom, enemyCount,
     layout: bossLayout,
-    enemySpawns: isBossRoom ? [bossSpawn] : layout.enemySpawns.slice(0, enemyCount),
+    enemySpawns: isBossRoom ? bossSpawns : layout.enemySpawns.slice(0, enemyCount),
   };
 };

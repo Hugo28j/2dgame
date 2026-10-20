@@ -47,8 +47,8 @@ export const BOSSES: readonly BossProfile[] = [
     phaseOne: mode(['single'], 1.2, 3, 55, 1200),
     phaseTwo: mode(['wide', 'single'], 0.9, 5, 62, 1050) },
   { name: 'Crystal Matriarch', color: 0xf0abfc, preferredRange: 200,
-    phaseOne: mode(['ring'], 0.86),
-    phaseTwo: mode(['offset-ring', 'cross'], 0.67, 0, 55, 900) },
+    phaseOne: mode(['ring'], 0.52),
+    phaseTwo: mode(['offset-ring', 'cross'], 0.37, 0, 55, 900) },
   { name: 'Rift Stalker', color: 0x22d3ee, preferredRange: 105,
     phaseOne: mode(['needle'], 1.05, 0, 55, 1000, 2),
     phaseTwo: mode(['wide', 'needle'], 0.72, 0, 55, 1000, 1) },
@@ -57,15 +57,26 @@ export const BOSSES: readonly BossProfile[] = [
     phaseTwo: mode(['offset-ring', 'wide', 'machinegun'], 0.53, 4, 58, 900, 3) },
 ] as const;
 
+/** Original archetype indices retained for all five worlds.
+ * Chamber 15 deliberately contains Gunner + Sentinel simultaneously.
+ */
+export const BOSS_ENCOUNTER_ARCHETYPES: Readonly<Record<number, readonly number[]>> = {
+  5: [0], 10: [2], 15: [4, 3], 20: [6], 25: [7], 30: [9],
+};
 export function getBossTier(roomNumber: number): number {
-  return Math.min(BOSSES.length, Math.max(1, Math.floor(roomNumber / 5)));
+  return Math.min(6, Math.max(1, Math.floor(roomNumber / 5)));
 }
-export function getBossProfile(roomNumber: number): BossProfile {
-  return BOSSES[getBossTier(roomNumber) - 1]!;
+export function getBossArchetypeIndex(roomNumber: number, bossSlot = 0): number {
+  const room = Math.max(5, Math.min(30, Math.floor(roomNumber / 5) * 5));
+  return BOSS_ENCOUNTER_ARCHETYPES[room]?.[bossSlot] ??
+    BOSS_ENCOUNTER_ARCHETYPES[room]![0]!;
 }
-export function getBossPlan(roomNumber: number, phase: 1 | 2, volley: number):
+export function getBossProfile(roomNumber: number, bossSlot = 0): BossProfile {
+  return BOSSES[getBossArchetypeIndex(roomNumber, bossSlot)]!;
+}
+export function getBossPlan(roomNumber: number, phase: 1 | 2, volley: number, bossSlot = 0):
   BossMode & { pattern: BulletPattern } {
-  const boss = getBossProfile(roomNumber);
+  const boss = getBossProfile(roomNumber, bossSlot);
   const m = phase === 1 ? boss.phaseOne : boss.phaseTwo;
   return { ...m, pattern: m.patterns[Math.abs(Math.floor(volley)) % m.patterns.length]! };
 }

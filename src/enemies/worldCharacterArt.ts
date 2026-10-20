@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { WORLDS, type WorldId } from '../worlds/worldConfig';
+import { BOSS_ENCOUNTER_ARCHETYPES } from './bossProfiles';
 import { getWorldCharacter, getWorldCharacterRoster, type CharacterLook } from './worldCharacters';
 
 /** Original hand-drawn vector sprites. All generated once at boot; no network
@@ -102,8 +103,7 @@ function drawMinion(g: Phaser.GameObjects.Graphics, look: CharacterLook): void {
 }
 
 function drawBoss(g: Phaser.GameObjects.Graphics, look: CharacterLook, tier: number): void {
-  // Ten silhouette variants per world. Horn / crown / helm composition changes
-  // with tier, so all fifty bosses get their own distinct profile.
+  // Distinct silhouettes for the six encounters, including both room-15 bosses.
   g.fillStyle(0x020617, 0.7); g.fillEllipse(24, 44, 40, 7);
   g.fillStyle(look.secondary); g.fillRoundedRect(6, 16, 36, 28, 8);
   g.fillStyle(look.primary); g.fillRoundedRect(10, 17, 28, 23, 6);
@@ -131,13 +131,13 @@ function drawBoss(g: Phaser.GameObjects.Graphics, look: CharacterLook, tier: num
   worldMark(g, look.worldId, 0xf8fafc, 24, 38);
 }
 
-/** One pre-rendered texture per minion and boss (5×6 + 5×10 = 80). */
+/** One pre-rendered texture per minion and encountered boss. */
 export function createWorldCharacterTextures(scene: Phaser.Scene): void {
   for (const world of WORLDS) {
     const roster = [
       ...getWorldCharacterRoster(world.id),
-      ...Array.from({ length: 10 }, (_, index) =>
-        getWorldCharacter(world.id, 'boss', (index + 1) * 5)),
+      ...Object.entries(BOSS_ENCOUNTER_ARCHETYPES).flatMap(([room, indices]) =>
+        indices.map((_, slot) => getWorldCharacter(world.id, 'boss', Number(room), slot))),
     ];
     for (const look of roster) {
       if (scene.textures.exists(look.textureKey)) continue;

@@ -29,18 +29,18 @@ describe('phase 7 room enemy rosters', () => {
     expect(seen).toEqual(new Set(['slime', 'archer', 'charger', 'mage', 'tank', 'bomber', 'boss']));
   });
 
-  it('has one real boss per fifth room, away from the player spawn', () => {
-    for (const room of [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]) {
+  it('has six boss fights, with two bosses on room 15, away from the player spawn', () => {
+    for (const room of [5, 10, 15, 20, 25, 30]) {
       const definition = getRoomDefinition(room);
       expect(definition.isBossRoom).toBe(true);
-      expect(definition.enemyCount).toBe(1);
-      expect(definition.enemySpawns).toHaveLength(1);
+      expect(definition.enemyCount).toBe(room === 15 ? 2 : 1);
+      expect(definition.enemySpawns).toHaveLength(definition.enemyCount);
       expect(getEnemyKindForRoom(room, 0)).toBe('boss');
       const spawn = definition.enemySpawns[0]!;
       expect(Math.hypot(spawn.x - definition.layout.playerSpawn.x,
         spawn.y - definition.layout.playerSpawn.y)).toBeGreaterThan(120);
     }
-    expect([5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map(getBossName)).toHaveLength(10);
+    expect([5, 10, 15, 20, 25, 30].map(getBossName)).toHaveLength(6);
   });
 
   it('configures valid, scaling HP and damage for each enemy type', () => {

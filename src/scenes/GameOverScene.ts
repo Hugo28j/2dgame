@@ -47,7 +47,7 @@ export class GameOverScene extends Phaser.Scene {
       ['Bereikte kamer', String(report.reachedRoom) + '/' + CHAPTER_ROOM_COUNT],
       ['Kamers voltooid', String(report.roomsCleared)],
       ['Vijanden verslagen', String(report.enemiesDefeated)],
-      ['Bosses verslagen', String(report.bossesDefeated) + '/10'],
+      ['Bosses verslagen', String(report.bossesDefeated) + '/7'],
       ['Totale schade', String(report.totalDamage)],
       ['VERDIEND DEZE RUN', '+' + report.earnedGold + ' G'],
       ['TOTAAL OOIT VERDIEND', profile.totalGoldEarned.toLocaleString('nl-BE') + ' G'],

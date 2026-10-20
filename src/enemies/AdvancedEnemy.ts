@@ -21,6 +21,7 @@ export class AdvancedEnemy extends Slime {
   private nextShotAt = 0;
   private bossVolleys = 0;
   private readonly roomNumber: number;
+  private readonly worldId: WorldId;
   private nextSpecialAt = 0;
   private windupEndsAt = 0;
   private dashEndsAt = 0;
@@ -32,16 +33,18 @@ export class AdvancedEnemy extends Slime {
 
   public constructor(scene: Phaser.Scene, id: string, x: number, y: number,
     kind: Exclude<EnemyKind, 'slime'>, roomNumber: number,
-    worldId: WorldId = 1) {
+    worldId: WorldId = 1,
+    public readonly bossSlot = 0) {
     const stats = getEnemyStatsForRoom(kind, roomNumber, worldId);
     super(scene, id, x, y, stats);
     this.kind = kind;
     this.roomNumber = roomNumber;
+    this.worldId = worldId;
     this.stats = stats;
     // Sprite palette is baked into the world-specific texture; white tint preserves detail.
     this.bossTint = 0xffffff;
     this.orbitSign = id.length % 2 === 0 ? 1 : -1;
-    this.setTexture(getWorldCharacter(worldId, kind, roomNumber).textureKey);
+    this.setTexture(getWorldCharacter(worldId, kind, roomNumber, bossSlot).textureKey);
     if (kind === 'boss') {
       this.setScale(1.75);
       this.setTint(this.bossTint);
@@ -53,6 +56,12 @@ export class AdvancedEnemy extends Slime {
   }
 
   public get isBoss(): boolean { return this.kind === 'boss'; }
+  public get isPoisonAlchemist(): boolean {
+    return this.isBoss && this.worldId === 1 && this.roomNumber === 20;
+  }
+  public get isMossWarden(): boolean {
+    return this.isBoss && this.worldId === 1 && this.roomNumber === 5;
+  }
 
   public updateAI(targetX: number, targetY: number, now: number,
     fire: EnemyFire, explode: EnemyExplosion, dropBombs?: EnemyBomb): void {
@@ -106,8 +115,8 @@ export class AdvancedEnemy extends Slime {
         break;
       case 'boss': {
         const phase = bossPhase(this.healthRatio);
-        const profile = getBossProfile(this.roomNumber);
-        const mode = getBossPlan(this.roomNumber, phase, this.bossVolleys);
+        const profile = getBossProfile(this.roomNumber, this.bossSlot);
+        const mode = getBossPlan(this.roomNumber, phase, this.bossVolleys, this.bossSlot);
         const move = rangedVelocity(this.x, this.y, targetX, targetY, speed,
           profile.preferredRange, this.orbitSign);
         if (this.windupEndsAt === 0 && this.dashEndsAt === 0) {
@@ -136,7 +145,8 @@ export class AdvancedEnemy extends Slime {
             this.bossVolleys % mode.dashEvery === 0) ||
           this.windupEndsAt > 0 || this.dashEndsAt > 0) {
           this.chargeLogic(targetX, targetY, now, distance,
-            phase === 2 ? 2900 : 4400);
+            this.isMossWarden ? (phase === 2 ? 2050 : 2750) :
+              phase === 2 ? 2900 : 4400);
         }
         break;
       }
@@ -172,7 +182,7 @@ export class AdvancedEnemy extends Slime {
       this.drawWarning(70, 0xef4444);
       if (now >= this.windupEndsAt) {
         this.clearWarning();
-        this.dashEndsAt = now + 360;
+        this.dashEndsAt = now + (this.isMossWarden ? 1080 : 360);
       }
       return;
     }
@@ -180,7 +190,7 @@ export class AdvancedEnemy extends Slime {
       const direction = new Phaser.Math.Vector2(targetX - this.x, targetY - this.y).normalize();
       this.dashX = direction.x;
       this.dashY = direction.y;
-      this.windupEndsAt = now + (this.isBoss ? 770 : 540);
+      this.windupEndsAt = now + (this.isMossWarden ? 330 : this.isBoss ? 770 : 540);
       this.setVelocity(0, 0);
       this.drawWarning(70, 0xef4444);
     }
@@ -197,7 +207,7 @@ export class AdvancedEnemy extends Slime {
       return;
     }
     // Warn about the full dash corridor, not an unrelated circle.
-    const reach = (this.isBoss ? 360 : 430) * 0.36;
+    const reach = this.isMossWarden ? 360 * 1.08 : (this.isBoss ? 360 : 430) * 0.36;
     const halfWidth = this.isBoss ? 32 : 24;
     const normalX = -this.dashY * halfWidth;
     const normalY = this.dashX * halfWidth;

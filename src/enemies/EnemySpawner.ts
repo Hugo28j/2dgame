@@ -34,7 +34,8 @@ export class EnemySpawner {
             { ...getSlimeStatsForRoom(room.number, worldId) },
             getWorldCharacter(worldId, kind, room.number).textureKey)
         : new AdvancedEnemy(this.scene, `${kind}-${this.nextEnemyNumber++}`,
-            point.x, point.y, kind, room.number, worldId);
+            point.x, point.y, kind, room.number, worldId,
+            kind === 'boss' ? index : 0);
       addBoundedEnemy(enemy, () => this.enemyGroup.add(enemy));
       return enemy;
     });
