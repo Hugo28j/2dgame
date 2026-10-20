@@ -24,6 +24,26 @@ describe('Guardian parry', () => {
 });
 
 describe('Guardian Dawnblade', () => {
+  it('registers hits when the painted slash touches the edge of a mob', () => {
+    const range = WEAPONS.sunblade.meleeRange;
+    const arc = WEAPONS.sunblade.meleeArc;
+    const origin = { x: 0, y: 0 };
+    const aim = { x: 1, y: 0 };
+    // Previously a mob at x=110 visibly overlapped the 96px slash
+    // but its centre was outside the melee hitbox.
+    expect(isInsideMeleeSwing(origin, aim, { x: 110, y: 0 }, range, arc)).toBe(false);
+    expect(isInsideMeleeSwing(origin, aim, { x: 110, y: 0 }, range, arc, 20)).toBe(true);
+    expect(isInsideMeleeSwing(origin, aim, { x: 117, y: 0 }, range, arc, 20)).toBe(false);
+    // Also catches a grazing hit at the angular edge of the crescent.
+    const nearArcEdge = arc / 2 + 0.1;
+    const edgeEnemy = { x: 90 * Math.cos(nearArcEdge), y: 90 * Math.sin(nearArcEdge) };
+    expect(isInsideMeleeSwing(origin, aim, edgeEnemy, range, arc)).toBe(false);
+    expect(isInsideMeleeSwing(origin, aim, edgeEnemy, range, arc, 20)).toBe(true);
+    // No change for other weapons, which still use centre-only geometry.
+    expect(isInsideMeleeSwing(origin, aim, { x: 80, y: 0 },
+      WEAPONS.warhammer.meleeRange, WEAPONS.warhammer.meleeArc)).toBe(false);
+  });
+
   it('has slightly longer range and a distinct knockback effect', () => {
     expect(WEAPONS.sunblade.meleeRange).toBeGreaterThan(82);
     expect(WEAPONS.sunblade.meleeRange).toBeLessThanOrEqual(100);
