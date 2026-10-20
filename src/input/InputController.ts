@@ -15,6 +15,7 @@ export class InputController {
   private readonly bindings: Readonly<KeyBindings>;
   private readonly heldKeys = new Set<string>();
   private readonly pressedAbilities = new Set<ControlAction>();
+  private readonly releasedAbilities = new Set<ControlAction>();
   private readonly keyboard: Phaser.Input.Keyboard.KeyboardPlugin;
   private lastAim: Vector2Value = { x: 1, y: 0 };
   private lastTouchTime = -Infinity;
@@ -24,6 +25,7 @@ export class InputController {
     this.aimJoystick.reset();
     this.heldKeys.clear();
     this.pressedAbilities.clear();
+    this.releasedAbilities.clear();
   };
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
@@ -65,6 +67,10 @@ export class InputController {
   private readonly onMouseUp = (event: MouseEvent): void => {
     const key = mouseButtonKey(event.button);
     if (key && this.heldKeys.has(key) && event.button !== 0) event.preventDefault();
+    if (key && this.heldKeys.has(key)) {
+      const action = CONTROL_ACTIONS.find(id => this.bindings[id].includes(key));
+      if (action === 'fireNova' || action === 'iceBlast') this.releasedAbilities.add(action);
+    }
     if (key) this.heldKeys.delete(key);
   };
 
@@ -76,6 +82,10 @@ export class InputController {
 
   private readonly onKeyUp = (event: KeyboardEvent): void => {
     const key = normalizeBindKey(event.key);
+    if (key && this.heldKeys.has(key)) {
+      const action = CONTROL_ACTIONS.find(id => this.bindings[id].includes(key));
+      if (action === 'fireNova' || action === 'iceBlast') this.releasedAbilities.add(action);
+    }
     if (key) this.heldKeys.delete(key);
   };
 
@@ -123,6 +133,7 @@ export class InputController {
     this.movementJoystick.reset();
     this.aimJoystick.reset();
     this.pressedAbilities.clear();
+    this.releasedAbilities.clear();
   }
 
   public getMovement(): Vector2Value {
@@ -135,6 +146,12 @@ export class InputController {
     const pressed = this.pressedAbilities.has(action);
     this.pressedAbilities.delete(action);
     return pressed;
+  }
+
+  public consumeAbilityReleased(action: 'fireNova' | 'iceBlast'): boolean {
+    const released = this.releasedAbilities.has(action);
+    this.releasedAbilities.delete(action);
+    return released;
   }
 
   public getAbilityLabel(action: 'dash' | 'fireNova' | 'iceBlast'): string {
@@ -182,6 +199,7 @@ export class InputController {
     this.aimJoystick.destroy();
     this.heldKeys.clear();
     this.pressedAbilities.clear();
+    this.releasedAbilities.clear();
   }
 
   private readonly handleVisibilityChange = (): void => {
