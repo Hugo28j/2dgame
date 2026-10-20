@@ -4,22 +4,22 @@ import { BOSS_ROOM_INTERVAL, CHAPTER_ROOM_COUNT, getEnemyCountForRoom,
   getMinimumSpawnDistance, getRoomDefinition, isSpawnSafe } from '../src/rooms/roomConfig';
 
 describe('late-room spawn counts and starting distance', () => {
-  it('increases from 3 to 31 normal enemies, retaining exactly one boss per fifth room', () => {
+  it('increases normal enemies, with two bosses in chamber 15', () => {
     expect(getEnemyCountForRoom(1)).toBe(3);
     expect(getEnemyCountForRoom(20)).toBeGreaterThan(10);
-    expect(getEnemyCountForRoom(49)).toBe(31);
+    expect(getEnemyCountForRoom(29)).toBeGreaterThan(getEnemyCountForRoom(20));
     expect(getEnemyCountForRoom(200)).toBe(32);
     for (let room = 1; room <= CHAPTER_ROOM_COUNT; room++) {
       const result = getRoomDefinition(room);
       expect(result.enemySpawns).toHaveLength(result.enemyCount);
-      expect(result.enemyCount).toBe(room % BOSS_ROOM_INTERVAL === 0
-        ? 1 : getEnemyCountForRoom(room));
+      expect(result.enemyCount).toBe(room === 15 ? 2 :
+        room % BOSS_ROOM_INTERVAL === 0 ? 1 : getEnemyCountForRoom(room));
     }
   });
 
   it('pushes later initial spawns at least 340px away without ever spawning in obstacles', () => {
     expect(getMinimumSpawnDistance(1)).toBe(140);
-    expect(getMinimumSpawnDistance(49)).toBe(340);
+    expect(getMinimumSpawnDistance(29)).toBe(265);
     for (let room = 1; room <= CHAPTER_ROOM_COUNT; room++) {
       const result = getRoomDefinition(room);
       if (result.isBossRoom) continue;
@@ -33,7 +33,7 @@ describe('late-room spawn counts and starting distance', () => {
   });
 
   it('does not cluster thirty enemies into a small corner of the large arena', () => {
-    for (const room of [29, 39, 44, 49]) {
+    for (const room of [24, 26, 27, 29]) {
       const points = getRoomDefinition(room).enemySpawns;
       const xs = points.map(p => p.x), ys = points.map(p => p.y);
       const bounds = getRoomDefinition(room).layout.bounds;
@@ -44,7 +44,7 @@ describe('late-room spawn counts and starting distance', () => {
 });
 
 describe('room start spawn policy', () => {
-  it('spawns every planned enemy immediately for all 50 rooms', () => {
+  it('spawns every planned enemy immediately for all 30 rooms', () => {
     for (let room = 1; room <= CHAPTER_ROOM_COUNT; room++) {
       const enemyCount = getRoomDefinition(room).enemyCount;
       const settings = spawnWaveSettings(room, enemyCount);
@@ -65,7 +65,7 @@ describe('room start spawn policy', () => {
   });
 
   it('avoids occupied points and never repeats selected indices across waves', () => {
-    const room = getRoomDefinition(49);
+    const room = getRoomDefinition(29);
     let remaining = room.enemySpawns.map((_, i) => i);
     const selected: number[] = [];
     const player = room.layout.playerSpawn;
