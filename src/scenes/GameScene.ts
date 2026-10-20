@@ -6,6 +6,8 @@ import { shouldParryHit } from '../combat/parry';
 import { addAndLaunch } from '../combat/launchProjectile';
 import { GAME_SCENE_KEY, GAME_TITLE, GAME_OVER_SCENE_KEY, GAME_WIDTH } from '../config/constants';
 import { EnemySpawner } from '../enemies/EnemySpawner';
+import { getSlimeStatsForRoom } from '../enemies/enemyConfig';
+import { getWorldCharacter } from '../enemies/worldCharacters';
 import { getBossProfile, getBossTier } from '../enemies/bossProfiles';
 import { SPORE_POISON, poisonActive, poisonCovers, poisonTickDue } from '../enemies/poisonHazard';
 import { AdvancedEnemy, type BulletPattern } from '../enemies/AdvancedEnemy';
@@ -206,7 +208,7 @@ export class GameScene extends Phaser.Scene {
           : undefined;
         child.updateAI(this.player.x, this.player.y, this.time.now,
           this.fireEnemyProjectiles, this.explodeEnemy, this.dropBossBombs,
-          nearestCover?.shieldSurface);
+          nearestCover?.shieldSurface, this.summonFrozenMinions);
       } else if (child instanceof Slime) {
         child.chase(this.player.x, this.player.y);
       }
@@ -791,6 +793,8 @@ export class GameScene extends Phaser.Scene {
         Math.cos(direction), Math.sin(direction),
         speed, enemy.stats.damage * (enemy.isBoss ? 0.57 : 1), color,
       );
+      if (this.worldId === 2 && enemy.kind === 'archer') bullet.statusEffect = 'slow';
+      if (this.worldId === 2 && enemy.kind === 'mage') bullet.statusEffect = 'freeze';
       addAndLaunch(bullet, () => this.enemyProjectiles!.add(bullet),
         { x: Math.cos(direction), y: Math.sin(direction) }, speed);
     }
@@ -927,6 +931,10 @@ export class GameScene extends Phaser.Scene {
   private readonly dropBossBombs = (enemy: AdvancedEnemy, targetX: number, targetY: number,
     count: number, radius: number, windupMs: number): void => {
     if (!this.player || this.gameOver || this.transitioning || this.roomProgress.doorOpen) return;
+    if (this.worldId === 2 && enemy.kind === 'bomber') {
+      this.throwFrozenSlowBomb(enemy, targetX, targetY, radius, windupMs);
+      return;
+    }
     if (enemy.isPoisonAlchemist) {
       this.throwPoisonBottles(enemy, targetX, targetY, count, radius);
       return;
@@ -964,6 +972,54 @@ export class GameScene extends Phaser.Scene {
       this.bombTimers.add(timer);
     }
   };
+
+  /** A thrown ice bomb lands in a visible slow patch, causing mild contact damage. */
+  private throwFrozenSlowBomb(enemy: AdvancedEnemy, targetX: number, targetY: number,
+    radius: number, windupMs: number): void {
+    const bounds = this.currentRoom?.layout.bounds;
+    if (!bounds) return;
+    const x = Phaser.Math.Clamp(targetX, bounds.x + radius, bounds.x + bounds.width - radius);
+    const y = Phaser.Math.Clamp(targetY, bounds.y + radius, bounds.y + bounds.height - radius);
+    const bomb = this.add.circle(enemy.x, enemy.y, 11, 0x67e8f9, 0.95)
+      .setStrokeStyle(3, 0xffffff).setDepth(30);
+    const indicator = this.add.circle(x, y, radius, 0x67e8f9, 0.1)
+      .setStrokeStyle(2, 0x7dd3fc, 0.75).setDepth(24);
+    this.bombWarnings.add(indicator);
+    const initialY = enemy.y;
+    this.tweens.add({
+      targets: bomb, x, y, scale: 1.3, duration: windupMs, ease: 'Linear',
+      onUpdate: tween => bomb.setY(Phaser.Math.Linear(initialY, y, tween.progress) -
+        Math.sin(Math.PI * tween.progress) * 75),
+      onComplete: () => {
+        bomb.destroy();
+        this.bombWarnings.delete(indicator);
+        indicator.destroy();
+        if (this.roomProgress.doorOpen || this.gameOver || this.transitioning) return;
+        const patch = this.add.circle(x, y, radius, 0x7dd3fc, 0.28)
+          .setStrokeStyle(2, 0xbae6fd, 0.75).setDepth(22);
+        this.bombWarnings.add(patch);
+        let lastDamageAt = 0;
+        let ticks = 0;
+        const timer = this.time.addEvent({ delay: 100, repeat: 24, callback: () => {
+          ticks++;
+          if (!patch.active || !this.player || this.roomProgress.doorOpen) return;
+          if (withinRadius(x, y, this.player.x, this.player.y, radius)) {
+            this.player.applyMovementPenalty(this.time.now, 550, 0.46);
+            if (this.time.now >= lastDamageAt) {
+              lastDamageAt = this.time.now + 850;
+              this.damagePlayer({ damage: enemy.stats.damage * 0.23, criticalChance: 0, criticalMultiplier: 1 });
+            }
+          }
+          if (ticks >= 25) {
+            patch.destroy(); this.bombWarnings.delete(patch); this.bombTimers.delete(timer);
+          }
+        } });
+        this.bombTimers.add(timer);
+      },
+    });
+    bomb.once(Phaser.GameObjects.Events.DESTROY, () => this.tweens.killTweensOf(bomb));
+    this.bombWarnings.add(bomb);
+  }
 
   /** Each green bottle visibly arcs from the alchemist to its target before
    * breaking. Impact creates a five-second damaging poison circle.
@@ -1072,7 +1128,10 @@ export class GameScene extends Phaser.Scene {
     if (!(playerObject instanceof Player) || !(bulletObject instanceof EnemyProjectile)) return;
     // Destroy on first overlap, even during i-frames: no late/double contact.
     const attack = bulletObject.attack;
+    const statusEffect = bulletObject.statusEffect;
     bulletObject.destroy();
+    if (statusEffect === 'slow') playerObject.applyMovementPenalty(this.time.now, 1900, 0.57);
+    if (statusEffect === 'freeze') playerObject.applyMovementPenalty(this.time.now, 1400, 0);
     this.damagePlayer(attack);
   };
 
@@ -1138,6 +1197,25 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private readonly summonFrozenMinions = (enemy: AdvancedEnemy, count: number): void => {
+    if (this.worldId !== 2 || !this.enemies || !this.currentRoom ||
+      this.roomProgress.doorOpen || this.gameOver || this.transitioning) return;
+    if (this.aliveEnemies >= 48) return;
+    const bounds = this.currentRoom.layout.bounds;
+    for (let i = 0; i < count; i++) {
+      const x = Phaser.Math.Clamp(enemy.x + (i === 0 ? -48 : 48),
+        bounds.x + 34, bounds.x + bounds.width - 34);
+      const y = Phaser.Math.Clamp(enemy.y + (i === 0 ? -26 : 26),
+        bounds.y + 38, bounds.y + bounds.height - 38);
+      const summoned = this.enemySpawner?.spawnSlimes([{ x, y }],
+        getSlimeStatsForRoom(this.currentRoom.number, 2))[0];
+      if (summoned) {
+        summoned.setTexture(getWorldCharacter(2, 'slime').textureKey);
+        this.roomProgress.addRequiredEnemies(1);
+      }
+    }
+  };
+
   private readonly handleEnemySpawned = (): void => {
     this.aliveEnemies += 1;
     this.updateEnemyCount();
@@ -1147,6 +1225,9 @@ export class GameScene extends Phaser.Scene {
     const kind = enemy instanceof AdvancedEnemy ? enemy.kind : 'slime';
     if (this.gameOver || !this.run.defeatEnemy(enemy.enemyId, kind)) return;
     this.spawnCoins(enemy.x, enemy.y, kind);
+    if (this.worldId === 2 && enemy instanceof AdvancedEnemy && enemy.kind === 'tank') {
+      this.summonFrozenMinions(enemy, 2);
+    }
     this.aliveEnemies = Math.max(0, this.aliveEnemies - 1);
     this.updateEnemyCount();
     if (this.roomProgress.registerEnemyDefeated()) {
