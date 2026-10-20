@@ -8,11 +8,13 @@ import { getChaseVelocity, getObstacleAvoidanceVelocity } from './slimeMovement'
 import { coverIsClose, rangedCoverSpot, shieldEndpoints, type ShieldSurface } from './treantShield';
 import { getBossPlan, getBossProfile } from './bossProfiles';
 import { CHARGER_DASH } from './enemyBalance';
+import { FROZEN_EARLY } from './frozenEarlyGame';
 import type { BulletPattern } from './projectilePatterns';
 export type { BulletPattern } from './projectilePatterns';
 
 export type EnemyFire = (enemy: AdvancedEnemy, pattern: BulletPattern, volley?: number, speed?: number) => void;
 export type EnemyExplosion = (enemy: AdvancedEnemy, radius: number) => void;
+export type EnemySummon = (enemy: AdvancedEnemy) => void;
 export type EnemyBomb = (enemy: AdvancedEnemy, targetX: number, targetY: number,
   count: number, radius: number, windupMs: number) => void;
 
@@ -25,6 +27,8 @@ export class AdvancedEnemy extends Slime {
   private readonly roomNumber: number;
   private readonly worldId: WorldId;
   private nextSpecialAt = 0;
+  private nextSummonAt = 0;
+  private witchHat?: Phaser.GameObjects.Graphics;
   private windupEndsAt = 0;
   private dashEndsAt = 0;
   private dashX = 0;
@@ -61,9 +65,14 @@ export class AdvancedEnemy extends Slime {
     }
     this.nextShotAt = scene.time.now + stats.attackIntervalMs;
     this.nextSpecialAt = scene.time.now + 1500;
+    this.nextSummonAt = scene.time.now + FROZEN_EARLY.witchSummonIntervalMs;
+    if (this.isFrostWitch) this.witchHat = scene.add.graphics().setDepth(14);
   }
 
   public get isBoss(): boolean { return this.kind === 'boss'; }
+  public get isFrostWitch(): boolean {
+    return this.worldId === 2 && this.kind === 'mage' && this.roomNumber <= FROZEN_EARLY.lastRoom;
+  }
   public get isTreantShield(): boolean { return this.kind === 'tank' && this.worldId === 1; }
   public get shieldSurface(): ShieldSurface {
     return { x: this.x, y: this.y, facingX: this.shieldFacingX, facingY: this.shieldFacingY };
@@ -77,9 +86,10 @@ export class AdvancedEnemy extends Slime {
 
   public updateAI(targetX: number, targetY: number, now: number,
     fire: EnemyFire, explode: EnemyExplosion, dropBombs?: EnemyBomb,
-    coverTank?: Readonly<ShieldSurface>): void {
+    coverTank?: Readonly<ShieldSurface>, summon?: EnemySummon): void {
     if (this.aiState === 'defeated') return;
     super.chase(targetX, targetY);
+    if (this.isFrostWitch) this.drawWitchHat(now);
     if (this.isTreantShield) {
       const dx = targetX - this.x, dy = targetY - this.y;
       const length = Math.hypot(dx, dy);
@@ -116,8 +126,12 @@ export class AdvancedEnemy extends Slime {
           : move;
         this.setVelocity(velocity.x, velocity.y);
         if (now >= this.nextShotAt) {
-          fire(this, this.kind === 'archer' ? 'single' : 'double');
+          fire(this, this.isFrostWitch || this.kind === 'archer' ? 'single' : 'double');
           this.nextShotAt = now + this.stats.attackIntervalMs;
+        }
+        if (this.isFrostWitch && now >= this.nextSummonAt) {
+          summon?.(this);
+          this.nextSummonAt = now + FROZEN_EARLY.witchSummonIntervalMs;
         }
         break;
       }
@@ -161,7 +175,7 @@ export class AdvancedEnemy extends Slime {
         }
         if (now >= this.nextShotAt && this.windupEndsAt === 0 && this.dashEndsAt === 0) {
           fire(this, mode.pattern, this.bossVolleys, mode.speed);
-          if (mode.bombs > 0 && dropBombs) {
+          if (mode.bombs > 0 && dropBombs && !(this.worldId === 2 && this.roomNumber === 10)) {
             dropBombs(this, targetX, targetY, mode.bombs, mode.radius, mode.windupMs);
           }
           this.bossVolleys++;
@@ -180,6 +194,22 @@ export class AdvancedEnemy extends Slime {
         break;
       }
     }
+  }
+
+  private drawWitchHat(now: number): void {
+    const g = this.witchHat;
+    if (!g || !g.active) return;
+    g.clear();
+    // Distinct ice witch silhouette over the existing Aurora Spirit texture.
+    const x = this.x, y = this.y - 18;
+    g.fillStyle(0x283d78, 0.98);
+    g.fillTriangle(x - 17, y + 4, x + 13, y + 4, x + 2, y - 27);
+    g.fillStyle(0x93c5fd, 0.95);
+    g.fillRect(x - 18, y + 3, 38, 5);
+    g.lineStyle(2, 0xcffafe, 0.94);
+    g.lineBetween(x - 13, y - 2, x + 14, y - 2);
+    g.fillStyle(0x67e8f9, 0.7 + 0.2 * Math.sin(now / 240));
+    g.fillCircle(x + 16, y - 18, 4);
   }
 
   /** The drawn plate is the same actual line segment used in damage interception.
@@ -297,11 +327,14 @@ export class AdvancedEnemy extends Slime {
     this.warning = undefined;
   }
   public override playDefeat(): void {
+    this.witchHat?.clear();
     this.shieldGraphic?.clear();
     this.clearWarning();
     super.playDefeat();
   }
   public override destroy(fromScene?: boolean): void {
+    this.witchHat?.destroy();
+    this.witchHat = undefined;
     this.shieldGraphic?.destroy();
     this.shieldGraphic = undefined;
     this.warning?.destroy();
