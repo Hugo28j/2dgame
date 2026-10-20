@@ -281,7 +281,7 @@ export class AbilityController {
       if (!this.dash.begin(now, stats.durationMs, direction)) return false;
       this.activeDashSpeed = stats.dashSpeed;
     }
-    if (!this.cooldowns.activate(id, now, stats.cooldownMs, this.player.abilityCooldownModifier)) {
+    if (!this.cooldowns.activate(id, now, stats.cooldownMs, this.cooldownModifier(id))) {
       if (stats.kind === 'dash') this.dash.cancel();
       return false;
     }
@@ -635,6 +635,11 @@ export class AbilityController {
     this.companion = undefined;
   }
 
+  /** Shield Bubble has exactly a 30-second base cooldown for the Guardian. */
+  private cooldownModifier(id: AbilityId): number {
+    return id === 'guardian-charge' ? 1 : this.player.abilityCooldownModifier;
+  }
+
   private stats(id: AbilityId): AbilityStats {
     return getAbilityStats(id, this.abilityLevels[id]);
   }
@@ -653,7 +658,7 @@ export class AbilityController {
       const unlocked = isAbilityUnlocked(button.id, this.heroLevel);
       const stats = this.stats(button.id);
       const remaining = this.cooldowns.remainingMs(button.id, now);
-      const total = stats.cooldownMs * this.player.abilityCooldownModifier;
+      const total = stats.cooldownMs * this.cooldownModifier(button.id);
       button.overlay.clear();
       button.background.setFillStyle(!unlocked ? 0x0f172a : remaining > 0 ? 0x111827 : 0x172338);
       button.icon.setAlpha(!unlocked ? 0.45 : remaining > 0 ? 0.35 : 1);
