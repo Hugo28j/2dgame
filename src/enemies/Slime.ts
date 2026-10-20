@@ -26,6 +26,9 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
   private slowedUntil = 0;
   private slowFactor = 1;
   private readonly healthBar: Phaser.GameObjects.Graphics;
+  private knockedUntil = 0;
+  private knockbackX = 0;
+  private knockbackY = 0;
 
   public constructor(
     scene: Phaser.Scene,
@@ -77,6 +80,11 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
       this.slowFactor = 1;
       this.clearTint();
     }
+    if (this.isKnockedBack(now)) {
+      this.setVelocity(this.knockbackX, this.knockbackY);
+      this.drawHealthBar();
+      return;
+    }
     const currentSpeed = this.movementSpeed * this.slowFactor;
     const body = this.body;
     const blockedHorizontally =
@@ -107,6 +115,21 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
     this.setVelocity(velocity.x, velocity.y);
     this.setFlipX(velocity.x < 0);
     this.drawHealthBar();
+  }
+
+  public isKnockedBack(now: number): boolean {
+    return this.aiState === 'chasing' && now < this.knockedUntil;
+  }
+
+  /** Knockback persists across enemy AI frames, rather than being overwritten on the next chase. */
+  public applyKnockback(now: number, durationMs: number, x: number, y: number, speed: number): void {
+    if (this.aiState === 'defeated') return;
+    const length = Math.hypot(x, y);
+    if (length <= 0 || durationMs <= 0) return;
+    this.knockbackX = x / length * speed;
+    this.knockbackY = y / length * speed;
+    this.knockedUntil = now + durationMs;
+    this.avoidanceUntil = 0;
   }
 
   /** A timed, refreshable slow that never affects defeated enemies. */

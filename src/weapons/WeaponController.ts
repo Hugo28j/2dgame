@@ -29,7 +29,7 @@ export class WeaponController {
     const config = this.config;
     if (config.attackMode === 'melee') this.swing(direction);
     else this.fire(direction);
-    this.nextShotAt = time + fireIntervalMs(config.fireRate * this.owner.attackSpeed * this.permanentSpeed);
+    this.nextShotAt = time + fireIntervalMs(config.fireRate * this.owner.attackSpeedAt(time) * this.permanentSpeed);
   }
   private fire(direction: Readonly<Vector2Value>): void {
     const config = this.config;

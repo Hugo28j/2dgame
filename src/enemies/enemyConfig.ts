@@ -17,17 +17,17 @@ export interface SlimeRuntimeStats extends EnemyConfig { roomNumber: number; }
 
 export const SLIME_CONFIG: Readonly<EnemyConfig> = Object.freeze({
   id: 'slime', name: 'Moss Slime', maxHp: 72, damage: 14, defense: 6,
-  movementSpeed: 62, attackRange: 26, attackIntervalMs: 700,
+  movementSpeed: 112, attackRange: 26, attackIntervalMs: 700,
 });
 
 export const ENEMY_CONFIGS: Readonly<Record<EnemyKind, EnemyConfig>> = {
   slime: SLIME_CONFIG,
-  archer: { id: 'archer', name: 'Thorn Archer', maxHp: 54, damage: 12, defense: 2, movementSpeed: 88, attackRange: 225, attackIntervalMs: 1500 },
-  charger: { id: 'charger', name: 'Rush Beetle', maxHp: 110, damage: 20, defense: 8, movementSpeed: 72, attackRange: 210, attackIntervalMs: 1100 },
-  mage: { id: 'mage', name: 'Rune Wisp', maxHp: 68, damage: 14, defense: 4, movementSpeed: 85, attackRange: 210, attackIntervalMs: 1950 },
-  tank: { id: 'tank', name: 'Stone Brute', maxHp: 235, damage: 23, defense: 18, movementSpeed: 40, attackRange: 30, attackIntervalMs: 1050 },
-  bomber: { id: 'bomber', name: 'Blast Shroom', maxHp: 75, damage: 27, defense: 3, movementSpeed: 82, attackRange: 105, attackIntervalMs: 1200 },
-  boss: { id: 'boss', name: 'Dungeon Guardian', maxHp: 880, damage: 23, defense: 12, movementSpeed: 66, attackRange: 280, attackIntervalMs: 1550 },
+  archer: { id: 'archer', name: 'Thorn Archer', maxHp: 54, damage: 12, defense: 2, movementSpeed: 103, attackRange: 225, attackIntervalMs: 1500 },
+  charger: { id: 'charger', name: 'Rush Beetle', maxHp: 110, damage: 20, defense: 8, movementSpeed: 94, attackRange: 210, attackIntervalMs: 1100 },
+  mage: { id: 'mage', name: 'Rune Wisp', maxHp: 68, damage: 14, defense: 4, movementSpeed: 101, attackRange: 210, attackIntervalMs: 1950 },
+  tank: { id: 'tank', name: 'Stone Brute', maxHp: 235, damage: 23, defense: 18, movementSpeed: 56, attackRange: 30, attackIntervalMs: 1050 },
+  bomber: { id: 'bomber', name: 'Blast Shroom', maxHp: 75, damage: 27, defense: 3, movementSpeed: 100, attackRange: 105, attackIntervalMs: 1200 },
+  boss: { id: 'boss', name: 'Dungeon Guardian', maxHp: 880, damage: 23, defense: 12, movementSpeed: 75, attackRange: 280, attackIntervalMs: 1550 },
 };
 export const BOSS_NAMES = BOSSES.map(boss => boss.name);
 

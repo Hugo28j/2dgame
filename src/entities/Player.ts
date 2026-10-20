@@ -17,6 +17,24 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   public readonly abilityDamageMultiplier: number;
   public currentHp: number;
   private readonly invulnerability = new InvulnerabilityWindow();
+  private rapidFireUntil = 0;
+  private sprintUntil = 0;
+
+  public boostAttackSpeed(now: number, durationMs: number): void {
+    this.rapidFireUntil = Math.max(this.rapidFireUntil, now + durationMs);
+  }
+
+  public boostMovementSpeed(now: number, durationMs: number): void {
+    this.sprintUntil = Math.max(this.sprintUntil, now + durationMs);
+  }
+
+  public attackSpeedAt(now: number): number {
+    return this.attackSpeed * (now < this.rapidFireUntil ? 2.15 : 1);
+  }
+
+  public movementSpeedAt(now: number): number {
+    return this.movementSpeed * (now < this.sprintUntil ? 1.65 : 1);
+  }
 
   public constructor(
     scene: Phaser.Scene, x: number, y: number,
@@ -62,7 +80,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   }
 
   public move(direction: Readonly<Vector2Value>): void {
-    this.setVelocity(direction.x * this.movementSpeed, direction.y * this.movementSpeed);
+    const speed = this.movementSpeedAt(this.scene.time.now);
+    this.setVelocity(direction.x * speed, direction.y * speed);
   }
 
   public face(direction: Readonly<Vector2Value>): void {

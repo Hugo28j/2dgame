@@ -3,6 +3,7 @@ import type { AttackData } from '../combat/damage';
 
 export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
   public readonly attack: Readonly<AttackData>;
+  private readonly baseVelocity: { x: number; y: number };
   public constructor(
     scene: Phaser.Scene, x: number, y: number,
     dx: number, dy: number, speed: number, damage: number,
@@ -16,13 +17,19 @@ export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
     this.setTint(color);
     this.setRotation(Math.atan2(dy, dx));
     const length = Math.hypot(dx, dy) || 1;
-    this.setVelocity(dx / length * speed, dy / length * speed);
+    this.baseVelocity = { x: dx / length * speed, y: dy / length * speed };
+    this.setVelocity(this.baseVelocity.x, this.baseVelocity.y);
     const body = this.body;
     if (body instanceof Phaser.Physics.Arcade.Body) {
       body.setCircle(6, 2, 2);
       body.setAllowGravity(false);
     }
   }
+  /** Temporarily slow only enemy bullets; restore their exact original speed afterwards. */
+  public setSlowMotion(factor: number): void {
+    this.setVelocity(this.baseVelocity.x * factor, this.baseVelocity.y * factor);
+  }
+
   public isOutsideArena(): boolean {
     const bounds = this.scene.physics.world.bounds;
     return this.x < bounds.x || this.x > bounds.right ||

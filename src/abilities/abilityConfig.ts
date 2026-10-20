@@ -8,7 +8,11 @@ export type AbilityId =
   | 'pyro-dash' | 'pyro-nova' | 'pyro-inferno'
   | 'storm-step' | 'storm-pulse' | 'storm-tempest'
   | 'void-rift' | 'void-collapse' | 'void-drain';
-export type AbilityKind = 'dash' | 'area' | 'slow' | 'heal' | 'drain';
+export type AbilityKind = 'dash' | 'area' | 'slow' | 'heal' | 'drain' | 'wind' | 'shotgun' | 'bomb' | 'timewarp' | 'rapidFire' | 'companion' | 'sprint';
+
+/** Abilities with a directional, hold-and-release aiming gesture. */
+export const isAimedAbility = (kind: AbilityKind): boolean =>
+  kind === 'wind' || kind === 'shotgun' || kind === 'bomb';
 
 export interface AbilityConfig {
   readonly id: AbilityId;
@@ -37,8 +41,8 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityConfig>> = {
     cooldownMs: 5200, radius: 0, damage: 0, heal: 0, durationMs: 240, dashSpeed: 650,
     invulnerabilityMs: 190, slowFactor: 1 }),
   'guardian-slam': ability({ id: 'guardian-slam', heroId: 'guardian', slot: 2, unlockLevel: 10,
-    kind: 'area', name: 'Ground Slam', description: 'Zware slag rondom je', symbol: '✦', color: 0xf59e0b,
-    cooldownMs: 9000, radius: 105, damage: 58, heal: 0, durationMs: 320, dashSpeed: 0,
+    kind: 'wind', name: 'Wind Burst', description: 'Rechthoekige windstoot die vijanden wegduwt', symbol: '➠', color: 0xf59e0b,
+    cooldownMs: 10000, radius: 225, damage: 37, heal: 0, durationMs: 320, dashSpeed: 0,
     invulnerabilityMs: 0, slowFactor: 1 }),
   'guardian-aegis': ability({ id: 'guardian-aegis', heroId: 'guardian', slot: 3, unlockLevel: 20,
     kind: 'heal', name: 'Aegis Sanctuary', description: 'Herstel HP en word beschermd', symbol: '⬟', color: 0xfde68a,
@@ -50,12 +54,12 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityConfig>> = {
     cooldownMs: 4300, radius: 0, damage: 0, heal: 0, durationMs: 190, dashSpeed: 780,
     invulnerabilityMs: 125, slowFactor: 1 }),
   'ranger-rain': ability({ id: 'ranger-rain', heroId: 'ranger', slot: 2, unlockLevel: 10,
-    kind: 'area', name: 'Arrow Rain', description: 'Pijlenregen in een groot gebied', symbol: '⇊', color: 0x7dd3fc,
-    cooldownMs: 8200, radius: 130, damage: 44, heal: 0, durationMs: 360, dashSpeed: 0,
+    kind: 'shotgun', name: 'Shotgun Volley', description: 'Gerichte salvo van zeven pijlen', symbol: '⋙', color: 0x7dd3fc,
+    cooldownMs: 8500, radius: 270, damage: 24, heal: 0, durationMs: 360, dashSpeed: 0,
     invulnerabilityMs: 0, slowFactor: 1 }),
   'ranger-volley': ability({ id: 'ranger-volley', heroId: 'ranger', slot: 3, unlockLevel: 20,
-    kind: 'area', name: 'Predator Volley', description: 'Kritieke aanval rondom je', symbol: '✣', color: 0x22d3ee,
-    cooldownMs: 13500, radius: 175, damage: 86, heal: 0, durationMs: 430, dashSpeed: 0,
+    kind: 'companion', name: 'Wolf Ally', description: 'Roep een AI-wolf met eigen HP op', symbol: '🐺', color: 0x22d3ee,
+    cooldownMs: 54000, radius: 300, damage: 25, heal: 0, durationMs: 11000, dashSpeed: 0,
     invulnerabilityMs: 0, slowFactor: 1 }),
 
   'mage-blink': ability({ id: 'mage-blink', heroId: 'mage', slot: 1, unlockLevel: 1,
@@ -63,16 +67,16 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityConfig>> = {
     cooldownMs: 4700, radius: 0, damage: 0, heal: 0, durationMs: 150, dashSpeed: 900,
     invulnerabilityMs: 150, slowFactor: 1 }),
   'mage-burst': ability({ id: 'mage-burst', heroId: 'mage', slot: 2, unlockLevel: 10,
-    kind: 'area', name: 'Arcane Burst', description: 'Magische explosie', symbol: '✹', color: 0xd8b4fe,
-    cooldownMs: 7600, radius: 120, damage: 56, heal: 0, durationMs: 330, dashSpeed: 0,
+    kind: 'bomb', name: 'Arcane Bomb', description: 'Gooi een bom in de gekozen richting', symbol: '●', color: 0xd8b4fe,
+    cooldownMs: 10000, radius: 115, damage: 70, heal: 0, durationMs: 330, dashSpeed: 0,
     invulnerabilityMs: 0, slowFactor: 1 }),
   'mage-timewarp': ability({ id: 'mage-timewarp', heroId: 'mage', slot: 3, unlockLevel: 20,
-    kind: 'slow', name: 'Time Warp', description: 'Vertraagt een enorme zone', symbol: '◴', color: 0xa78bfa,
-    cooldownMs: 15000, radius: 190, damage: 38, heal: 0, durationMs: 5200, dashSpeed: 0,
+    kind: 'timewarp', name: 'Slow Motion', description: 'Vertraagt vijanden en hun projectielen tijdelijk', symbol: '◴', color: 0xa78bfa,
+    cooldownMs: 34000, radius: 0, damage: 0, heal: 0, durationMs: 4600, dashSpeed: 0,
     invulnerabilityMs: 0, slowFactor: 0.28 }),
 
   'frost-dash': ability({ id: 'frost-dash', heroId: 'frostblade', slot: 1, unlockLevel: 1,
-    kind: 'dash', name: 'Ice Lunge', description: 'Snelle ijzige uitval', symbol: '➜', color: 0x7dd3fc,
+    kind: 'dash', name: 'Ice Lunge', description: 'Dash met ijsspoor dat vijanden vertraagt', symbol: '➜', color: 0x7dd3fc,
     cooldownMs: 4500, radius: 0, damage: 0, heal: 0, durationMs: 190, dashSpeed: 820,
     invulnerabilityMs: 135, slowFactor: 1 }),
   'frost-ring': ability({ id: 'frost-ring', heroId: 'frostblade', slot: 2, unlockLevel: 10,
@@ -85,7 +89,7 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityConfig>> = {
     invulnerabilityMs: 0, slowFactor: 0.22 }),
 
   'pyro-dash': ability({ id: 'pyro-dash', heroId: 'pyromancer', slot: 1, unlockLevel: 1,
-    kind: 'dash', name: 'Flame Rush', description: 'Vurige ontsnappingsdash', symbol: '➜', color: 0xfb923c,
+    kind: 'dash', name: 'Flame Rush', description: 'Dash met brandend spoor', symbol: '➜', color: 0xfb923c,
     cooldownMs: 5000, radius: 0, damage: 0, heal: 0, durationMs: 200, dashSpeed: 750,
     invulnerabilityMs: 145, slowFactor: 1 }),
   'pyro-nova': ability({ id: 'pyro-nova', heroId: 'pyromancer', slot: 2, unlockLevel: 10,
@@ -93,7 +97,7 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityConfig>> = {
     cooldownMs: 7800, radius: 125, damage: 65, heal: 0, durationMs: 340, dashSpeed: 0,
     invulnerabilityMs: 0, slowFactor: 1 }),
   'pyro-inferno': ability({ id: 'pyro-inferno', heroId: 'pyromancer', slot: 3, unlockLevel: 20,
-    kind: 'area', name: 'Inferno', description: 'Massale vuuruitbarsting', symbol: '☀', color: 0xef4444,
+    kind: 'bomb', name: 'Inferno Bomb', description: 'Gerichte explosieve vuurbom', symbol: '☀', color: 0xef4444,
     cooldownMs: 16000, radius: 185, damage: 118, heal: 0, durationMs: 520, dashSpeed: 0,
     invulnerabilityMs: 0, slowFactor: 1 }),
 
@@ -102,8 +106,8 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityConfig>> = {
     cooldownMs: 3800, radius: 0, damage: 0, heal: 0, durationMs: 175, dashSpeed: 940,
     invulnerabilityMs: 120, slowFactor: 1 }),
   'storm-pulse': ability({ id: 'storm-pulse', heroId: 'stormstrider', slot: 2, unlockLevel: 10,
-    kind: 'area', name: 'Thunder Pulse', description: 'Elektrische schokgolf', symbol: 'ϟ', color: 0xfacc15,
-    cooldownMs: 7000, radius: 135, damage: 52, heal: 0, durationMs: 300, dashSpeed: 0,
+    kind: 'rapidFire', name: 'Overcharge', description: 'Sterk verhoogde vuursnelheid voor korte tijd', symbol: 'ϟ', color: 0xfacc15,
+    cooldownMs: 38000, radius: 0, damage: 0, heal: 0, durationMs: 6000, dashSpeed: 0,
     invulnerabilityMs: 0, slowFactor: 1 }),
   'storm-tempest': ability({ id: 'storm-tempest', heroId: 'stormstrider', slot: 3, unlockLevel: 20,
     kind: 'area', name: 'Eye of the Storm', description: 'Gigantische bliksemstorm', symbol: '☈', color: 0xfef08a,
@@ -115,8 +119,8 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityConfig>> = {
     cooldownMs: 4400, radius: 0, damage: 0, heal: 0, durationMs: 180, dashSpeed: 860,
     invulnerabilityMs: 180, slowFactor: 1 }),
   'void-collapse': ability({ id: 'void-collapse', heroId: 'voidwalker', slot: 2, unlockLevel: 10,
-    kind: 'slow', name: 'Void Collapse', description: 'Treft en vertraagt nabije vijanden', symbol: '◎', color: 0xa855f7,
-    cooldownMs: 8200, radius: 145, damage: 61, heal: 0, durationMs: 2800, dashSpeed: 0,
+    kind: 'sprint', name: 'Shadow Sprint', description: 'Sneller lopen zonder te dashen', symbol: '»', color: 0xa855f7,
+    cooldownMs: 17000, radius: 0, damage: 0, heal: 0, durationMs: 4200, dashSpeed: 0,
     invulnerabilityMs: 0, slowFactor: 0.48 }),
   'void-drain': ability({ id: 'void-drain', heroId: 'voidwalker', slot: 3, unlockLevel: 20,
     kind: 'drain', name: 'Soul Drain', description: 'Steel leven van alle nabije vijanden', symbol: '☾', color: 0xe879f9,
