@@ -32,12 +32,18 @@ export class GameOverScene extends Phaser.Scene {
     const fontFamily = 'system-ui, sans-serif';
     this.cameras.main.setScroll((390 - GAME_WIDTH) / 2, 0);
     this.cameras.main.setBackgroundColor('#081525');
-    this.add.rectangle(195, 422, 364, 760, 0x101d30)
+    const panel = this.add.rectangle(195, 422, 364, 760, 0x101d30)
       .setStrokeStyle(3, report.victory ? 0x38bdf8 : 0xef4444);
-    this.add.text(195, 87, report.victory ? 'CHAPTER VOLTOOID!' : 'GAME OVER', {
+    panel.setScale(0.86).setAlpha(0);
+    this.tweens.add({ targets: panel, scaleX: 1, scaleY: 1, alpha: 1,
+      duration: 550, ease: 'Back.easeOut' });
+    this.cameras.main.fadeIn(500, 0, 0, 0);
+    const headline = this.add.text(195, 87, report.victory ? 'CHAPTER VOLTOOID!' : 'GAME OVER', {
       fontFamily, fontSize: '28px', fontStyle: 'bold',
       color: report.victory ? '#67e8f9' : '#fca5a5',
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setScale(0.5).setAlpha(0);
+    this.tweens.add({ targets: headline, scaleX: 1, scaleY: 1, alpha: 1,
+      duration: 600, delay: 120, ease: 'Back.easeOut' });
     this.add.text(195, 128, 'JE RUN-RESULTAAT', {
       fontFamily, fontSize: '14px', color: '#cbd5e1',
     }).setOrigin(0.5);
@@ -82,12 +88,19 @@ export class GameOverScene extends Phaser.Scene {
     );
 
     const button = (y: number, label: string, callback: () => void, primary = false): void => {
+      // Full-height hit target above the visible label, with explicit center geometry.
       const plate = this.add.rectangle(195, y, 294, 53, primary ? 0x0e7490 : 0x334155)
-        .setStrokeStyle(2, primary ? 0x67e8f9 : 0x64748b)
-        .setInteractive({ useHandCursor: true });
-      this.add.text(195, y, label, { fontFamily, fontSize: '17px', fontStyle: 'bold', color: '#fff' })
-        .setOrigin(0.5);
-      plate.on('pointerdown', callback);
+        .setStrokeStyle(2, primary ? 0x67e8f9 : 0x64748b).setDepth(20);
+      const caption = this.add.text(195, y, label, {
+        fontFamily, fontSize: '17px', fontStyle: 'bold', color: '#fff',
+      }).setOrigin(0.5).setDepth(21);
+      const hit = this.add.zone(195, y, 300, 60).setDepth(30)
+        .setScrollFactor(0).setInteractive({ useHandCursor: true });
+      const activate = (): void => { if (!this.scene.isActive()) return; callback(); };
+      hit.on('pointerdown', activate);
+      caption.setInteractive({ useHandCursor: true }).on('pointerdown', activate);
+      this.tweens.add({ targets: [plate, caption], alpha: { from: 0, to: 1 },
+        duration: 380, delay: 340, ease: 'Sine.easeOut' });
     };
     const navigate = (target: string): void => {
       // Also safe when the user clicks before deferred cleanup fires.
