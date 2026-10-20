@@ -44,10 +44,11 @@ export class EnemySpawner {
 
   /** Second phase of World 1 chamber 15: two separate Sentinel bosses. */
   public spawnSplitBosses(points: readonly SpawnPoint[], room: number): AdvancedEnemy[] {
-    return points.map(point => {
+    return points.map((point, index) => {
       const boss = new AdvancedEnemy(this.scene, `split-boss-${this.nextEnemyNumber++}`,
         point.x, point.y, 'boss', room, 1, 1);
       boss.fasterTwin = true;
+      boss.splitTwinIndex = index === 0 ? 0 : 1;
       addBoundedEnemy(boss, () => this.enemyGroup.add(boss));
       return boss;
     });
