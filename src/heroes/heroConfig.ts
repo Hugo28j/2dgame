@@ -86,7 +86,7 @@ export const HEROES: Readonly<Record<HeroId, HeroConfig>> = {
   },
 };
 export const HERO_IDS = Object.keys(HEROES) as HeroId[];
-export const MAX_HERO_LEVEL = 20;
+export const MAX_HERO_LEVEL = 50;
 export function heroUpgradeCost(level: number): number {
   return 35 + Math.max(0, level - 1) * 30;
 }
