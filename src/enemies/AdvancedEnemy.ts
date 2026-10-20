@@ -5,7 +5,7 @@ import { getEnemyStatsForRoom, type EnemyKind, type SlimeRuntimeStats } from './
 import { bossPhase, rangedVelocity } from './enemyMovement';
 import { Slime } from './Slime';
 import { getChaseVelocity, getObstacleAvoidanceVelocity } from './slimeMovement';
-import { coverIsClose, rangedCoverSpot, shieldEndpoints, type ShieldPoint, type ShieldSurface } from './treantShield';
+import { coverIsClose, rangedCoverSpot, shieldEndpoints, type ShieldSurface } from './treantShield';
 import { getBossPlan, getBossProfile } from './bossProfiles';
 import { CHARGER_DASH } from './enemyBalance';
 import type { BulletPattern } from './projectilePatterns';
