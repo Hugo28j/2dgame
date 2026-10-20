@@ -7,7 +7,7 @@ export const ICE_WALL = Object.freeze({
   playerPadding: 12, everyVolleys: 10, damageMultiplier: 0.92,
 });
 export const HOMING_ORB = Object.freeze({
-  worldId: 2, room: 10, lifetimeMs: 15000,
+  worldId: 2, room: 10, lifetimeMs: 8000,
   speed: 156, turnRateRadiansPerSecond: 2.55,
   everyVolleys: 3, maxActive: 3, damageMultiplier: 0.62,
 });
