@@ -1,20 +1,24 @@
 import Phaser from 'phaser';
 import type { AttackData } from '../combat/damage';
+export type EnemyProjectileEffect = 'none' | 'frost-chill' | 'frost-burst';
 
 export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
   public readonly attack: Readonly<AttackData>;
+  public readonly effect: EnemyProjectileEffect;
   private readonly baseVelocity: { x: number; y: number };
   public constructor(
     scene: Phaser.Scene, x: number, y: number,
     dx: number, dy: number, speed: number, damage: number,
-    color: number = 0xfb7185,
+    color: number = 0xfb7185, effect: EnemyProjectileEffect = 'none',
   ) {
     super(scene, x, y, 'enemy-bullet');
     this.attack = { damage, criticalChance: 0, criticalMultiplier: 1 };
+    this.effect = effect;
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.setDepth(17);
     this.setTint(color);
+    if (effect === 'frost-burst') this.setScale(1.65);
     this.setRotation(Math.atan2(dy, dx));
     const length = Math.hypot(dx, dy) || 1;
     this.baseVelocity = { x: dx / length * speed, y: dy / length * speed };

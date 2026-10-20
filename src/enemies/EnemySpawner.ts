@@ -7,6 +7,7 @@ import { AdvancedEnemy } from './AdvancedEnemy';
 import { addBoundedEnemy } from './addBoundedEnemy';
 import { getEnemyKindForRoom, getSlimeStatsForRoom } from './enemyConfig';
 import { getWorldCharacter } from './worldCharacters';
+
 import type { RoomDefinition } from '../rooms/roomConfig';
 
 export interface SpawnPoint {
@@ -28,7 +29,7 @@ export class EnemySpawner {
     return toSpawn.map(index => {
       const point = room.enemySpawns[index];
       if (!point) throw new Error('Missing enemy spawn point for index ' + index);
-      const kind = getEnemyKindForRoom(room.number, index);
+      const kind = getEnemyKindForRoom(room.number, index, worldId);
       const enemy = kind === 'slime'
         ? new Slime(this.scene, `slime-${this.nextEnemyNumber++}`, point.x, point.y,
             { ...getSlimeStatsForRoom(room.number, worldId) },
@@ -36,6 +37,19 @@ export class EnemySpawner {
         : new AdvancedEnemy(this.scene, `${kind}-${this.nextEnemyNumber++}`,
             point.x, point.y, kind, room.number, worldId,
             kind === 'boss' ? index : 0);
+      addBoundedEnemy(enemy, () => this.enemyGroup.add(enemy));
+      return enemy;
+    });
+  }
+
+  /** Summoned Snow Puffs use their own unique IDs, correct world-2 art and
+   * are tracked by GameScene so active waves cannot grow without a cap. */
+  public summonSnowPuffs(points: readonly SpawnPoint[], room: number): readonly Slime[] {
+    return points.map(point => {
+      const stats = getSlimeStatsForRoom(room, 2);
+      const enemy = new Slime(this.scene, `frost-summon-${this.nextEnemyNumber++}`,
+        point.x, point.y, { ...stats, maxHp: Math.round(stats.maxHp * 0.68) },
+        'world-2-slime');
       addBoundedEnemy(enemy, () => this.enemyGroup.add(enemy));
       return enemy;
     });

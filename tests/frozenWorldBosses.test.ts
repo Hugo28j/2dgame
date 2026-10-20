@@ -25,10 +25,10 @@ describe('Frozen Hollow unique bosses', () => {
     expect(wallHitsCircle(240, gap, { x: 340, y: 250 }, 12)).toBe(false);
     expect(wallGapCenter(40, bounds, 0)).toBeGreaterThan(40);
   });
-  it('lets a 15-second seeker turn toward a moving hero without instant snapping', () => {
-    expect(HOMING_ORB.lifetimeMs).toBe(15000);
-    expect(orbExpired(1000, 15999)).toBe(false);
-    expect(orbExpired(1000, 16000)).toBe(true);
+  it('lets an 8-second seeker turn toward a moving hero without instant snapping', () => {
+    expect(HOMING_ORB.lifetimeMs).toBe(8000);
+    expect(orbExpired(1000, 8999)).toBe(false);
+    expect(orbExpired(1000, 9000)).toBe(true);
     const turned = steerHomingHeading(0, { x: 0, y: 0 }, { x: 0, y: 200 }, 16);
     expect(turned).toBeGreaterThan(0);
     expect(turned).toBeLessThan(0.1);

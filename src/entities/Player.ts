@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 import type { Damageable } from '../combat/damage';
 import { InvulnerabilityWindow } from '../combat/InvulnerabilityWindow';
 import { SHIELD_MAX_HP, absorbWithShield } from '../abilities/ShieldHealth';
+import { FROZEN_EARLY } from '../enemies/frozenEarlyGame';
 import { HEROES, getHeroStats, type HeroId } from '../heroes/heroConfig';
 import type { Vector2Value } from '../input/vectorMath';
 
@@ -22,6 +23,22 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   private readonly invulnerability = new InvulnerabilityWindow();
   private rapidFireUntil = 0;
   private sprintUntil = 0;
+  private chilledUntil = 0;
+  private frozenUntil = 0;
+  public get isFrozen(): boolean { return this.scene.time.now < this.frozenUntil; }
+  public get isChilled(): boolean { return this.scene.time.now < this.chilledUntil; }
+  public clearFrost(): void {
+    this.chilledUntil = 0;
+    this.frozenUntil = 0;
+  }
+
+  public chill(now: number): void {
+    this.chilledUntil = Math.max(this.chilledUntil, now + FROZEN_EARLY.chillDurationMs);
+  }
+  public freeze(now: number): void {
+    this.frozenUntil = Math.max(this.frozenUntil, now + FROZEN_EARLY.freezeDurationMs);
+    this.setVelocity(0, 0);
+  }
 
   public boostAttackSpeed(now: number, durationMs: number): void {
     this.rapidFireUntil = Math.max(this.rapidFireUntil, now + durationMs);
@@ -36,7 +53,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   }
 
   public movementSpeedAt(now: number): number {
-    return this.movementSpeed * (now < this.sprintUntil ? 1.65 : 1);
+    if (now < this.frozenUntil) return 0;
+    return this.movementSpeed * (now < this.sprintUntil ? 1.65 : 1) *
+      (now < this.chilledUntil ? FROZEN_EARLY.chillSpeedFactor : 1);
   }
 
   public constructor(

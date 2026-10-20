@@ -23,6 +23,14 @@ export class RoomProgress {
     this.doorOpen = this.plannedEnemies === 0;
   }
 
+  /** Live witch summons join the current encounter before they appear.
+   * They count toward clearing the room, preventing premature door opening.
+   */
+  public addEnemies(count: number): void {
+    if (this.doorOpen || !Number.isSafeInteger(count) || count <= 0) return;
+    this.plannedEnemies += count;
+  }
+
   public registerEnemyDefeated(): boolean {
     if (this.doorOpen) {
       return true;

@@ -13,6 +13,7 @@ import { EnemyProjectile } from '../enemies/EnemyProjectile';
 import { HomingEnemyProjectile } from '../enemies/HomingEnemyProjectile';
 import { coverIsClose, firstShieldOnPath, type ShieldPoint } from '../enemies/treantShield';
 import { ICE_WALL, HOMING_ORB, wallGapCenter, wallHitsCircle, wallXAt } from '../enemies/frozenBossAttacks';
+import { FROZEN_EARLY, canSummonFrostMinions } from '../enemies/frozenEarlyGame';
 import { withinRadius } from '../enemies/enemyMovement';
 import { shotAngles } from '../enemies/projectilePatterns';
 import {
@@ -68,6 +69,8 @@ export class GameScene extends Phaser.Scene {
     gapY: number; warnAt: number; launchAt: number; hit: boolean;
     damage: number; owner: AdvancedEnemy;
   }>();
+  private readonly witchSummons = new Map<AdvancedEnemy, Set<Slime>>();
+  private frostStatusVisual?: Phaser.GameObjects.Graphics;
   private readonly poisonBottles = new Set<Phaser.GameObjects.Container>();
   private readonly poisonPools = new Set<{
     circle: Phaser.GameObjects.Arc; x: number; y: number;
@@ -184,6 +187,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.player.move(this.controls.getMovement());
+    this.drawFrostStatus();
     this.collectNearbyCoins(delta);
     // All room enemies are spawned up front, leaving no reinforcement indices.
     this.updateEnemyWaves();
@@ -191,6 +195,7 @@ export class GameScene extends Phaser.Scene {
     const aim = this.controls.getAim(this.player.x, this.player.y);
     this.player.face(aim);
     this.abilities?.update(this.time.now, delta);
+    if (this.player.isFrozen) this.player.setVelocity(0, 0);
     this.updatePoisonPools(this.time.now);
     this.updateFrozenWalls(this.time.now);
     this.weapon.update(this.time.now, this.controls.isShooting(), aim);
@@ -206,7 +211,7 @@ export class GameScene extends Phaser.Scene {
           : undefined;
         child.updateAI(this.player.x, this.player.y, this.time.now,
           this.fireEnemyProjectiles, this.explodeEnemy, this.dropBossBombs,
-          nearestCover?.shieldSurface);
+          nearestCover?.shieldSurface, this.summonFrostMinions);
       } else if (child instanceof Slime) {
         child.chase(this.player.x, this.player.y);
       }
@@ -474,8 +479,10 @@ export class GameScene extends Phaser.Scene {
 
     this.abilities?.cancelMotion();
     this.weapon?.clearGroundEffects();
+    this.player?.clearFrost();
     this.clearBossBombs();
     this.clearCoins();
+    this.witchSummons.clear();
     this.activeBosses = [];
     this.enemyProjectiles?.clear(true, true);
     this.enemies.clear(true, true);
@@ -525,6 +532,79 @@ export class GameScene extends Phaser.Scene {
 
     if (showBanner) {
       this.showRoomBanner(room);
+    }
+  }
+
+  /** Every living ice witch attempts to call exactly two Snow Puffs each
+   * five seconds. Both summons count toward clearing the chamber, and per-
+   * witch / per-room live caps keep infinite fights and FPS spikes away.
+   */
+  private readonly summonFrostMinions = (witch: AdvancedEnemy): void => {
+    if (!witch.isFrostWitch || witch.aiState === 'defeated' || !witch.active ||
+      this.gameOver || this.transitioning || this.roomProgress.doorOpen ||
+      !this.currentRoom || !this.player || !this.enemies || !this.enemySpawner) return;
+
+    let owned = this.witchSummons.get(witch);
+    if (!owned) { owned = new Set<Slime>(); this.witchSummons.set(witch, owned); }
+    for (const summon of owned) {
+      if (!summon.active || summon.aiState === 'defeated') owned.delete(summon);
+    }
+    const aliveSummons = this.enemies.getChildren().filter(child =>
+      child instanceof Slime && child.active && child.aiState !== 'defeated' &&
+      child.enemyId.startsWith('frost-summon-')).length;
+    if (!canSummonFrostMinions(aliveSummons, owned.size, FROZEN_EARLY.witchSummonCount)) return;
+    const layout = this.currentRoom.layout;
+    const candidates: { x: number; y: number }[] = [];
+    for (const range of [65, 105, 145]) {
+      for (let i = 0; i < 8 && candidates.length < FROZEN_EARLY.witchSummonCount; i++) {
+        const angle = i * Math.PI / 4 + this.time.now / 3900;
+        const x = Phaser.Math.Clamp(witch.x + Math.cos(angle) * range,
+          layout.bounds.x + 38, layout.bounds.x + layout.bounds.width - 38);
+        const y = Phaser.Math.Clamp(witch.y + Math.sin(angle) * range,
+          layout.bounds.y + 38, layout.bounds.y + layout.bounds.height - 38);
+        if (Math.hypot(x - this.player.x, y - this.player.y) < 95 ||
+          Math.hypot(x - witch.x, y - witch.y) < 35 ||
+          layout.obstacles.some(o =>
+            Math.abs(x - o.x) < o.width / 2 + 36 &&
+            Math.abs(y - o.y) < o.height / 2 + 36) ||
+          candidates.some(p => Math.hypot(p.x - x, p.y - y) < 54)) continue;
+        candidates.push({ x, y });
+      }
+      if (candidates.length === FROZEN_EARLY.witchSummonCount) break;
+    }
+    if (candidates.length !== FROZEN_EARLY.witchSummonCount) return;
+
+    this.roomProgress.addEnemies(candidates.length);
+    const spawned = this.enemySpawner.summonSnowPuffs(candidates, this.currentRoom.number);
+    for (const summon of spawned) owned.add(summon);
+    for (const point of candidates) {
+      const portal = this.add.circle(point.x, point.y, 25, 0x67e8f9, 0.28)
+        .setStrokeStyle(3, 0xcffafe, 0.85).setDepth(16);
+      this.tweens.add({ targets: portal, alpha: 0, scale: 1.6, duration: 460,
+        onComplete: () => portal.destroy() });
+    }
+    this.updateEnemyCount();
+  };
+
+  private drawFrostStatus(): void {
+    if (!this.player) return;
+    const g = this.frostStatusVisual ??=
+      this.add.graphics().setDepth(27);
+    g.clear();
+    if (!this.player.isFrozen && !this.player.isChilled) return;
+    const x = this.player.x, y = this.player.y;
+    const frozen = this.player.isFrozen;
+    g.lineStyle(frozen ? 5 : 3, frozen ? 0xdafaff : 0x38bdf8, frozen ? 0.96 : 0.6);
+    g.strokeCircle(x, y, frozen ? 31 : 26);
+    g.fillStyle(0x67e8f9, frozen ? 0.22 : 0.09);
+    g.fillCircle(x, y, frozen ? 30 : 25);
+    if (frozen) {
+      g.lineStyle(2, 0xffffff, 0.94);
+      for (let i = 0; i < 6; i++) {
+        const a = i * Math.PI / 3;
+        g.lineBetween(x + Math.cos(a) * 29, y + Math.sin(a) * 29,
+          x + Math.cos(a) * 41, y + Math.sin(a) * 41);
+      }
     }
   }
 
@@ -782,14 +862,19 @@ export class GameScene extends Phaser.Scene {
     const angles = shotAngles(pattern, angle, volley);
     const speed = (enemy.kind === 'boss' ? 220 + getBossTier(enemy.stats.roomNumber) * 8 :
       enemy.kind === 'mage' ? 220 : 320) * speedFactor;
-    const color = enemy.isBoss ? getBossProfile(enemy.stats.roomNumber, enemy.bossSlot).color :
+    const frostArcher = this.worldId === 2 && enemy.kind === 'archer' &&
+      enemy.stats.roomNumber <= FROZEN_EARLY.lastRoom;
+    const frostWitch = enemy.isFrostWitch;
+    const effect = frostWitch ? 'frost-burst' : frostArcher ? 'frost-chill' : 'none';
+    const color = frostWitch ? 0x93c5fd : frostArcher ? 0x38bdf8 :
+      enemy.isBoss ? getBossProfile(enemy.stats.roomNumber, enemy.bossSlot).color :
       enemy.kind === 'mage' ? 0xa78bfa : 0xfb7185;
     for (const direction of angles) {
       const bullet = new EnemyProjectile(
         this, enemy.x + Math.cos(direction) * 30,
         enemy.y + Math.sin(direction) * 30,
         Math.cos(direction), Math.sin(direction),
-        speed, enemy.stats.damage * (enemy.isBoss ? 0.57 : 1), color,
+        speed, enemy.stats.damage * (enemy.isBoss ? 0.57 : frostWitch ? FROZEN_EARLY.witchOrbDamageFactor : 1), color, effect,
       );
       addAndLaunch(bullet, () => this.enemyProjectiles!.add(bullet),
         { x: Math.cos(direction), y: Math.sin(direction) }, speed);
@@ -805,7 +890,7 @@ export class GameScene extends Phaser.Scene {
   };
 
   /** Blizzard Tyrant's frosty seeker pursues the player's *current* position
-   * for at most fifteen seconds and obeys normal projectile hit/slow rules.
+   * for at most eight seconds and obeys normal projectile hit/slow rules.
    */
   private launchHomingOrb(enemy: AdvancedEnemy): void {
     if (!this.player || !this.enemyProjectiles) return;
@@ -1065,21 +1150,54 @@ export class GameScene extends Phaser.Scene {
     this.damagePlayer(enemy.contactAttack);
   };
 
+  /** The Frost Witch's orb bursts both on the hero and arena obstacles.
+   * AoE collision is resolved once and immobilizes only a vulnerable hero.
+   */
+  private explodeFrostBolt(x: number, y: number, attack: Readonly<Projectile['attack']>): void {
+    const radius = FROZEN_EARLY.witchOrbRadius;
+    const blast = this.add.circle(x, y, radius, 0x67e8f9, 0.28)
+      .setStrokeStyle(5, 0xe0f2fe, 0.98).setDepth(30);
+    const crystal = this.add.circle(x, y, radius * 0.42, 0xcffafe, 0.42)
+      .setStrokeStyle(2, 0xffffff, 0.9).setDepth(31);
+    this.tweens.add({ targets: [blast, crystal], alpha: 0, scale: 1.2, duration: 300,
+      onComplete: () => { blast.destroy(); crystal.destroy(); } });
+    if (!this.player || this.gameOver || this.transitioning ||
+      !withinRadius(x, y, this.player.x, this.player.y, radius)) return;
+    const vulnerable = this.player.canReceiveContactDamage(this.time.now);
+    this.damagePlayer(attack);
+    if (vulnerable && !this.gameOver) this.player.freeze(this.time.now);
+  }
+
   private readonly handleEnemyBulletHit = (
     playerObject: ArcadeCollisionObject,
     bulletObject: ArcadeCollisionObject,
   ): void => {
-    if (!(playerObject instanceof Player) || !(bulletObject instanceof EnemyProjectile)) return;
-    // Destroy on first overlap, even during i-frames: no late/double contact.
+    if (!(playerObject instanceof Player) || !(bulletObject instanceof EnemyProjectile) ||
+        !bulletObject.active) return;
+    // Consume once on overlap (including i-frames), even for AoE ice impacts.
     const attack = bulletObject.attack;
+    const effect = bulletObject.effect;
+    const x = bulletObject.x, y = bulletObject.y;
     bulletObject.destroy();
-    this.damagePlayer(attack);
+    if (effect === 'frost-burst') {
+      this.explodeFrostBolt(x, y, attack);
+    } else {
+      const susceptible = playerObject.canReceiveContactDamage(this.time.now);
+      this.damagePlayer(attack);
+      if (effect === 'frost-chill' && susceptible && !this.gameOver)
+        playerObject.chill(this.time.now);
+    }
   };
 
   private readonly handleEnemyBulletObstacle = (
     projectileObject: ArcadeCollisionObject,
   ): void => {
-    if (projectileObject instanceof EnemyProjectile) projectileObject.destroy();
+    if (!(projectileObject instanceof EnemyProjectile) || !projectileObject.active) return;
+    const effect = projectileObject.effect;
+    const x = projectileObject.x, y = projectileObject.y;
+    const attack = projectileObject.attack;
+    projectileObject.destroy();
+    if (effect === 'frost-burst') this.explodeFrostBolt(x, y, attack);
   };
 
   private readonly handleProjectileObstacle = (
@@ -1472,6 +1590,9 @@ export class GameScene extends Phaser.Scene {
     this.upgradeReady = false;
     this.abilities?.destroy();
     this.abilities = undefined;
+    this.frostStatusVisual?.destroy();
+    this.frostStatusVisual = undefined;
+    this.witchSummons.clear();
     this.weapon?.clearGroundEffects();
     this.controls?.destroy();
     this.projectiles?.clear(true, true);

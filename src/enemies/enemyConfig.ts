@@ -1,6 +1,7 @@
 import { getWorld, type WorldId } from '../worlds/worldConfig';
 import { BOSSES, getBossProfile, getBossTier } from './bossProfiles';
 import { BRAMBLE_GUNNER_HP_MULTIPLIER, WORLD1_MOSSLING_SPEED_MULTIPLIER } from './enemyBalance';
+import { FROZEN_EARLY, earlyFrozenEnemy } from './frozenEarlyGame';
 
 export type EnemyKind = 'slime' | 'archer' | 'charger' | 'mage' | 'tank' | 'bomber' | 'boss';
 
@@ -64,10 +65,14 @@ export const ENEMY_UNLOCK_ROOMS = {
   slime: 1, archer: 7, charger: 12, tank: 17, mage: 23, bomber: 29,
 } as const;
 
-export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number): EnemyKind => {
+export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number,
+  worldId: WorldId = 1): EnemyKind => {
   const room = Math.max(1, Math.floor(roomNumber));
   if (room % 5 === 0) return 'boss';
   const index = Math.max(0, Math.floor(spawnIndex));
+  if (worldId === FROZEN_EARLY.world && room <= FROZEN_EARLY.lastRoom) {
+    return earlyFrozenEnemy(room, index);
+  }
   const entries = Object.entries(ENEMY_UNLOCK_ROOMS) as Array<
     [Exclude<EnemyKind, 'boss'>, number]>;
   // A new enemy always appears when its type is first introduced.
