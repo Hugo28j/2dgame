@@ -9,8 +9,9 @@ import { coverIsClose, rangedCoverSpot, shieldEndpoints, shouldBreakTreantShield
 import { getBossPlan, getBossProfile } from './bossProfiles';
 import { CHARGER_DASH, WORLD1_BEETLE_DASH } from './enemyBalance';
 import { MOSS_DASH, ROOT_BRANCH, SPORE_THROW_INTERVAL_MS } from './worldOneBossBalance';
-import { FROZEN_EARLY } from './frozenEarlyGame';
 import { FROZEN_BALANCE } from './frozenBalance';
+import { firstSummonTime, getSummonerType, nextSummonTime, summonIsDue,
+  type SummonerType } from './summonCadence';
 import { BRAMBLE_CINEMATIC } from './brambleCinematic';
 import { JADE_BRANCH } from './groveAttacks';
 import { sporePatrolVelocity } from './sporeMovement';
@@ -42,7 +43,8 @@ export class AdvancedEnemy extends Slime {
   private readonly roomNumber: number;
   private readonly worldId: WorldId;
   private nextSpecialAt = 0;
-  private nextSummonAt = 0;
+  private nextSummonAt = Number.POSITIVE_INFINITY;
+  private readonly summonerType: SummonerType | undefined;
   private witchHat?: Phaser.GameObjects.Graphics;
   private windupEndsAt = 0;
   private dashEndsAt = 0;
@@ -82,8 +84,8 @@ export class AdvancedEnemy extends Slime {
     this.nextShotAt = scene.time.now + stats.attackIntervalMs;
     this.nextJadeBranchesAt = scene.time.now + JADE_BRANCH.intervalMs / 2;
     this.nextSpecialAt = scene.time.now + 1500;
-    this.nextSummonAt = scene.time.now + (worldId === 2 && roomNumber === 15 && kind === 'boss'
-      ? FROZEN_BALANCE.sentinelSummonIntervalMs : FROZEN_EARLY.witchSummonIntervalMs);
+    this.summonerType = getSummonerType(worldId, kind, roomNumber, bossSlot);
+    this.nextSummonAt = firstSummonTime(scene.time.now, this.summonerType);
     if (this.isFrostWitch) this.witchHat = scene.add.graphics().setDepth(14);
   }
 
@@ -136,6 +138,11 @@ export class AdvancedEnemy extends Slime {
     frozenSpecial?: (enemy: AdvancedEnemy, effect: 'boulder' | 'snow' | 'golems', count: number) => void,
     jadeBranches?: EnemyJadeBranches): void {
     if (this.aiState === 'defeated') return;
+    // Living summoners call their first wave ~350 ms after appearing. Do this
+    // before stun / knockback returns, otherwise a newly spawned summoner can
+    // unintentionally wait longer than one second. Once attempted, the full
+    // original cooldown starts from this moment, not from construction.
+    this.updateTimedSummons(now, summon, frozenSpecial);
     super.chase(targetX, targetY);
     if (this.isStunned(now)) return;
     if (this.isFrostWitch) this.drawWitchHat(now);
@@ -182,10 +189,6 @@ export class AdvancedEnemy extends Slime {
           fire(this, this.isFrostWitch || this.kind === 'archer' ? 'single' : 'double');
           this.nextShotAt = now + this.stats.attackIntervalMs;
         }
-        if (this.isFrostWitch && now >= this.nextSummonAt) {
-          summon?.(this);
-          this.nextSummonAt = now + FROZEN_EARLY.witchSummonIntervalMs;
-        }
         break;
       }
       case 'tank':
@@ -226,11 +229,6 @@ export class AdvancedEnemy extends Slime {
             this.nextSnowfallAt = now + 1000 / FROZEN_BALANCE.snowballsPerSecond;
           }
           break;
-        }
-        if (this.isSnowSentinel && now >= this.nextSummonAt) {
-          frozenSpecial?.(this, 'golems', phase === 1 ?
-            FROZEN_BALANCE.sentinelPhaseOneCount : FROZEN_BALANCE.sentinelPhaseTwoCount);
-          this.nextSummonAt = now + FROZEN_BALANCE.sentinelSummonIntervalMs;
         }
         if (this.isRootTyrant) {
           this.setVelocity(move.x * 0.55, move.y * 0.55);
@@ -328,6 +326,25 @@ export class AdvancedEnemy extends Slime {
         break;
       }
     }
+  }
+
+  /** Shared initial and repeat-cast scheduling. Death-triggered splits are
+   * intentionally not represented here and keep their old death handlers. */
+  private updateTimedSummons(now: number, summon?: EnemySummon,
+    frozenSpecial?: (enemy: AdvancedEnemy, effect: 'boulder' | 'snow' | 'golems', count: number) => void): void {
+    const type = this.summonerType;
+    if (!type || !summonIsDue(now, this.nextSummonAt)) return;
+    if (type === 'frost-witch') {
+      if (!summon) return;
+      summon(this);
+    } else {
+      if (!frozenSpecial) return;
+      const phase = bossPhase(this.healthRatio);
+      frozenSpecial(this, 'golems', phase === 1
+        ? FROZEN_BALANCE.sentinelPhaseOneCount
+        : FROZEN_BALANCE.sentinelPhaseTwoCount);
+    }
+    this.nextSummonAt = nextSummonTime(now, type);
   }
 
   private drawWitchHat(now: number): void {
