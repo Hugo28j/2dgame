@@ -50,6 +50,8 @@ import { coinDropsForEnemy } from '../progression/coinRewards';
 import { roomClearHealing } from '../progression/roomHealing';
 import { RunUpgradeDeck, type RunUpgradeId } from '../progression/runUpgrades';
 import { getWorld, getWorldBossName, type WorldId } from '../worlds/worldConfig';
+import { drawFrozenFloor } from '../worlds/iceFloorArt';
+import { ICE_ENEMY_STEERING, iceVelocity } from '../worlds/iceMotion';
 import { findChainTargets } from '../weapons/chainLightning';
 import { upgradeCardBounds } from '../ui/upgradeLayout';
 import { displayedHp } from '../ui/displayValues';
@@ -104,6 +106,11 @@ export class GameScene extends Phaser.Scene {
   private enemySpawner?: EnemySpawner;
   private door?: Phaser.GameObjects.Rectangle;
   private arenaArt?: Phaser.GameObjects.Container;
+  private iceObstacleDecor?: Phaser.GameObjects.Graphics;
+  private iceTrailGraphics?: Phaser.GameObjects.Graphics;
+  private iceMarks: { x: number; y: number; vx: number; vy: number; expires: number }[] = [];
+  private iceMarkCooldown = new WeakMap<Phaser.Physics.Arcade.Sprite, number>();
+  private lastIceTrailRender = 0;
   private currentRoom?: RoomDefinition;
   private healthBar?: Phaser.GameObjects.Graphics;
   private healthText?: Phaser.GameObjects.Text;
@@ -146,6 +153,7 @@ export class GameScene extends Phaser.Scene {
     this.run = new RunLedger(undefined, this.worldId);
     this.upgrades = new RunUpgradeDeck();
     this.drawBackdrop();
+    if (this.worldId === 2) this.iceTrailGraphics = this.add.graphics().setDepth(3);
 
     const firstRoom = getRoomDefinition(1, this.worldId);
     const profile = progressStore.current;
@@ -209,7 +217,8 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    this.player.move(this.controls.getMovement());
+    this.player.move(this.controls.getMovement(), delta, this.worldId === 2);
+    if (this.worldId === 2) this.recordIceTrail(this.player, 105);
     this.updateLevelUpGlow();
     this.drawFrostStatus();
     this.collectNearbyCoins(delta);
@@ -230,6 +239,8 @@ export class GameScene extends Phaser.Scene {
     // Ranged world-1 mobs use nearby Ancient Treants as moving cover.
     const treants = this.liveTreantShields();
     for (const child of this.enemies.getChildren()) {
+      if (!(child instanceof Slime) || child.aiState === 'defeated' || !child.active) continue;
+      const previousVelocity = { x: child.body?.velocity.x ?? 0, y: child.body?.velocity.y ?? 0 };
       if (child instanceof AdvancedEnemy) {
         const nearestCover = this.worldId === 1 && (child.kind === 'archer' || child.kind === 'mage')
           ? treants.filter(tank => coverIsClose(child, tank))
@@ -240,10 +251,29 @@ export class GameScene extends Phaser.Scene {
           this.fireEnemyProjectiles, this.explodeEnemy, this.dropBossBombs,
           nearestCover?.shieldSurface, this.summonFrostMinions,
           this.performRootAttack, this.dropDashTrailBomb, this.frozenBossSpecial);
-      } else if (child instanceof Slime) {
+      } else {
         child.chase(this.player.x, this.player.y);
       }
+      // All world-2 enemy types (including bosses) glide, but scripted dashes,
+      // windups, knockback and stuns retain their intentional control.
+      if (this.worldId === 2 && !child.isStunned(this.time.now) &&
+          !child.isKnockedBack(this.time.now) &&
+          !(child instanceof AdvancedEnemy && child.hasScriptedMotion)) {
+        const body = child.body;
+        if (body instanceof Phaser.Physics.Arcade.Body) {
+          const next = iceVelocity(previousVelocity,
+            { x: body.velocity.x, y: body.velocity.y }, delta, ICE_ENEMY_STEERING, {
+              left: body.blocked.left || body.touching.left,
+              right: body.blocked.right || body.touching.right,
+              up: body.blocked.up || body.touching.up,
+              down: body.blocked.down || body.touching.down,
+            });
+          child.setVelocity(next.x, next.y);
+        }
+      }
+      if (this.worldId === 2) this.recordIceTrail(child, 210);
     }
+    if (this.worldId === 2) this.renderIceTrails();
     for (const child of this.enemyProjectiles?.getChildren() ?? []) {
       if (child instanceof EnemyProjectile) {
         if (child instanceof HomingEnemyProjectile) {
@@ -363,6 +393,50 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Reuses one small vector layer, never emitting one particle sprite per step. */
+  private recordIceTrail(sprite: Phaser.Physics.Arcade.Sprite, intervalMs: number): void {
+    const body = sprite.body;
+    if (!(body instanceof Phaser.Physics.Arcade.Body)) return;
+    const speed = Math.hypot(body.velocity.x, body.velocity.y);
+    if (speed < 75) return;
+    const now = this.time.now;
+    if (now < (this.iceMarkCooldown.get(sprite) ?? 0)) return;
+    this.iceMarkCooldown.set(sprite, now + intervalMs);
+    this.iceMarks.push({
+      x: sprite.x - body.velocity.x / speed * 15,
+      y: sprite.y - body.velocity.y / speed * 15,
+      vx: body.velocity.x / speed, vy: body.velocity.y / speed,
+      expires: now + 560,
+    });
+    if (this.iceMarks.length > 110) this.iceMarks.shift();
+  }
+
+  private renderIceTrails(): void {
+    const g = this.iceTrailGraphics;
+    if (!g) return;
+    const now = this.time.now;
+    if (now - this.lastIceTrailRender < 42) return;
+    this.lastIceTrailRender = now;
+    this.iceMarks = this.iceMarks.filter(mark => mark.expires > now);
+    g.clear();
+    for (const mark of this.iceMarks) {
+      const alpha = Math.min(0.45, (mark.expires - now) / 560 * 0.45);
+      g.lineStyle(2, 0x5a9cc0, alpha);
+      g.lineBetween(mark.x - mark.vx * 9, mark.y - mark.vy * 9,
+        mark.x + mark.vx * 5, mark.y + mark.vy * 5);
+      g.fillStyle(0xffffff, alpha * 1.5);
+      g.fillCircle(mark.x - mark.vy * 4, mark.y + mark.vx * 4, 2);
+    }
+  }
+
+  private clearIceEffects(): void {
+    this.iceMarks = [];
+    this.iceMarkCooldown = new WeakMap();
+    this.iceTrailGraphics?.clear();
+    this.iceObstacleDecor?.destroy();
+    this.iceObstacleDecor = undefined;
+  }
+
   private updateCamera(): void {
     if (!this.player || !this.currentRoom) return;
     const target = targetArenaScroll(this.player.x, this.player.y, this.currentRoom.layout.bounds);
@@ -395,6 +469,9 @@ export class GameScene extends Phaser.Scene {
       floor.strokeCircle(x, y, 12 + (i % 3) * 9);
       floor.lineBetween(x - 9, y, x + 9, y);
     }
+    // A light, cracked ice surface covers the entire world-2 floor.
+    const ice = this.add.graphics();
+    if (this.worldId === 2) drawFrozenFloor(ice, bounds, room.number);
     // World-specific floor motifs give each campaign its own map identity.
     // Cheap static vector graphics: regenerated only when changing chambers.
     const motifs = this.add.graphics();
@@ -433,7 +510,7 @@ export class GameScene extends Phaser.Scene {
           break;
       }
     }
-    this.arenaArt = this.add.container(0, 0, [plate, floor, motifs]).setDepth(0);
+    this.arenaArt = this.add.container(0, 0, [plate, floor, ice, motifs]).setDepth(0);
   }
 
   private createDoor(): void {
@@ -514,6 +591,7 @@ export class GameScene extends Phaser.Scene {
     this.player?.clearFrost();
     this.clearBossBombs();
     this.clearCoins();
+    this.clearIceEffects();
     this.witchSummons.clear();
     this.activeBosses = [];
     this.enemyProjectiles?.clear(true, true);
@@ -689,6 +767,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     const world = getWorld(this.worldId);
+    const snow = this.worldId === 2 ? this.add.graphics().setDepth(7) : undefined;
     for (const definition of room.layout.obstacles) {
       const obstacle = this.add
         .rectangle(
@@ -702,7 +781,16 @@ export class GameScene extends Phaser.Scene {
         .setDepth(6);
       this.physics.add.existing(obstacle, true);
       this.obstacles.add(obstacle);
+      if (snow) {
+        snow.fillStyle(0xffffff, 0.88);
+        snow.fillRoundedRect(definition.x - definition.width / 2 + 3,
+          definition.y - definition.height / 2 + 3, definition.width - 6, 10, 4);
+        snow.fillStyle(0xe0f7ff, 0.4);
+        snow.fillEllipse(definition.x, definition.y + definition.height / 2 - 2,
+          definition.width * 0.9, 10);
+      }
     }
+    this.iceObstacleDecor = snow;
   }
 
   private closeDoor(): void {
@@ -2176,6 +2264,9 @@ export class GameScene extends Phaser.Scene {
       this.levelUpGlow = undefined;
     }
     this.clearBossBombs();
+    this.clearIceEffects();
+    this.iceTrailGraphics?.destroy();
+    this.iceTrailGraphics = undefined;
     this.upgradeHitAreas.forEach(hitArea => hitArea.destroy());
     this.upgradeHitAreas = [];
     this.upgradeOverlay?.destroy(true);
