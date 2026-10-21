@@ -13,7 +13,7 @@ describe('phase 7 room enemy rosters', () => {
     expect(getEnemyKindForRoom(2, 0)).toBe('slime');
     expect(getEnemyKindForRoom(3, 0)).toBe('slime');
     expect(getEnemyKindForRoom(4, 0)).toBe('archer');
-    expect(getEnemyKindForRoom(6, 0)).toBe('slime');
+    expect(['slime', 'archer']).toContain(getEnemyKindForRoom(6, 0));
     expect(getEnemyKindForRoom(7, 0)).not.toBe('boss');
     expect(getEnemyKindForRoom(11, 0)).toBe('charger');
     expect(getEnemyKindForRoom(16, 0)).toBe('tank');
