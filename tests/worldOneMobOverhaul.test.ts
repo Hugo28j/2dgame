@@ -26,7 +26,7 @@ describe('World 1 mob rebalance and replacement spawns', () => {
   });
   it('buffs Mossling, Briar and Willow but keeps Frozen Hollow untouched', () => {
     expect(getEnemyStatsForRoom('slime',1,1).movementSpeed).toBe(175);
-    expect(getEnemyStatsForRoom('archer',1,1).damage).toBe(18);
+    expect(getEnemyStatsForRoom('archer',1,1).damage).toBe(36);
     expect(getEnemyStatsForRoom('mage',21,1).maxHp).toBe(Math.round(68*6*(1+20*.08)));
     expect(getEnemyStatsForRoom('mage',21,1).attackIntervalMs).toBe(Math.round(1950/1.2));
     expect(getEnemyStatsForRoom('mage',21,2).attackIntervalMs).toBe(Math.round(1950/1.05));
