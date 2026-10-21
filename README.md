@@ -8,6 +8,7 @@ Dungeon Ascent wordt een originele, mobile-first 2D roguelike shooter voor de br
 - Phaser Arcade Physics Groups overschrijven de initiële velocity van een nieuw projectiel. Zowel speler- als vijandschoten krijgen hun snelheid daarom opnieuw **nadat** ze aan de groep zijn toegevoegd.
 - Reguliere schoten verdwijnen bij een treffer op een muur of vijand; bestaande piercing-wapens/upgrades blijven doelbewust meerdere vijanden kunnen doorboren tot hun hitlimiet. Vijandelijke schoten verdwijnen bij een botsing met muur of speler.
 - Vijanden krijgen na toevoegen aan de Physics Group expliciet botsing met kamergrenzen, ook tijdens boss charges.
+- Het eindscherm gebruikt native browserknoppen boven het canvas: **Opnieuw spelen** start kamer 1 met dezelfde held en wereld, terwijl **Hoofdmenu** direct terugkeert naar het menu.
 
 ## Instelbare besturing en vernieuwd menu
 
