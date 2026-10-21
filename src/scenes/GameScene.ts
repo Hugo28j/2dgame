@@ -9,6 +9,8 @@ import { EnemySpawner } from '../enemies/EnemySpawner';
 import { getBossProfile, getBossTier } from '../enemies/bossProfiles';
 import { MOSS_DASH, ROOT_BRANCH, rootBurstAngles } from '../enemies/worldOneBossBalance';
 import { SPORE_POISON, poisonActive, poisonCovers, poisonTickDue } from '../enemies/poisonHazard';
+import { selectPoisonLocations, type PoisonCircle } from '../enemies/poisonPlacement';
+import { rootWavePoint, rootTipHits } from '../enemies/rootGrowth';
 import { AdvancedEnemy, type BulletPattern } from '../enemies/AdvancedEnemy';
 import { EnemyProjectile } from '../enemies/EnemyProjectile';
 import { ricochetAxis } from '../enemies/enemyRicochet';
@@ -97,6 +99,8 @@ export class GameScene extends Phaser.Scene {
   private readonly witchSummons = new Map<AdvancedEnemy, Set<Slime>>();
   private frostStatusVisual?: Phaser.GameObjects.Graphics;
   private readonly poisonBottles = new Set<Phaser.GameObjects.Container>();
+  /** Locations reserved by in-flight bottles; kept disjoint from active pools. */
+  private readonly poisonReservations = new Set<PoisonCircle>();
   private readonly poisonPools = new Set<{
     circle: Phaser.GameObjects.Arc; x: number; y: number;
     radius: number; startAt: number; nextTickAt: number; damage: number;
@@ -994,7 +998,7 @@ export class GameScene extends Phaser.Scene {
     // The two split Void Sentinels fire in opposite directions and rotate
     // twice as quickly as the original spiral. Keep other bosses unchanged.
     const angles = this.worldId === 1 && enemy.fasterTwin &&
-      enemy.stats.roomNumber === 15
+      enemy.stats.roomNumber === 20
       ? [splitTwinShotAngle(volley, enemy.splitTwinIndex)]
       : shotAngles(pattern, angle, volley);
     const briarHunter = this.worldId === 1 && enemy.kind === 'archer';
@@ -1008,7 +1012,7 @@ export class GameScene extends Phaser.Scene {
       briarHunter ? 'briar-ricochet' : 'none';
     const color = frostWitch ? 0x93c5fd : frostArcher ? 0x38bdf8 :
       briarHunter ? 0xa3e635 :
-      enemy.isBoss ? getBossProfile(enemy.stats.roomNumber, enemy.bossSlot).color :
+      enemy.isBoss ? getBossProfile(enemy.stats.roomNumber, enemy.bossSlot, this.worldId).color :
       enemy.kind === 'mage' ? 0xa78bfa : 0xfb7185;
     for (const direction of angles) {
       const bullet = new EnemyProjectile(
@@ -1315,80 +1319,118 @@ export class GameScene extends Phaser.Scene {
     this.frozenWalls.clear();
   }
 
-  /** Animated ground-grown thorn lines and two rotated eight-way branch bursts. */
+  /** Growing underground root wave and three rotating eight-way barrages. */
   private readonly performRootAttack = (enemy: AdvancedEnemy, attack: 'line' | 'burst',
-    targetX: number, targetY: number, rotated: boolean): void => {
+    targetX: number, targetY: number, rotation: number | boolean): void => {
     if (!this.currentRoom || this.gameOver || this.transitioning || this.roomProgress.doorOpen) return;
     const bounds = this.currentRoom.layout.bounds;
-    const originX = enemy.x, originY = enemy.y;
-    const dx = targetX - originX, dy = targetY - originY;
-    const aim = Math.atan2(dy, dx);
-    const angles = attack === 'burst' ? rootBurstAngles(rotated) : [aim];
+    const origin = {x: enemy.x, y: enemy.y};
+    const aim = Math.atan2(targetY - origin.y, targetX - origin.x);
+    const angles = attack === 'burst' ? rootBurstAngles(rotation) : [aim];
+    const warningMs = attack === 'line' ? ROOT_BRANCH.lineWarningMs : ROOT_BRANCH.burstWarningMs;
+    const growMs = attack === 'line' ? 660 : 460;
     for (const angle of angles) {
       const length = attack === 'burst' ? ROOT_BRANCH.burstLength :
-        Math.max(390, Math.hypot(dx, dy) + 95);
-      const endX = Phaser.Math.Clamp(originX + Math.cos(angle) * length, bounds.x + 12,
-        bounds.x + bounds.width - 12);
-      const endY = Phaser.Math.Clamp(originY + Math.sin(angle) * length, bounds.y + 12,
-        bounds.y + bounds.height - 12);
+        Math.max(390, Math.hypot(targetX - origin.x, targetY - origin.y) + 95);
+      const end = {
+        x: Phaser.Math.Clamp(origin.x + Math.cos(angle) * length,
+          bounds.x + 12, bounds.x + bounds.width - 12),
+        y: Phaser.Math.Clamp(origin.y + Math.sin(angle) * length,
+          bounds.y + 12, bounds.y + bounds.height - 12),
+      };
+      // Fissures warn the player where a root is about to surface; this is
+      // purely a telegraph and never deals damage.
       const preview = this.add.graphics().setDepth(24);
       this.rootEffects.add(preview);
-      preview.lineStyle(ROOT_BRANCH.lineWidth + 10, 0x65a30d, .17);
-      preview.lineBetween(originX, originY, endX, endY);
-      preview.lineStyle(2, 0xd9f99d, .8);
-      preview.lineBetween(originX, originY, endX, endY);
-      const warningMs = attack === 'line' ? ROOT_BRANCH.lineWarningMs :
-        ROOT_BRANCH.burstWarningMs;
+      preview.lineStyle(2, 0xd9f99d, 0.84);
+      const segments = 18;
+      for (let j = 0; j < segments; j += 2) {
+        const a = rootWavePoint(origin, end, j / segments);
+        const b = rootWavePoint(origin, end, (j + 1) / segments);
+        preview.lineBetween(a.x, a.y, b.x, b.y);
+      }
+      preview.lineStyle(4, 0x65a30d, 0.30);
+      preview.strokeCircle(origin.x, origin.y, 22);
+      const sprout = this.add.graphics().setDepth(27);
+      this.rootEffects.add(sprout);
+      sprout.fillStyle(0x5b3a1a, 0.93);
+      sprout.fillEllipse(origin.x, origin.y, 18, 8);
+      sprout.lineStyle(2, 0xa3e635, 0.76);
+      sprout.lineBetween(origin.x - 5, origin.y, origin.x + 3, origin.y - 17);
       let timer: Phaser.Time.TimerEvent;
       timer = this.time.delayedCall(warningMs, () => {
         this.bombTimers.delete(timer);
         this.rootEffects.delete(preview);
+        this.rootEffects.delete(sprout);
         preview.destroy();
+        sprout.destroy();
         if (!enemy.active || enemy.aiState === 'defeated' || this.gameOver ||
-          this.transitioning || this.roomProgress.doorOpen) return;
+            this.transitioning || this.roomProgress.doorOpen || this.choosingUpgrade) return;
         const growth = this.add.graphics().setDepth(28);
         this.rootEffects.add(growth);
-        const distance = Math.hypot(endX - originX, endY - originY);
+        let previousProgress = 0;
+        let damaged = false;
         this.tweens.addCounter({
-          from: 0, to: 1, duration: 260, ease: 'Cubic.easeOut',
+          from: 0, to: 1, duration: growMs, ease: 'Linear',
           onUpdate: tween => {
-            if (!growth.active) return;
+            if (!growth.active || this.roomProgress.doorOpen || this.gameOver ||
+                this.transitioning || this.choosingUpgrade) return;
             const t = tween.getValue() ?? 0;
-            const tipX = Phaser.Math.Linear(originX, endX, t);
-            const tipY = Phaser.Math.Linear(originY, endY, t);
+            const totalSegments = Math.max(1, Math.ceil(t * 32));
+            const points: {x: number; y: number}[] = [];
+            for (let i = 0; i <= totalSegments; i++)
+              points.push(rootWavePoint(origin, end, t * i / totalSegments));
             growth.clear();
-            growth.lineStyle(ROOT_BRANCH.lineWidth, 0x854d0e, 1);
-            growth.lineBetween(originX, originY, tipX, tipY);
-            growth.lineStyle(9, 0x65a30d, 1);
-            growth.lineBetween(originX, originY, tipX, tipY);
-            const steps = Math.floor(distance * t / 42);
-            for (let i = 1; i <= steps; i++) {
-              const fraction = i * 42 / distance;
-              const x = Phaser.Math.Linear(originX, endX, fraction);
-              const y = Phaser.Math.Linear(originY, endY, fraction);
-              const side = i % 2 ? 1 : -1;
-              growth.lineStyle(5, 0xa3e635, 1);
-              growth.lineBetween(x, y, x - Math.sin(angle + side * .42) * 21,
-                y + Math.cos(angle + side * .42) * 21);
+            growth.lineStyle(18, 0x5c381c, 1);
+            for (let i = 1; i < points.length; i++) {
+              growth.lineBetween(points[i - 1]!.x, points[i - 1]!.y,
+                points[i]!.x, points[i]!.y);
             }
+            growth.lineStyle(9, 0x8ba246, 1);
+            for (let i = 1; i < points.length; i++) {
+              growth.lineBetween(points[i - 1]!.x, points[i - 1]!.y,
+                points[i]!.x, points[i]!.y);
+            }
+            // Side roots emerge progressively, never pre-rendered ahead of the tip.
+            for (let fraction = 0.14; fraction <= t; fraction += 0.14) {
+              const p = rootWavePoint(origin, end, fraction);
+              const dir = angle + (Math.floor(fraction * 100) % 2 ? 1 : -1) * 0.8;
+              growth.lineStyle(4, 0x6d4c23, 0.9);
+              growth.lineBetween(p.x, p.y, p.x + Math.cos(dir) * 17,
+                p.y + Math.sin(dir) * 17);
+            }
+            const tip = rootWavePoint(origin, end, t);
+            growth.fillStyle(0xc2e98b, 0.92);
+            growth.fillCircle(tip.x, tip.y, 11);
+            // Damage travels with the leading tip, NOT instantly along the
+            // full line. Substeps prevent skipped collisions at low mobile FPS.
+            if (!damaged && this.player?.active && enemy.active &&
+                enemy.aiState !== 'defeated') {
+              const slices = Math.max(1, Math.ceil((t - previousProgress) * 60));
+              for (let step = 0; step < slices; step++) {
+                const a = rootWavePoint(origin, end,
+                  previousProgress + (t - previousProgress) * step / slices);
+                const b = rootWavePoint(origin, end,
+                  previousProgress + (t - previousProgress) * (step + 1) / slices);
+                if (rootTipHits(a, b, this.player, ROOT_BRANCH.lineWidth / 2 + 13)) {
+                  damaged = true;
+                  this.damagePlayer({damage: enemy.stats.damage * .62,
+                    criticalChance: 0, criticalMultiplier: 1});
+                  break;
+                }
+              }
+            }
+            previousProgress = t;
           },
           onComplete: () => {
-            this.rootEffects.delete(growth);
-            growth.destroy();
+            if (!growth.active) return;
+            this.tweens.add({ targets: growth, alpha: 0, duration: 180,
+              onComplete: () => {
+                this.rootEffects.delete(growth);
+                growth.destroy();
+              } });
           },
         });
-        // One hit per branch; warning gives time to leave its corridor.
-        if (this.player && this.player.active) {
-          const vx = endX - originX, vy = endY - originY;
-          const projection = Phaser.Math.Clamp(
-            ((this.player.x - originX) * vx + (this.player.y - originY) * vy) /
-              Math.max(1, vx * vx + vy * vy), 0, 1);
-          const closestX = originX + vx * projection, closestY = originY + vy * projection;
-          if (Math.hypot(this.player.x - closestX, this.player.y - closestY) <
-            ROOT_BRANCH.lineWidth / 2 + 13)
-            this.damagePlayer({ damage: enemy.stats.damage * .62,
-              criticalChance: 0, criticalMultiplier: 1 });
-        }
       });
       this.bombTimers.add(timer);
     }
@@ -1538,23 +1580,22 @@ export class GameScene extends Phaser.Scene {
   private throwPoisonBottles(enemy: AdvancedEnemy, count: number, radius: number): void {
     const bounds = this.currentRoom?.layout.bounds;
     if (!bounds) return;
-    for (let i = 0; i < count; i++) {
-      // Landing sites can be directly under/near the boss or elsewhere in the arena.
-      const centerOnBoss = i === 0 || Math.random() < .28;
-      const x = centerOnBoss ? Phaser.Math.Clamp(enemy.x + Phaser.Math.Between(-30, 30),
-        bounds.x + radius + 8, bounds.x + bounds.width - radius - 8) : Phaser.Math.Between(
-        Math.ceil(bounds.x + radius + 8),
-        Math.floor(bounds.x + bounds.width - radius - 8));
-      const y = centerOnBoss ? Phaser.Math.Clamp(enemy.y + Phaser.Math.Between(-30, 30),
-        bounds.y + radius + 8, bounds.y + bounds.height - radius - 8) : Phaser.Math.Between(
-        Math.ceil(bounds.y + radius + 8),
-        Math.floor(bounds.y + bounds.height - radius - 8));
+    const occupied = [
+      ...Array.from(this.poisonPools, p => ({x: p.x, y: p.y, radius: p.radius})),
+      ...this.poisonReservations,
+    ];
+    const sites = selectPoisonLocations(count, radius, bounds, occupied, Math.random,
+      this.player ? {x: this.player.x, y: this.player.y} : undefined);
+    // Less is better than overlapping. All in-flight bottles are reserved before
+    // any next cast, and each new active pool occupies the same location.
+    for (const [i, site] of sites.entries()) {
+      const {x, y} = site;
+      this.poisonReservations.add(site);
       const marker = this.add.circle(x, y, radius, 0x4ade80, 0.14)
         .setStrokeStyle(2, 0xa3e635, 0.85).setDepth(25);
       this.bombWarnings.add(marker);
-      // Half-second landing warning before the flask breaks.
       const warningTween = this.tweens.add({
-        targets: marker, alpha: { from: 0.9, to: 0.4 }, scale: { from: 0.86, to: 1 },
+        targets: marker, alpha: {from: 0.9, to: 0.4}, scale: {from: 0.86, to: 1},
         duration: SPORE_POISON.bottleFlightMs + i * 55, ease: 'Sine.easeInOut',
       });
       const glass = this.add.ellipse(0, 4, 17, 23, 0x4ade80)
@@ -1580,6 +1621,7 @@ export class GameScene extends Phaser.Scene {
           bottle.setRotation(t * Math.PI * 1.5);
         },
         onComplete: () => {
+          this.poisonReservations.delete(site);
           if (!bottle.active) return;
           this.poisonBottles.delete(bottle);
           this.bombWarnings.delete(marker);
@@ -1636,6 +1678,7 @@ export class GameScene extends Phaser.Scene {
       bottle.destroy();
     }
     this.poisonBottles.clear();
+    this.poisonReservations.clear();
     for (const pool of this.poisonPools) pool.circle.destroy();
     this.poisonPools.clear();
   }
@@ -1803,9 +1846,9 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: flash, scaleX: 4, scaleY: 4, alpha: 0,
       duration: 450, ease: 'Cubic.easeOut', onComplete: () => flash.destroy() });
     this.time.delayedCall(420, () => {
-      if (!this.currentRoom || this.currentRoom.number !== 15 ||
+      if (!this.currentRoom || this.currentRoom.number !== 20 ||
           this.gameOver || this.transitioning) return;
-      const twins = this.enemySpawner?.spawnSplitBosses(points, 15) ?? [];
+      const twins = this.enemySpawner?.spawnSplitBosses(points, 20) ?? [];
       this.activeBosses = twins;
       this.updateBossHud();
       this.updateEnemyCount();
@@ -1834,7 +1877,7 @@ export class GameScene extends Phaser.Scene {
     this.spawnCoins(enemy.x, enemy.y, kind);
     this.spawnXp(enemy.x, enemy.y, kind);
     this.spawnArmor(enemy, kind);
-    if (this.worldId === 1 && this.roomProgress.roomNumber === 15 &&
+    if (this.worldId === 1 && this.roomProgress.roomNumber === 20 &&
         enemy instanceof AdvancedEnemy && enemy.isBoss && enemy.bossSlot === 0) {
       this.startWorldOneBossSplit(enemy);
     }
