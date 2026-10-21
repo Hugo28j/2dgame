@@ -5,6 +5,7 @@ import { BRAMBLE_GUNNER_HP_MULTIPLIER, WORLD1_MOSSLING_SPEED_MULTIPLIER,
   WORLD1_WISP_FIRE_RATE_MULTIPLIER, WORLD1_SPORECAP_HP_MULTIPLIER,
   WORLD1_SPORECAP_SPEED_MULTIPLIER } from './enemyBalance';
 import { FROZEN_EARLY, earlyFrozenEnemy } from './frozenEarlyGame';
+import { FROZEN_BALANCE, WORLD2_UNLOCK_ROOMS } from './frozenBalance';
 
 export type EnemyKind = 'slime' | 'archer' | 'charger' | 'mage' | 'tank' | 'bomber' | 'boss';
 
@@ -48,7 +49,9 @@ export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number,
     ...base, roomNumber: number,
     maxHp: Math.round(base.maxHp *
       (worldId === 2 && kind === 'mage' ? 3 :
-        worldId === 2 && kind === 'archer' ? 1.5 :
+        worldId === 2 && kind === 'archer' ? 1.5 * FROZEN_BALANCE.rangerHpMultiplier :
+        worldId === 2 && kind === 'tank' ? FROZEN_BALANCE.golemHpMultiplier :
+        worldId === 2 && kind === 'charger' ? FROZEN_BALANCE.shotgunHpMultiplier :
         worldId === 1 && kind === 'mage' ? WORLD1_WISP_HP_MULTIPLIER :
         worldId === 1 && kind === 'bomber' ? WORLD1_SPORECAP_HP_MULTIPLIER : 1) *
       (1 + completed * SLIME_DIFFICULTY.hpPerRoom) *
@@ -57,15 +60,18 @@ export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number,
       // in the same room and other world's gunner retain full HP.
       (kind === 'boss' && worldId === 1 && number === 15 && bossSlot === 0
         ? BRAMBLE_GUNNER_HP_MULTIPLIER : 1) *
+      (kind === 'boss' && worldId === 2 && number === 5 ? FROZEN_BALANCE.glacierWardenHpMultiplier :
+        kind === 'boss' && worldId === 2 && number === 15 ? FROZEN_BALANCE.snowSentinelHpMultiplier : 1) *
       (kind === 'boss' && worldId === 1 && number === 20 ? 1.5 :
         kind === 'boss' && worldId === 1 && number === 30 ? 2 : 1)),
-    damage: Math.round(base.damage * (worldId === 2 && kind === 'archer' ? 2 :
+    damage: Math.round(base.damage * (worldId === 2 && kind === 'archer' ? 2 * FROZEN_BALANCE.rangerDamageMultiplier :
       worldId === 1 && kind === 'archer' ? WORLD1_BRIAR_DAMAGE_MULTIPLIER : 1) *
       (1 + completed * SLIME_DIFFICULTY.damagePerRoom) *
       (kind === 'boss' ? 1 + (getBossTier(number) - 1) * 0.05 : 1) * world.damageMultiplier),
     movementSpeed: Math.round(base.movementSpeed * world.speedMultiplier *
       (worldId === 1 && kind === 'slime' ? WORLD1_MOSSLING_SPEED_MULTIPLIER :
-        worldId === 1 && kind === 'bomber' ? WORLD1_SPORECAP_SPEED_MULTIPLIER : 1)),
+        worldId === 1 && kind === 'bomber' ? WORLD1_SPORECAP_SPEED_MULTIPLIER :
+        worldId === 2 && kind === 'tank' ? FROZEN_BALANCE.golemSpeedMultiplier : 1)),
     attackIntervalMs: Math.round(base.attackIntervalMs / (world.attackSpeedMultiplier *
       (worldId === 1 && kind === 'mage' ? WORLD1_WISP_FIRE_RATE_MULTIPLIER : 1))),
   };
@@ -73,9 +79,7 @@ export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number,
 export const getSlimeStatsForRoom = (roomNumber: number, worldId: WorldId = 1): SlimeRuntimeStats =>
   getEnemyStatsForRoom('slime', roomNumber, worldId);
 
-export const WORLD2_UNLOCK_ROOMS = {
-  archer: 1, mage: 3, slime: 11, tank: 15, bomber: 20, charger: 30,
-} as const;
+export { WORLD2_UNLOCK_ROOMS } from './frozenBalance';
 
 /** First rooms contain only slimes. New enemies unlock gradually, then become
  * more frequent as the dungeon gets deeper. Deterministic for reproducible runs. */
@@ -87,7 +91,7 @@ export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number,
   worldId: WorldId = 1): EnemyKind => {
   const room = Math.max(1, Math.floor(roomNumber));
   if (room % 5 === 0) {
-    if (worldId === 2 && room === 15 && spawnIndex === 2) return 'tank';
+    if (worldId === 2 && room === 15) return 'boss';
     if (worldId === 2 && room === 20 && spawnIndex === 1) return 'bomber';
     if (worldId === 2 && room === 30 && spawnIndex === 1) return 'charger';
     return 'boss';
@@ -105,6 +109,7 @@ export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number,
   const weighted: EnemyKind[] = [];
   for (const [kind, unlock] of entries) {
     if (room < unlock) continue;
+    if (worldId === 2 && kind === 'archer' && room >= 21) continue;
     if (worldId === 1 && ((kind === 'archer' && room >= 21) ||
       (kind === 'slime' && room >= 26))) continue;
     const weight = worldId === 1 && kind === 'mage' && room >= 21 ? 7 :

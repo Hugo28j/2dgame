@@ -15,6 +15,7 @@ import { HomingEnemyProjectile } from '../enemies/HomingEnemyProjectile';
 import { coverIsClose, firstShieldOnPath, type ShieldPoint } from '../enemies/treantShield';
 import { ICE_WALL, HOMING_ORB, wallGapCenter, wallHitsCircle, wallXAt } from '../enemies/frozenBossAttacks';
 import { FROZEN_EARLY, canSummonFrostMinions } from '../enemies/frozenEarlyGame';
+import { FROZEN_BALANCE } from '../enemies/frozenBalance';
 import { withinRadius } from '../enemies/enemyMovement';
 import { splitTwinShotAngle, shotAngles } from '../enemies/projectilePatterns';
 import {
@@ -74,6 +75,11 @@ export class GameScene extends Phaser.Scene {
   private enemies?: Phaser.Physics.Arcade.Group;
   private enemyProjectiles?: Phaser.Physics.Arcade.Group;
   private readonly bombTimers = new Set<Phaser.Time.TimerEvent>();
+  private readonly glacierBoulders = new Set<{
+    ball: Phaser.GameObjects.Container; x: number; y: number;
+    vx: number; vy: number; owner: AdvancedEnemy; damage: number;
+  }>();
+  private readonly fallingSnowballs = new Set<Phaser.GameObjects.Container>();
   private readonly bombWarnings = new Set<Phaser.GameObjects.Arc>();
   private readonly rootEffects = new Set<Phaser.GameObjects.Graphics>();
   private readonly frozenWalls = new Set<{
@@ -215,6 +221,7 @@ export class GameScene extends Phaser.Scene {
     if (this.player.isFrozen) this.player.setVelocity(0, 0);
     this.updatePoisonPools(this.time.now);
     this.updateFrozenWalls(this.time.now);
+    this.updateGlacierBoulders(delta);
     this.weapon.update(this.time.now, this.controls.isShooting(), aim);
 
     // Ranged world-1 mobs use nearby Ancient Treants as moving cover.
@@ -229,7 +236,7 @@ export class GameScene extends Phaser.Scene {
         child.updateAI(this.player.x, this.player.y, this.time.now,
           this.fireEnemyProjectiles, this.explodeEnemy, this.dropBossBombs,
           nearestCover?.shieldSurface, this.summonFrostMinions,
-          this.performRootAttack, this.dropDashTrailBomb);
+          this.performRootAttack, this.dropDashTrailBomb, this.frozenBossSpecial);
       } else if (child instanceof Slime) {
         child.chase(this.player.x, this.player.y);
       }
@@ -896,8 +903,7 @@ export class GameScene extends Phaser.Scene {
     const speed = (enemy.kind === 'boss' ? (220 + getBossTier(enemy.stats.roomNumber) * 8) *
       (enemy.stats.roomNumber === 30 ? 1.25 : 1) :
       enemy.kind === 'mage' ? 220 : 320) * speedFactor;
-    const frostArcher = this.worldId === 2 && enemy.kind === 'archer' &&
-      enemy.stats.roomNumber <= FROZEN_EARLY.lastRoom;
+    const frostArcher = this.worldId === 2 && enemy.kind === 'archer';
     const frostWitch = enemy.isFrostWitch;
     const effect = frostWitch ? 'frost-burst' : frostArcher ? 'frost-chill' : 'none';
     const color = frostWitch ? 0x93c5fd : frostArcher ? 0x38bdf8 :
@@ -922,6 +928,172 @@ export class GameScene extends Phaser.Scene {
       }
     }
   };
+
+  /** Exclusive World-2 bosses: growing rolling ice boulders, falling snow,
+   * and bounded Golem reinforcements. All visual objects are cleaned on room exit. */
+  private readonly frozenBossSpecial = (enemy: AdvancedEnemy,
+    effect: 'boulder' | 'snow' | 'golems', count: number): void => {
+    if (this.worldId !== 2 || !this.currentRoom || !this.player ||
+        this.gameOver || this.transitioning || this.roomProgress.doorOpen ||
+        !enemy.active || enemy.aiState === 'defeated') return;
+    if (effect === 'boulder') this.chargeGlacierBoulder(enemy);
+    else if (effect === 'snow') this.dropCeilingSnow(enemy);
+    else this.summonSentinelGolems(enemy, count);
+  };
+
+  private chargeGlacierBoulder(enemy: AdvancedEnemy): void {
+    if (!this.player || !this.currentRoom || this.glacierBoulders.size >= 3) return;
+    const core = this.add.circle(0, 0, FROZEN_BALANCE.boulderRadius, 0x67e8f9, 1)
+      .setStrokeStyle(4, 0xecfeff).setScale(.15);
+    const spiral = this.add.arc(0, 0, 20, 0, 310, false, 0xcffafe, .65)
+      .setStrokeStyle(3, 0xffffff, .7).setScale(.15);
+    const glow = this.add.circle(0, 0, 40, 0x7dd3fc, .22).setScale(.15);
+    const ball = this.add.container(enemy.x, enemy.y - 14, [glow, core, spiral]).setDepth(28);
+    this.tweens.add({ targets: [core, spiral, glow], scale: 1,
+      duration: FROZEN_BALANCE.boulderChargeMs, ease: 'Cubic.easeOut' });
+    let timer: Phaser.Time.TimerEvent;
+    timer = this.time.delayedCall(FROZEN_BALANCE.boulderChargeMs, () => {
+      this.bombTimers.delete(timer);
+      if (!ball.active || !enemy.active || enemy.aiState === 'defeated' ||
+        !this.player || this.gameOver || this.transitioning || this.roomProgress.doorOpen) {
+        ball.destroy(); return;
+      }
+      const angle = Math.atan2(this.player.y - enemy.y, this.player.x - enemy.x);
+      const speed = FROZEN_BALANCE.boulderSpeed;
+      this.glacierBoulders.add({ ball, x: ball.x, y: ball.y,
+        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        owner: enemy, damage: enemy.stats.damage * 2.2 });
+    });
+    this.bombTimers.add(timer);
+  }
+
+  private updateGlacierBoulders(deltaMs: number): void {
+    if (!this.currentRoom || !this.player) return;
+    const bounds = this.currentRoom.layout.bounds;
+    const radius = FROZEN_BALANCE.boulderRadius;
+    for (const boulder of this.glacierBoulders) {
+      const { ball, owner } = boulder;
+      if (!ball.active || !owner.active || owner.aiState === 'defeated' ||
+          this.roomProgress.doorOpen) {
+        ball.destroy(); this.glacierBoulders.delete(boulder); continue;
+      }
+      const dt = Math.min(deltaMs, 50) / 1000;
+      boulder.x += boulder.vx * dt;
+      boulder.y += boulder.vy * dt;
+      ball.setPosition(boulder.x, boulder.y);
+      const spiral = ball.list[2];
+      if (spiral instanceof Phaser.GameObjects.Arc) spiral.rotation += dt * 5;
+      if (Math.hypot(this.player.x - boulder.x, this.player.y - boulder.y) < radius + 13) {
+        this.damagePlayer({ damage: boulder.damage, criticalChance: 0, criticalMultiplier: 1 });
+        this.shatterGlacierBoulder(boulder, false);
+      } else {
+        const hitsWall = boulder.x < bounds.x + radius || boulder.x > bounds.x + bounds.width - radius ||
+          boulder.y < bounds.y + radius || boulder.y > bounds.y + bounds.height - radius;
+        const hitsObstacle = this.currentRoom.layout.obstacles.some(obstacle =>
+          Math.abs(boulder.x - obstacle.x) < obstacle.width / 2 + radius &&
+          Math.abs(boulder.y - obstacle.y) < obstacle.height / 2 + radius);
+        if (hitsWall || hitsObstacle) this.shatterGlacierBoulder(boulder, true);
+      }
+    }
+  }
+
+  private shatterGlacierBoulder(boulder: {
+    ball: Phaser.GameObjects.Container; x: number; y: number;
+    vx: number; vy: number; owner: AdvancedEnemy; damage: number;
+  }, fragments: boolean): void {
+    this.glacierBoulders.delete(boulder);
+    boulder.ball.destroy();
+    const flash = this.add.circle(boulder.x, boulder.y, 34, 0x93c5fd, .68)
+      .setStrokeStyle(3, 0xecfeff).setDepth(30);
+    this.tweens.add({ targets: flash, scale: 1.5, alpha: 0,
+      duration: 320, onComplete: () => flash.destroy() });
+    if (!fragments || !this.enemyProjectiles || !this.currentRoom || !this.player) return;
+    const bounds = this.currentRoom.layout.bounds;
+    // Fragments fan back into the arena, away from the wall impact.
+    let center = Math.atan2(-boulder.vy, -boulder.vx);
+    if (boulder.x <= bounds.x + FROZEN_BALANCE.boulderRadius) center = 0;
+    else if (boulder.x >= bounds.x + bounds.width - FROZEN_BALANCE.boulderRadius) center = Math.PI;
+    else if (boulder.y <= bounds.y + FROZEN_BALANCE.boulderRadius) center = Math.PI / 2;
+    else if (boulder.y >= bounds.y + bounds.height - FROZEN_BALANCE.boulderRadius) center = -Math.PI / 2;
+    for (let i = 0; i < FROZEN_BALANCE.snowballWallFragments; i++) {
+      const angle = center + (i - 2) * .25;
+      const dx = Math.cos(angle), dy = Math.sin(angle);
+      const shot = new EnemyProjectile(this, boulder.x + dx * 36, boulder.y + dy * 36, dx, dy, 245,
+        boulder.owner.stats.damage * .65, 0xcffafe, 'frost-chill');
+      addAndLaunch(shot, () => this.enemyProjectiles!.add(shot), { x: dx, y: dy }, 245);
+    }
+  }
+
+  private dropCeilingSnow(enemy: AdvancedEnemy): void {
+    if (!this.currentRoom || !this.player || this.fallingSnowballs.size >= 18) return;
+    const bounds = this.currentRoom.layout.bounds;
+    const radius = FROZEN_BALANCE.snowFallRadius;
+    const x = Phaser.Math.Between(Math.ceil(bounds.x + radius + 8),
+      Math.floor(bounds.x + bounds.width - radius - 8));
+    const y = Phaser.Math.Between(Math.ceil(bounds.y + radius + 8),
+      Math.floor(bounds.y + bounds.height - radius - 8));
+    const shadow = this.add.ellipse(0, 0, radius * 2.2, radius * 1.1,
+      0x020617, .34).setScale(.25);
+    const ball = this.add.circle(0, -190, 11, 0xe0f2fe, 1)
+      .setStrokeStyle(3, 0x38bdf8);
+    const shine = this.add.circle(-3, -194, 3, 0xffffff, .9);
+    const falling = this.add.container(x, y, [shadow, ball, shine]).setDepth(27);
+    this.fallingSnowballs.add(falling);
+    this.tweens.add({ targets: shadow, scale: 1,
+      duration: FROZEN_BALANCE.snowFallDurationMs, ease: 'Linear' });
+    this.tweens.add({ targets: [ball, shine], y: 0,
+      duration: FROZEN_BALANCE.snowFallDurationMs, ease: 'Cubic.easeIn',
+      onComplete: () => {
+        if (!falling.active) return;
+        this.fallingSnowballs.delete(falling);
+        falling.destroy();
+        const puff = this.add.circle(x, y, radius, 0xcffafe, .55)
+          .setStrokeStyle(2, 0xffffff).setDepth(30);
+        this.tweens.add({ targets: puff, alpha: 0, scale: 1.5,
+          duration: 230, onComplete: () => puff.destroy() });
+        if (!this.gameOver && !this.transitioning && !this.roomProgress.doorOpen &&
+            enemy.active && enemy.aiState !== 'defeated' && this.player &&
+            Math.hypot(this.player.x - x, this.player.y - y) < radius + 10)
+          this.damagePlayer({ damage: enemy.stats.damage * .65,
+            criticalChance: 0, criticalMultiplier: 1 });
+      },
+    });
+  }
+
+  private summonSentinelGolems(enemy: AdvancedEnemy, count: number): void {
+    if (!this.currentRoom || !this.enemySpawner || !this.enemies || !this.player ||
+        !enemy.isSnowSentinel) return;
+    const alive = this.enemies.getChildren().filter(child =>
+      child instanceof AdvancedEnemy && child.active && child.aiState !== 'defeated' &&
+      child.enemyId.startsWith('sentinel-golem-')).length;
+    const toSpawn = Math.min(count, FROZEN_BALANCE.sentinelMaxActiveGolems - alive);
+    if (toSpawn <= 0) return;
+    const bounds = this.currentRoom.layout.bounds;
+    const points: { x: number; y: number }[] = [];
+    for (let i = 0; i < 40 && points.length < toSpawn; i++) {
+      const angle = (i * 2.399963 + this.time.now / 4000);
+      const distance = 100 + (i % 3) * 55;
+      const x = Phaser.Math.Clamp(enemy.x + Math.cos(angle) * distance,
+        bounds.x + 40, bounds.x + bounds.width - 40);
+      const y = Phaser.Math.Clamp(enemy.y + Math.sin(angle) * distance,
+        bounds.y + 40, bounds.y + bounds.height - 40);
+      if (Math.hypot(x - this.player.x, y - this.player.y) < 110 ||
+        this.currentRoom.layout.obstacles.some(o =>
+          Math.abs(o.x - x) < o.width / 2 + 35 && Math.abs(o.y - y) < o.height / 2 + 35) ||
+        points.some(p => Math.hypot(p.x - x, p.y - y) < 55)) continue;
+      points.push({ x, y });
+    }
+    if (!points.length) return;
+    this.roomProgress.addEnemies(points.length);
+    this.enemySpawner.summonGlacierGolems(points, this.currentRoom.number);
+    this.updateEnemyCount();
+    for (const point of points) {
+      const portal = this.add.circle(point.x, point.y, 30, 0x7dd3fc, .38)
+        .setStrokeStyle(3, 0xe0f2fe, .9).setDepth(22);
+      this.tweens.add({ targets: portal, alpha: 0, scale: 1.6,
+        duration: 450, onComplete: () => portal.destroy() });
+    }
+  }
 
   /** Blizzard Tyrant's frosty seeker pursues the player's *current* position
    * for at most eight seconds and obeys normal projectile hit/slow rules.
@@ -1354,6 +1526,10 @@ export class GameScene extends Phaser.Scene {
     this.rootEffects.clear();
     this.bombWarnings.clear();
     this.clearFrozenWalls();
+    for (const boulder of this.glacierBoulders) boulder.ball.destroy();
+    this.glacierBoulders.clear();
+    for (const snow of this.fallingSnowballs) snow.destroy();
+    this.fallingSnowballs.clear();
     for (const bottle of this.poisonBottles) {
       this.tweens.killTweensOf(bottle);
       bottle.destroy();

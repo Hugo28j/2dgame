@@ -10,6 +10,7 @@ import { getBossPlan, getBossProfile } from './bossProfiles';
 import { CHARGER_DASH, WORLD1_BEETLE_DASH } from './enemyBalance';
 import { MOSS_DASH, ROOT_BRANCH, SPORE_THROW_INTERVAL_MS } from './worldOneBossBalance';
 import { FROZEN_EARLY } from './frozenEarlyGame';
+import { FROZEN_BALANCE } from './frozenBalance';
 import type { BulletPattern } from './projectilePatterns';
 export type { BulletPattern } from './projectilePatterns';
 
@@ -27,6 +28,7 @@ export class AdvancedEnemy extends Slime {
   public readonly stats: Readonly<SlimeRuntimeStats>;
   private nextShotAt = 0;
   private nextTrailAt = 0;
+  private nextSnowfallAt = 0;
   private rootStage: 'line' | 'burst1' | 'burst2' | 'rest' = 'line';
   public fasterTwin = false;
   /** Index of the two split Void Sentinels (0 spins clockwise, 1 counterclockwise). */
@@ -73,11 +75,18 @@ export class AdvancedEnemy extends Slime {
     }
     this.nextShotAt = scene.time.now + stats.attackIntervalMs;
     this.nextSpecialAt = scene.time.now + 1500;
-    this.nextSummonAt = scene.time.now + FROZEN_EARLY.witchSummonIntervalMs;
+    this.nextSummonAt = scene.time.now + (worldId === 2 && roomNumber === 15 && kind === 'boss'
+      ? FROZEN_BALANCE.sentinelSummonIntervalMs : FROZEN_EARLY.witchSummonIntervalMs);
     if (this.isFrostWitch) this.witchHat = scene.add.graphics().setDepth(14);
   }
 
   public get isBoss(): boolean { return this.kind === 'boss'; }
+  public get isGlacierWarden(): boolean {
+    return this.isBoss && this.worldId === 2 && this.roomNumber === 5;
+  }
+  public get isSnowSentinel(): boolean {
+    return this.isBoss && this.worldId === 2 && this.roomNumber === 15 && this.bossSlot === 1;
+  }
   public get isFrostWitch(): boolean {
     return this.worldId === 2 && this.kind === 'mage';
   }
@@ -98,7 +107,8 @@ export class AdvancedEnemy extends Slime {
   public updateAI(targetX: number, targetY: number, now: number,
     fire: EnemyFire, explode: EnemyExplosion, dropBombs?: EnemyBomb,
     coverTank?: Readonly<ShieldSurface>, summon?: EnemySummon,
-    rootAttack?: EnemyRoot, trailBomb?: EnemyTrail): void {
+    rootAttack?: EnemyRoot, trailBomb?: EnemyTrail,
+    frozenSpecial?: (enemy: AdvancedEnemy, effect: 'boulder' | 'snow' | 'golems', count: number) => void): void {
     if (this.aiState === 'defeated') return;
     super.chase(targetX, targetY);
     if (this.isStunned(now)) return;
@@ -179,6 +189,23 @@ export class AdvancedEnemy extends Slime {
         const mode = getBossPlan(this.roomNumber, phase, this.bossVolleys, this.bossSlot);
         const move = rangedVelocity(this.x, this.y, targetX, targetY, speed,
           profile.preferredRange, this.orbitSign);
+        if (this.isGlacierWarden) {
+          this.setVelocity(move.x * 0.65, move.y * 0.65);
+          if (now >= this.nextShotAt) {
+            frozenSpecial?.(this, 'boulder', 1);
+            this.nextShotAt = now + (phase === 1 ? 2950 : 2250);
+          }
+          if (phase === 2 && now >= this.nextSnowfallAt) {
+            frozenSpecial?.(this, 'snow', 1);
+            this.nextSnowfallAt = now + 1000 / FROZEN_BALANCE.snowballsPerSecond;
+          }
+          break;
+        }
+        if (this.isSnowSentinel && now >= this.nextSummonAt) {
+          frozenSpecial?.(this, 'golems', phase === 1 ?
+            FROZEN_BALANCE.sentinelPhaseOneCount : FROZEN_BALANCE.sentinelPhaseTwoCount);
+          this.nextSummonAt = now + FROZEN_BALANCE.sentinelSummonIntervalMs;
+        }
         if (this.isRootTyrant) {
           this.setVelocity(move.x * 0.55, move.y * 0.55);
           if (now >= this.nextShotAt) {

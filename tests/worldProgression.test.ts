@@ -30,10 +30,10 @@ describe('five unique playable worlds', () => {
         expect(getRoomDefinition(room).isBossRoom).toBe(true);
         expect(getRoomDefinition(room).enemyCount).toBe(1);
         bossNames.add(getWorldBossName(world.id, room));
-        if (room === 15) bossNames.add(getWorldBossName(world.id, room, 1));
+        if (room === 15 && world.id !== 2) bossNames.add(getWorldBossName(world.id, room, 1));
       }
     }
-    expect(bossNames.size).toBe(35);
+    expect(bossNames.size).toBe(34);
   });
 
   it('uses different floor patterns in the five maps without unsafe spawn positions', () => {
@@ -60,7 +60,7 @@ describe('five unique playable worlds', () => {
         const oldStats = getEnemyStatsForRoom(kind, 24, (world - 1) as 1 | 2 | 3 | 4 | 5);
         const newStats = getEnemyStatsForRoom(kind, 24, world as 1 | 2 | 3 | 4 | 5);
         if ((kind === 'mage' && (world === 2 || world === 3)) ||
-            (kind === 'archer' && world === 3)) {
+            ((kind === 'archer' || kind === 'tank' || kind === 'charger') && world === 3)) {
           // Frozen Hollow witches and boosted archers intentionally have
           // more HP than the corresponding World 3 base archetypes.
           expect(oldStats.maxHp).toBeGreaterThan(newStats.maxHp);
@@ -78,6 +78,8 @@ describe('five unique playable worlds', () => {
           // slimes retain their pre-existing speed rather than being buffed too.
           expect(oldStats.movementSpeed).toBe(kind === 'slime' ? 175 : 300);
           expect(newStats.movementSpeed).toBe(kind === 'slime' ? 116 : 104);
+        } else if (kind === 'tank' && world === 3) {
+          expect(oldStats.movementSpeed).toBeGreaterThan(newStats.movementSpeed);
         } else {
           expect(newStats.movementSpeed).toBeGreaterThanOrEqual(oldStats.movementSpeed);
         }
