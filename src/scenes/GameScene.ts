@@ -65,6 +65,7 @@ import { findChainTargets } from '../weapons/chainLightning';
 import { runeBounceTarget } from '../weapons/runeTome';
 import { upgradeCardBounds } from '../ui/upgradeLayout';
 import { displayedHp } from '../ui/displayValues';
+import { EMBER_ATTACKS } from '../enemies/emberWastes';
 
 type ArcadeCollisionObject =
   | Phaser.Types.Physics.Arcade.GameObjectWithBody
@@ -1067,24 +1068,33 @@ export class GameScene extends Phaser.Scene {
       ? [splitTwinShotAngle(amplifiedTwinVolleyIndex(volley), enemy.splitTwinIndex)]
       : shotAngles(pattern, angle, volley);
     const briarHunter = this.worldId === 1 && enemy.kind === 'archer';
-    const speed = (enemy.kind === 'boss' ? (220 + getBossTier(enemy.stats.roomNumber) * 8) *
+    const emberFlame = this.worldId === 3 && enemy.kind === 'archer';
+    const emberFireball = this.worldId === 3 && enemy.kind === 'mage';
+    const speed = (emberFlame ? EMBER_ATTACKS.flameProjectileSpeed :
+      emberFireball ? EMBER_ATTACKS.fireballProjectileSpeed :
+      enemy.kind === 'boss' ? (220 + getBossTier(enemy.stats.roomNumber) * 8) *
       (enemy.stats.roomNumber === 30 ? 1.25 : 1) :
       enemy.kind === 'mage' ? 220 : 320) * speedFactor *
       (briarHunter ? WORLD1_BRIAR_ARROW_SPEED_MULTIPLIER : 1);
     const frostArcher = this.worldId === 2 && enemy.kind === 'archer';
     const frostWitch = enemy.isFrostWitch;
-    const effect = frostWitch ? 'frost-burst' : frostArcher ? 'frost-chill' :
+    const effect = emberFlame ? 'ember-flame' : emberFireball ? 'ember-fireball' :
+      frostWitch ? 'frost-burst' : frostArcher ? 'frost-chill' :
       briarHunter ? 'briar-ricochet' : 'none';
     const color = frostWitch ? 0x93c5fd : frostArcher ? 0x38bdf8 :
       briarHunter ? 0xa3e635 :
       enemy.isBoss ? getBossProfile(enemy.stats.roomNumber, enemy.bossSlot, this.worldId).color :
+      emberFlame ? 0xfbbf24 : emberFireball ? 0xf97316 :
       enemy.kind === 'mage' ? 0xa78bfa : 0xfb7185;
+    if (emberFlame || emberFireball) this.showEmberMuzzle(enemy, angle, emberFireball);
     for (const direction of angles) {
       const bullet = new EnemyProjectile(
         this, enemy.x + Math.cos(direction) * 30,
         enemy.y + Math.sin(direction) * 30,
         Math.cos(direction), Math.sin(direction),
-        speed, enemy.stats.damage * (enemy.isBoss ? 0.57 : frostWitch ? FROZEN_EARLY.witchOrbDamageFactor : 1), color, effect,
+        speed, enemy.stats.damage * (enemy.isBoss ? 0.57 :
+          frostWitch ? FROZEN_EARLY.witchOrbDamageFactor :
+          emberFlame ? EMBER_ATTACKS.flameDamageFactor : 1), color, effect,
       );
       addAndLaunch(bullet, () => this.enemyProjectiles!.add(bullet),
         { x: Math.cos(direction), y: Math.sin(direction) }, speed);
@@ -1098,6 +1108,17 @@ export class GameScene extends Phaser.Scene {
       }
     }
   };
+
+  private showEmberMuzzle(enemy: AdvancedEnemy, angle: number, fireball: boolean): void {
+    const distance = fireball ? 26 : 31;
+    const x = enemy.x + Math.cos(angle) * distance;
+    const y = enemy.y + Math.sin(angle) * distance;
+    const flare = this.add.star(x, y, fireball ? 8 : 6, 4,
+      fireball ? 14 : 10, fireball ? 0xf97316 : 0xfde047, 0.92).setDepth(29);
+    flare.setRotation(angle);
+    this.tweens.add({ targets: flare, scale: 1.65, alpha: 0,
+      duration: fireball ? 220 : 130, onComplete: () => flare.destroy() });
+  }
 
   /** Exclusive World-2 bosses: growing rolling ice boulders, falling snow,
    * and bounded Golem reinforcements. All visual objects are cleaned on room exit. */
@@ -1504,6 +1525,10 @@ export class GameScene extends Phaser.Scene {
   /** Moss Warden phase-two dash drops animated explosive seed-bombs. */
   private readonly dropDashTrailBomb = (enemy: AdvancedEnemy, x: number, y: number): void => {
     if (this.gameOver || this.transitioning || this.roomProgress.doorOpen) return;
+    if (this.worldId === 3 && enemy.isBlazehound) {
+      this.createBlazehoundTrail(enemy, x, y);
+      return;
+    }
     const seed = this.add.circle(x, y, 9, 0x92400e, 1)
       .setStrokeStyle(2, 0xfde68a).setDepth(27);
     const fuse = this.add.circle(x + 2, y - 10, 3, 0xf97316, 1).setDepth(28);
@@ -1541,6 +1566,44 @@ export class GameScene extends Phaser.Scene {
     });
     this.bombTimers.add(timer);
   };
+
+  private createBlazehoundTrail(enemy: AdvancedEnemy, x: number, y: number): void {
+    const patch = this.add.circle(x, y, EMBER_ATTACKS.houndTrailRadius, 0xef4444, 0.22)
+      .setStrokeStyle(2, 0xf97316, 0.78).setDepth(21);
+    const core = this.add.circle(x, y, EMBER_ATTACKS.houndTrailRadius * 0.52,
+      0xfbbf24, 0.28).setDepth(22);
+    this.bombWarnings.add(patch);
+    this.bombWarnings.add(core);
+    this.tweens.add({ targets: [patch, core], scaleX: 1.12, scaleY: 0.88,
+      alpha: 0.12, duration: 190, yoyo: true, repeat: -1 });
+    let nextDamageAt = this.time.now;
+    let ticks = 0;
+    const totalTicks = Math.ceil(EMBER_ATTACKS.houndTrailDurationMs / 100);
+    let timer: Phaser.Time.TimerEvent;
+    timer = this.time.addEvent({ delay: 100,
+      repeat: totalTicks - 1,
+      callback: () => {
+        ticks++;
+        if (!patch.active || this.roomProgress.doorOpen || this.gameOver || this.transitioning) {
+          timer.remove(false);
+        } else if (this.player && this.time.now >= nextDamageAt &&
+            withinRadius(x, y, this.player.x, this.player.y, EMBER_ATTACKS.houndTrailRadius)) {
+          nextDamageAt = this.time.now + 650;
+          this.damagePlayer({ damage: enemy.stats.damage * EMBER_ATTACKS.houndTrailDamageFactor,
+            criticalChance: 0, criticalMultiplier: 1 });
+        }
+        if (ticks < totalTicks && patch.active && !this.roomProgress.doorOpen &&
+            !this.gameOver && !this.transitioning) return;
+        this.bombTimers.delete(timer);
+        for (const flame of [patch, core]) {
+          this.bombWarnings.delete(flame);
+          if (flame.active) flame.destroy();
+        }
+      },
+      callbackScope: this,
+    });
+    this.bombTimers.add(timer);
+  }
 
   /** Telegraph targeted bombs well before detonation. All timers are cancelled on room exit. */
   private readonly dropBossBombs = (enemy: AdvancedEnemy, targetX: number, targetY: number,

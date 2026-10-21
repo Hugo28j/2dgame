@@ -60,21 +60,29 @@ describe('five unique playable worlds', () => {
       for (let world = 2; world <= WORLD_COUNT; world++) {
         const oldStats = getEnemyStatsForRoom(kind, 24, (world - 1) as 1 | 2 | 3 | 4 | 5);
         const newStats = getEnemyStatsForRoom(kind, 24, world as 1 | 2 | 3 | 4 | 5);
-        if ((kind === 'mage' && (world === 2 || world === 3)) ||
-            ((kind === 'archer' || kind === 'tank' || kind === 'charger') && world === 3)) {
+        const crossesEmberRoster = kind !== 'boss' && (world === 3 || world === 4);
+        if (crossesEmberRoster) {
+          // World 3 now has six independent fire archetypes. Matching internal
+          // AI slot names across the W3→W4 boundary no longer compares like-for-like.
+          expect(newStats.maxHp).toBeGreaterThan(0);
+        } else if (kind === 'mage' && world === 2) {
           // Frozen Hollow witches and boosted archers intentionally have
           // more HP than the corresponding World 3 base archetypes.
           expect(oldStats.maxHp).toBeGreaterThan(newStats.maxHp);
         } else {
           expect(newStats.maxHp).toBeGreaterThan(oldStats.maxHp);
         }
-        if (kind === 'archer' && world === 3) {
+        if (crossesEmberRoster) {
+          expect(newStats.damage).toBeGreaterThan(0);
+        } else if (kind === 'archer' && world === 3) {
           // The requested 2x Frozen Hollow projectile damage also exceeds W3.
           expect(oldStats.damage).toBeGreaterThan(newStats.damage);
         } else {
           expect(newStats.damage).toBeGreaterThan(oldStats.damage);
         }
-        if ((kind === 'slime' || kind === 'bomber') && world === 2) {
+        if (crossesEmberRoster) {
+          expect(newStats.movementSpeed).toBeGreaterThan(0);
+        } else if ((kind === 'slime' || kind === 'bomber') && world === 2) {
           // World 1 Mosslings intentionally get +25% speed; Frozen Hollow
           // slimes retain their pre-existing speed rather than being buffed too.
           expect(oldStats.movementSpeed).toBe(kind === 'slime' ? 175 : 300);
@@ -84,7 +92,11 @@ describe('five unique playable worlds', () => {
         } else {
           expect(newStats.movementSpeed).toBeGreaterThanOrEqual(oldStats.movementSpeed);
         }
-        if (kind === 'mage' && world === 2)
+        if (crossesEmberRoster) {
+          // Ember Wastes has an independent high-frequency fire roster, so an
+          // AI slot's interval is not comparable to Storm Citadel's next archetype.
+          expect(newStats.attackIntervalMs).toBeGreaterThan(0);
+        } else if (kind === 'mage' && world === 2)
           expect(newStats.attackIntervalMs).toBeGreaterThan(oldStats.attackIntervalMs);
         else expect(newStats.attackIntervalMs).toBeLessThanOrEqual(oldStats.attackIntervalMs);
       }

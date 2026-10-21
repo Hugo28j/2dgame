@@ -40,6 +40,10 @@ function worldMark(g: Phaser.GameObjects.Graphics, world: WorldId, color: number
 function drawMinion(g: Phaser.GameObjects.Graphics, look: CharacterLook): void {
   g.fillStyle(0x07111b, 0.8); g.fillEllipse(24, 43, 37, 7);
   g.fillStyle(look.secondary, 0.9);
+  if (look.worldId === 3) {
+    drawEmberMinion(g, look);
+    return;
+  }
   switch (look.kind) {
     case 'slime':
       g.fillStyle(look.primary);
@@ -99,6 +103,62 @@ function drawMinion(g: Phaser.GameObjects.Graphics, look: CharacterLook): void {
       break;
     default: break;
   }
+}
+
+/** Six purpose-built silhouettes for Ember Wastes instead of recolored mobs. */
+function drawEmberMinion(g: Phaser.GameObjects.Graphics, look: CharacterLook): void {
+  switch (look.kind) {
+    case 'slime': // Ash Crawler: low, six-legged coal beetle.
+      g.fillStyle(0x2b1b1b); g.fillEllipse(24, 29, 34, 23);
+      g.fillStyle(0x9a3412); g.fillEllipse(24, 25, 27, 17);
+      g.lineStyle(4, 0x431407);
+      for (const y of [27, 35]) { g.lineBetween(12, y, 4, y + 5); g.lineBetween(36, y, 44, y + 5); }
+      g.fillStyle(0xfde047); g.fillCircle(16, 27, 2.5); g.fillCircle(32, 27, 2.5);
+      g.fillStyle(0xf97316); g.fillTriangle(18, 18, 24, 3, 29, 19);
+      break;
+    case 'archer': // Furnace Breather: masked goblin with a brass nozzle.
+      g.fillStyle(0x7c2d12); g.fillRoundedRect(10, 17, 26, 25, 7);
+      g.fillStyle(0x292524); g.fillCircle(23, 17, 13);
+      g.fillStyle(0xfbbf24); g.fillRoundedRect(13, 15, 22, 8, 3);
+      g.fillStyle(0x451a03); g.fillRect(32, 17, 13, 5);
+      g.fillStyle(0xf97316); g.fillTriangle(44, 14, 48, 20, 44, 25);
+      g.fillStyle(0xfffbeb); g.fillCircle(19, 16, 2); g.fillCircle(27, 16, 2);
+      break;
+    case 'charger': // Blazehound: long, lean fire beast.
+      g.fillStyle(0x7f1d1d); g.fillEllipse(23, 29, 37, 20);
+      g.fillStyle(0xdc2626); g.fillTriangle(5, 24, 14, 10, 19, 25);
+      g.fillTriangle(30, 23, 41, 8, 43, 29);
+      g.fillStyle(0xfbbf24); g.fillTriangle(12, 21, 19, 3, 24, 22);
+      g.fillTriangle(22, 20, 29, 2, 34, 23);
+      g.fillStyle(0xfef08a); g.fillCircle(14, 27, 3); g.fillCircle(34, 27, 3);
+      g.fillStyle(0x451a03); g.fillRect(9, 35, 8, 9); g.fillRect(31, 35, 8, 9);
+      break;
+    case 'mage': // Cinder Warlock: horned robe holding a fire orb.
+      g.fillStyle(0x450a0a); g.fillTriangle(24, 8, 6, 43, 42, 43);
+      g.fillStyle(0x991b1b); g.fillCircle(24, 18, 12);
+      g.fillStyle(0x111827); g.fillEllipse(24, 19, 15, 13);
+      g.fillStyle(0xfef08a); g.fillCircle(20, 18, 2); g.fillCircle(28, 18, 2);
+      g.fillStyle(0xf97316); g.fillTriangle(15, 12, 10, 1, 21, 10); g.fillTriangle(27, 10, 38, 1, 33, 13);
+      g.fillStyle(0xfbbf24, .95); g.fillCircle(42, 29, 7); g.fillStyle(0xfffbeb); g.fillCircle(42, 29, 3);
+      break;
+    case 'tank': // Magma Bulwark: cracked lava armor.
+      g.fillStyle(0x1c1917); g.fillRoundedRect(5, 10, 38, 34, 7);
+      g.fillStyle(0x57534e); g.fillRoundedRect(1, 20, 14, 21, 4); g.fillRoundedRect(34, 20, 13, 21, 4);
+      g.lineStyle(3, 0xf97316); g.lineBetween(14, 13, 23, 25); g.lineBetween(23, 25, 18, 40);
+      g.lineBetween(34, 12, 28, 24); g.lineBetween(28, 24, 35, 37);
+      g.fillStyle(0xfde047); g.fillRect(15, 20, 6, 3); g.fillRect(28, 20, 6, 3);
+      break;
+    case 'bomber': // Bombardier Imp: horned imp carrying a lit bomb.
+      g.fillStyle(0x9f1239); g.fillRoundedRect(9, 18, 28, 24, 8);
+      g.fillStyle(0x4c0519); g.fillTriangle(11, 21, 5, 5, 20, 16); g.fillTriangle(29, 16, 43, 5, 37, 23);
+      g.fillStyle(0xfef08a); g.fillCircle(17, 25, 3); g.fillCircle(29, 25, 3);
+      g.fillStyle(0x1c1917); g.fillCircle(40, 35, 10);
+      g.lineStyle(2, 0xfbbf24); g.lineBetween(39, 25, 44, 17);
+      g.fillStyle(0xf97316); g.fillCircle(45, 15, 4);
+      break;
+    default: break;
+  }
+  worldMark(g, look.worldId, 0xffedd5, 24, 12);
 }
 
 function drawBoss(g: Phaser.GameObjects.Graphics, look: CharacterLook, tier: number): void {

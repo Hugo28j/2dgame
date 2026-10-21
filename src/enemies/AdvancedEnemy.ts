@@ -15,6 +15,7 @@ import { firstSummonTime, getSummonerType, nextSummonTime, summonIsDue,
 import { BRAMBLE_CINEMATIC } from './brambleCinematic';
 import { JADE_BRANCH } from './groveAttacks';
 import { sporePatrolVelocity } from './sporeMovement';
+import { EMBER_ATTACKS } from './emberWastes';
 import type { BulletPattern } from './projectilePatterns';
 export type { BulletPattern } from './projectilePatterns';
 
@@ -72,6 +73,10 @@ export class AdvancedEnemy extends Slime {
     this.bossTint = 0xffffff;
     this.orbitSign = id.length % 2 === 0 ? 1 : -1;
     this.setTexture(getWorldCharacter(worldId, kind, roomNumber, bossSlot).textureKey);
+    if (worldId === 3 && kind !== 'boss') {
+      scene.tweens.add({ targets: this, scaleX: 1.06, scaleY: 0.94,
+        duration: 330 + (id.length % 4) * 45, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
+    }
     if (kind === 'boss') {
       this.setScale(1.75);
       this.setTint(this.bossTint);
@@ -90,6 +95,7 @@ export class AdvancedEnemy extends Slime {
   }
 
   public get isBoss(): boolean { return this.kind === 'boss'; }
+  public get isBlazehound(): boolean { return this.worldId === 3 && this.kind === 'charger'; }
   public get isBrambleGunner(): boolean {
     return this.isBoss && this.worldId === 1 && this.roomNumber === 20 &&
       this.bossSlot === 0 && !this.fasterTwin;
@@ -156,6 +162,10 @@ export class AdvancedEnemy extends Slime {
       this.drawTreantShield();
     }
     if (this.isKnockedBack(now)) return;
+    if (this.worldId === 3 && this.kind !== 'boss') {
+      this.updateEmberMob(targetX, targetY, now, fire, explode, dropBombs, trailBomb);
+      return;
+    }
     if (this.worldId === 2 && this.kind !== 'boss' && this.kind !== 'mage' && this.kind !== 'archer') {
       this.updateLateFrozenMob(targetX, targetY, now, fire, dropBombs);
       return;
@@ -375,6 +385,59 @@ export class AdvancedEnemy extends Slime {
     if (this.kind === 'bomber') dropBombs?.(this, targetX, targetY, 1, 62, 950);
     else fire(this, 'shotgun-six');
     this.nextShotAt = now + (this.kind === 'charger' ? 4400 : this.stats.attackIntervalMs);
+  }
+
+  /** Dedicated Ember Wastes roster: each internal slot has an exclusive fire identity. */
+  private updateEmberMob(targetX: number, targetY: number, now: number,
+    fire: EnemyFire, explode: EnemyExplosion, dropBombs?: EnemyBomb,
+    flameTrail?: EnemyTrail): void {
+    const speed = this.stats.movementSpeed * this.slowMultiplier;
+    const distance = Phaser.Math.Distance.Between(this.x, this.y, targetX, targetY);
+    if (this.kind === 'archer') {
+      const move = rangedVelocity(this.x, this.y, targetX, targetY, speed, 135, this.orbitSign);
+      this.setVelocity(move.x, move.y);
+      if (now >= this.nextShotAt && distance < 245) {
+        fire(this, 'fan');
+        this.nextShotAt = now + this.stats.attackIntervalMs;
+      }
+      return;
+    }
+    if (this.kind === 'mage') {
+      const move = rangedVelocity(this.x, this.y, targetX, targetY, speed, 245, this.orbitSign);
+      this.setVelocity(move.x, move.y);
+      if (now >= this.nextShotAt) {
+        fire(this, 'single');
+        this.nextShotAt = now + this.stats.attackIntervalMs;
+      }
+      return;
+    }
+    if (this.kind === 'charger') {
+      const move = getChaseVelocity(this.x, this.y, targetX, targetY, speed);
+      this.setVelocity(move.x, move.y);
+      this.setFlipX(move.x < 0);
+      if (now >= this.nextTrailAt && Math.hypot(move.x, move.y) > 20) {
+        flameTrail?.(this, this.x, this.y + 10);
+        this.nextTrailAt = now + EMBER_ATTACKS.houndTrailSpacingMs;
+      }
+      return;
+    }
+    if (this.kind === 'tank') {
+      if (distance <= EMBER_ATTACKS.bulwarkSlamRadius && now >= this.nextShotAt) {
+        this.setVelocity(0, 0);
+        explode(this, EMBER_ATTACKS.bulwarkSlamRadius);
+        this.nextShotAt = now + this.stats.attackIntervalMs;
+      }
+      return;
+    }
+    if (this.kind === 'bomber') {
+      const move = rangedVelocity(this.x, this.y, targetX, targetY, speed, 275, this.orbitSign);
+      this.setVelocity(move.x, move.y);
+      if (now >= this.nextShotAt) {
+        dropBombs?.(this, targetX, targetY, 1,
+          EMBER_ATTACKS.bomberRadius, EMBER_ATTACKS.bomberWindupMs);
+        this.nextShotAt = now + this.stats.attackIntervalMs;
+      }
+    }
   }
 
   /** The drawn plate is the same actual line segment used in damage interception.

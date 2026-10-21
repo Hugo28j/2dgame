@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import type { AttackData } from '../combat/damage';
 import { reflectArrow, type RicochetAxis } from './enemyRicochet';
-export type EnemyProjectileEffect = 'none' | 'frost-chill' | 'frost-burst' | 'briar-ricochet';
+export type EnemyProjectileEffect = 'none' | 'frost-chill' | 'frost-burst' | 'briar-ricochet' |
+  'ember-flame' | 'ember-fireball';
 
 export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
   public readonly attack: Readonly<AttackData>;
@@ -37,6 +38,16 @@ export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
         repeat: -1, onUpdate: () => { if (!this.active) scene.tweens.killTweensOf(this); } });
     }
     if (effect === 'frost-burst') this.setScale(1.65);
+    if (effect === 'ember-flame') {
+      this.setScale(0.72);
+      scene.tweens.add({ targets: this, scaleX: 1.15, scaleY: 0.55, alpha: 0.72,
+        duration: 150, yoyo: true, repeat: -1 });
+    }
+    if (effect === 'ember-fireball') {
+      this.setScale(1.72);
+      scene.tweens.add({ targets: this, angle: '+=360', scale: 1.95,
+        duration: 420, yoyo: true, repeat: -1 });
+    }
     this.setRotation(Math.atan2(dy, dx));
     const length = Math.hypot(dx, dy) || 1;
     this.baseVelocity = { x: dx / length * speed, y: dy / length * speed };
