@@ -291,12 +291,13 @@ export class MainMenuScene extends Phaser.Scene {
       this.text(65, y - 16, weapon.attackMode === 'melee' ? '⚔' : '➶', 20, COLOR.white, true, true);
       this.fittedText(98, y - 32, weapon.name.toUpperCase(), 12, COLOR.white, 228, true);
       const stats = getWeaponStats(id, level);
-      // Show Guardian's effective unbuffed speed, including his inherent
-      // 0.92 attack-speed modifier: level-20 Bulwark must display 1.50 s/hit.
-      const shownFireRate = stats.heroId === 'guardian'
-        ? 1000 / weaponBaseAttackIntervalMs(stats) : stats.fireRate;
-      this.fittedText(98, y - 10, 'LV.' + level + '  ·  DMG ' + stats.damage +
-        '  ·  ' + shownFireRate.toFixed(2) + '/S', 10, COLOR.secondary, 222);
+      const shownFireRate = 1000 / weaponBaseAttackIntervalMs(stats);
+      const attackLabel = id === 'fireorbs'
+        ? 'CONTINU · ' + stats.meleeRange.toFixed(0) + ' RANGE'
+        : shownFireRate.toFixed(2) + '/S' + (id === 'staff'
+          ? ' · ' + stats.projectileCount + ' BOLLEN' : '');
+      this.fittedText(98, y - 10, 'LV.' + level + ' · DMG ' + stats.damage +
+        ' · ' + attackLabel, 10, COLOR.secondary, 222);
       this.fittedText(43, y + 15, unlocked ? weapon.description :
         'ONTGRENDELT GRATIS OP HERO LEVEL ' + SECOND_WEAPON_UNLOCK_LEVEL, 10, COLOR.faint, 298);
       this.button(291, y + 34, 102, 28, selected ? 'ACTIEF' : unlocked ? 'UITRUSTEN' : 'SLOT',
@@ -434,11 +435,13 @@ export class MainMenuScene extends Phaser.Scene {
       label: WEAPONS[id].name,
       description: (() => {
         const stats = getWeaponStats(id, profile.weaponLevels[id]);
-        const secondsPerAttack = stats.heroId === 'guardian'
-          ? weaponBaseAttackIntervalMs(stats) / 1000 : 1 / stats.fireRate;
+        if (id === 'fireorbs') return 'VLAM ' + stats.damage.toFixed(1) +
+          ' DMG/SEC · BRAND 1/SEC · RANGE ' + stats.meleeRange.toFixed(0);
+        const secondsPerAttack = weaponBaseAttackIntervalMs(stats) / 1000;
         return 'DMG ' + stats.damage.toFixed(1) +
           ' · ' + secondsPerAttack.toFixed(2) + ' SEC/AANVAL' +
-          ' · ' + stats.projectileCount + (stats.attackMode === 'melee' ? ' SLAG' : ' SCHOTEN');
+          ' · ' + stats.projectileCount +
+          (stats.attackMode === 'melee' ? ' SLAG' : ' SCHOTEN');
       })(),
       level: profile.weaponLevels[id], max: MAX_WEAPON_LEVEL,
       cost: weaponUpgradeCost(profile.weaponLevels[id]),
