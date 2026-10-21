@@ -1,11 +1,13 @@
 import Phaser from 'phaser';
 import type { AttackData } from '../combat/damage';
-export type EnemyProjectileEffect = 'none' | 'frost-chill' | 'frost-burst';
+import { reflectArrow, type RicochetAxis } from './enemyRicochet';
+export type EnemyProjectileEffect = 'none' | 'frost-chill' | 'frost-burst' | 'briar-ricochet';
 
 export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
   public readonly attack: Readonly<AttackData>;
   public readonly effect: EnemyProjectileEffect;
-  private readonly baseVelocity: { x: number; y: number };
+  private baseVelocity: { x: number; y: number };
+  private ricochetsRemaining: number;
   public constructor(
     scene: Phaser.Scene, x: number, y: number,
     dx: number, dy: number, speed: number, damage: number,
@@ -14,6 +16,7 @@ export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
     super(scene, x, y, 'enemy-bullet');
     this.attack = { damage, criticalChance: 0, criticalMultiplier: 1 };
     this.effect = effect;
+    this.ricochetsRemaining = effect === 'briar-ricochet' ? 1 : 0;
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.setDepth(17);
@@ -44,6 +47,38 @@ export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
       body.setAllowGravity(false);
     }
   }
+  public get ricochetCount(): number { return this.ricochetsRemaining; }
+  public get travelVelocity(): Readonly<{ x: number; y: number }> { return this.baseVelocity; }
+
+  /** Only the first obstacle/wall impact can reflect a Briar arrow. */
+  public tryRicochet(axis: RicochetAxis): boolean {
+    if (!this.active || this.effect !== 'briar-ricochet' || this.ricochetsRemaining === 0)
+      return false;
+    this.ricochetsRemaining--;
+    this.baseVelocity = reflectArrow(this.baseVelocity, axis);
+    this.setVelocity(this.baseVelocity.x, this.baseVelocity.y);
+    this.setRotation(Math.atan2(this.baseVelocity.y, this.baseVelocity.x));
+    return true;
+  }
+
+  /** Arena edges count as walls even though enemies' projectiles do not
+   * collide with Phaser's world bounds (so the first hit can still ricochet). */
+  public bounceAtArenaEdge(): boolean {
+    if (this.effect !== 'briar-ricochet') return false;
+    const bounds = this.scene.physics.world.bounds;
+    const beyondX = this.x < bounds.x || this.x > bounds.right;
+    const beyondY = this.y < bounds.y || this.y > bounds.bottom;
+    if (!beyondX && !beyondY) return false;
+    const success = this.tryRicochet(beyondX ? 'x' : 'y');
+    if (success) {
+      this.setPosition(
+        Phaser.Math.Clamp(this.x, bounds.x + 8, bounds.right - 8),
+        Phaser.Math.Clamp(this.y, bounds.y + 8, bounds.bottom - 8),
+      );
+    }
+    return success;
+  }
+
   /** Temporarily slow only enemy bullets; restore their exact original speed afterwards. */
   public setSlowMotion(factor: number): void {
     this.setVelocity(this.baseVelocity.x * factor, this.baseVelocity.y * factor);
