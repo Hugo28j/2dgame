@@ -8,9 +8,13 @@ import type { Vector2Value } from '../input/vectorMath';
 import { fireIntervalMs, getWeaponStats, WARHAMMER_GROUND_SLAM, type WeaponId } from './weaponConfig';
 import { isInsideMeleeSwing } from './meleeCombat';
 import { inForwardRectangle, normalizedDirection } from '../abilities/directedGeometry';
+import { GLACIAL_COMBO, glacialStrikeDelayMs, glacialStrikeHits,
+  glacialStrikeShape, nextGlacialStrike, type GlacialStrike } from './glacialCombo';
 
 export class WeaponController {
   private nextShotAt = 0;
+  private glacialStrike: GlacialStrike = 0;
+  private lastGlacialStrikeAt = -Infinity;
   private readonly groundEffects = new Set<Phaser.GameObjects.Graphics>();
   public extraProjectiles = 0;
   public extraPiercing = 0;
@@ -31,8 +35,24 @@ export class WeaponController {
   public get attackMode(): 'melee' | 'projectile' { return this.config.attackMode; }
   public get config() { return getWeaponStats(this.weaponId, this.upgradeLevel); }
   public update(time: number, firing: boolean, direction: Readonly<Vector2Value>): void {
-    if (!firing || time < this.nextShotAt) return;
+    if (!firing) {
+      // Releasing the trigger for a while resets the *next* sequence, but does
+      // not bypass the third strike's mandatory recovery.
+      if (this.weaponId === 'iceblade' && time - this.lastGlacialStrikeAt > 650)
+        this.glacialStrike = 0;
+      return;
+    }
+    if (time < this.nextShotAt) return;
     const config = this.config;
+    if (this.weaponId === 'iceblade') {
+      const strike = this.glacialStrike;
+      this.animateGlacialStrike(strike, direction);
+      this.glacialStrike = nextGlacialStrike(strike);
+      this.lastGlacialStrikeAt = time;
+      this.nextShotAt = time + glacialStrikeDelayMs(strike,
+        config.fireRate * this.owner.attackSpeedAt(time) * this.permanentSpeed);
+      return; // Never also execute generic melee/swing for Glacial Blade.
+    }
     if (this.weaponId === 'warhammer') this.groundSlam(direction, time);
     else if (config.attackMode === 'melee') this.swing(direction);
     else this.fire(direction);
@@ -93,6 +113,110 @@ export class WeaponController {
       .setStrokeStyle(5, config.color, 0.95).setDepth(24);
     this.scene.tweens.add({ targets: arc, alpha: 0, scale: 1.08, duration: 150,
       onComplete: () => arc.destroy() });
+  }
+
+  /** Short slash, reverse slash, then a long fencing thrust. Each strike
+   * resolves once at the visual contact frame with its own hitbox geometry. */
+  private animateGlacialStrike(strike: GlacialStrike,
+    direction: Readonly<Vector2Value>): void {
+    const aim = normalizedDirection(direction);
+    const config = this.config;
+    const shape = glacialStrikeShape(strike,config.meleeRange*(1+this.extraMeleeRange));
+    const angle = Math.atan2(aim.y,aim.x);
+    const effect = this.scene.add.graphics().setDepth(27);
+    this.groundEffects.add(effect);
+    let applied=false;
+    const duration = strike === 2 ? GLACIAL_COMBO.thrustAnimationMs :
+      GLACIAL_COMBO.slashAnimationMs;
+    this.scene.tweens.addCounter({
+      from:0,to:1,duration,ease: 'Cubic.easeOut',
+      onUpdate: tween => {
+        if (!effect.active || !this.owner.active) return;
+        const progress=tween.getValue()??0;
+        if (!applied && progress >= (strike===2 ? 0.56 : 0.42)) {
+          applied=true;
+          this.hitGlacialStrike(strike,aim);
+        }
+        const ox=this.owner.x,oy=this.owner.y;
+        const fade=Math.min(1, (1-progress)*2.5);
+        effect.clear();
+        if (strike !== 2) {
+          // Two crescent slashes sweep in opposite directions.
+          const forward=strike===0?progress:1-progress;
+          const center=angle - shape.arc/2 + forward*shape.arc;
+          const first= strike===0 ? Math.max(angle-shape.arc/2,center-.42) :
+            Math.min(angle+shape.arc/2,center+.42);
+          const a=Math.min(first,center), b=Math.max(first,center);
+          effect.lineStyle(16,0x38bdf8,.27*fade);
+          effect.beginPath();effect.arc(ox,oy,shape.reach-4,a,b);effect.strokePath();
+          effect.lineStyle(7,0xb5f4ff,.94*fade);
+          effect.beginPath();effect.arc(ox,oy,shape.reach-1,a,b);effect.strokePath();
+          effect.lineStyle(2.5,0xffffff,.96*fade);
+          effect.beginPath();effect.arc(ox,oy,shape.reach+3,a,b);effect.strokePath();
+          effect.fillStyle(0xe0faff,fade);
+          effect.fillCircle(ox+Math.cos(center)*shape.reach,
+            oy+Math.sin(center)*shape.reach,3);
+        } else {
+          const reach=shape.reach*(.14+.86*progress);
+          const sx=ox+aim.x*18, sy=oy+aim.y*18;
+          const tx=ox+aim.x*reach,ty=oy+aim.y*reach;
+          // Only a thin straight thrust is painted; width matches hitbox.
+          effect.lineStyle(shape.halfWidth*2,0x38bdf8,.16*fade);
+          effect.lineBetween(sx,sy,tx,ty);
+          effect.lineStyle(9,0x7dd3fc,.68*fade);
+          effect.lineBetween(sx,sy,tx,ty);
+          effect.lineStyle(3,0xf0faff,fade);
+          effect.lineBetween(sx,sy,tx,ty);
+          const nx=-aim.y,ny=aim.x;
+          effect.fillStyle(0xe0ffff,.9*fade);
+          effect.fillTriangle(tx+aim.x*11,ty+aim.y*11,
+            tx+nx*7,ty+ny*7,tx-nx*7,ty-ny*7);
+        }
+      },
+      onComplete:()=>{
+        // Don't lose hits when a lag spike advances past the contact frame.
+        if (!applied && this.owner.active) this.hitGlacialStrike(strike,aim);
+        this.groundEffects.delete(effect);
+        if(effect.active) effect.destroy();
+        if(strike===2 && this.owner.active) this.animateGlacialRecovery();
+      },
+    });
+  }
+
+  private hitGlacialStrike(strike: GlacialStrike,
+    aim: Readonly<Vector2Value>): void {
+    const attack=this.createAttack();
+    const range=this.config.meleeRange;
+    for(const child of this.meleeTargets?.getChildren()??[]){
+      if (!(child instanceof Slime)||!child.active||child.aiState==='defeated')continue;
+      if(!glacialStrikeHits(strike,this.owner,aim,child,range,this.extraMeleeRange))continue;
+      this.onMeleeHit?.(child,attack);
+      if(this.meleeStunMs>0&&child.active)
+        child.applyStun(this.scene.time.now,this.meleeStunMs);
+    }
+  }
+
+  /** Visible settling frost after the forward stab, within the long cooldown. */
+  private animateGlacialRecovery(): void {
+    const effect=this.scene.add.graphics().setDepth(26);
+    this.groundEffects.add(effect);
+    this.scene.tweens.addCounter({
+      from:0,to:1,duration:GLACIAL_COMBO.recoveryAnimationMs,
+      onUpdate:tween=>{
+        if(!effect.active||!this.owner.active)return;
+        const t=tween.getValue()??0;
+        effect.clear();
+        effect.lineStyle(2.5,0xb6ecff,.65*(1-t));
+        effect.strokeCircle(this.owner.x,this.owner.y,20+t*8);
+        effect.fillStyle(0xffffff,.45*(1-t));
+        for(let i=0;i<5;i++){
+          const a=i*2*Math.PI/5;
+          effect.fillCircle(this.owner.x+Math.cos(a)*(21+t*17),
+            this.owner.y+Math.sin(a)*(21+t*17),2.4);
+        }
+      },
+      onComplete:()=>{this.groundEffects.delete(effect);if(effect.active)effect.destroy()},
+    });
   }
 
   /** A short, travelling crescent rather than a static sector that lingers. */
@@ -242,8 +366,13 @@ export class WeaponController {
 
   /** Room transitions must not leave old ground effects visible in the next arena. */
   public clearGroundEffects(): void {
-    for (const effect of this.groundEffects) effect.destroy();
+    for (const effect of this.groundEffects) {
+      this.scene.tweens.killTweensOf(effect);
+      effect.destroy();
+    }
     this.groundEffects.clear();
+    this.glacialStrike = 0;
+    this.lastGlacialStrikeAt = -Infinity;
   }
 
   private createAttack(): AttackData {
