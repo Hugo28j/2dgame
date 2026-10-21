@@ -9,7 +9,6 @@ import { coverIsClose, rangedCoverSpot, shieldEndpoints, shouldBreakTreantShield
 import { getBossPlan, getBossProfile } from './bossProfiles';
 import { CHARGER_DASH, WORLD1_BEETLE_DASH } from './enemyBalance';
 import { MOSS_DASH, ROOT_BRANCH, SPORE_THROW_INTERVAL_MS } from './worldOneBossBalance';
-import { FROZEN_EARLY } from './frozenEarlyGame';
 import { FROZEN_BALANCE } from './frozenBalance';
 import { firstSummonTime, getSummonerType, nextSummonTime, summonIsDue,
   type SummonerType } from './summonCadence';
