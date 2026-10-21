@@ -82,3 +82,10 @@ export function rangedCoverSpot(
 export function coverIsClose(shooter: Readonly<ShieldPoint>, tank: Readonly<ShieldPoint>): boolean {
   return Math.hypot(shooter.x - tank.x, shooter.y - tank.y) <= TREANT_SHIELD.maxCoverDistance;
 }
+
+/** Breaks permanently below 30% living HP; the body survives the shield. */
+export const TREANT_SHIELD_BREAK_RATIO = 0.30;
+export function shouldBreakTreantShield(healthRatio: number, alreadyBroken: boolean): boolean {
+  return !alreadyBroken && Number.isFinite(healthRatio) &&
+    healthRatio > 0 && healthRatio < TREANT_SHIELD_BREAK_RATIO;
+}
