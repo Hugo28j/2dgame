@@ -3,7 +3,7 @@ import Phaser from 'phaser';
 import type { Damageable } from '../combat/damage';
 import { InvulnerabilityWindow } from '../combat/InvulnerabilityWindow';
 import { SHIELD_MAX_HP, absorbWithShield } from '../abilities/ShieldHealth';
-import { FROZEN_EARLY } from '../enemies/frozenEarlyGame';
+import { FROZEN_EARLY, frostMovementFactor } from '../enemies/frozenEarlyGame';
 import { HEROES, getHeroStats, type HeroId } from '../heroes/heroConfig';
 import type { Vector2Value } from '../input/vectorMath';
 import { ICE_PLAYER_STEERING, iceVelocity } from '../worlds/iceMotion';
@@ -68,12 +68,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
 
   public movementSpeedAt(now: number): number {
     if (now < this.frozenUntil) return 0;
-    // A simultaneous Archer chill and Witch slow use the strongest factor,
-    // not multiplicative 0.55 × 0.5 immobilization.
-    const frostFactor = Math.min(
-      now < this.chilledUntil ? FROZEN_EARLY.chillSpeedFactor : 1,
-      now < this.witchSlowedUntil ? FROZEN_EARLY.witchSlowSpeedFactor : 1,
-    );
+    // Concurrent Archer and Witch slows never combine into near-paralysis.
+    const frostFactor = frostMovementFactor(now, this.chilledUntil, this.witchSlowedUntil);
     return this.movementSpeed * (now < this.sprintUntil ? 1.65 : 1) * frostFactor;
   }
 
