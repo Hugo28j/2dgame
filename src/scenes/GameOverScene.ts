@@ -7,7 +7,7 @@ import { progressStore } from '../progression/ProgressStore';
 import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
 import { getWorld } from '../worlds/worldConfig';
 import {
-  clientPointInGame, containsScreenPoint, endScreenLayout,
+  clientBoundsForGameButton, endScreenLayout,
 } from '../ui/endScreenLayout';
 
 interface GameOverData {
@@ -140,24 +140,64 @@ export class GameOverScene extends Phaser.Scene {
     const navigate = (target: string): void => {
       if (navigating) return;
       navigating = true;
-      // Also safe when the user clicks before deferred cleanup fires.
-      if (this.scene.isSleeping(GAME_SCENE_KEY)) this.scene.stop(GAME_SCENE_KEY);
-      this.scene.start(target);
+      // Use the global scene manager so this works even while the Game Over
+      // scene is being shut down. Starting GameScene constructs a fresh run in
+      // room 1 while ProgressStore keeps the selected hero and world intact.
+      const sceneManager = this.game.scene;
+      sceneManager.stop(GAME_SCENE_KEY);
+      sceneManager.stop(GAME_OVER_SCENE_KEY);
+      sceneManager.start(target);
     };
     button(layout.replay, 'OPNIEUW SPELEN', () => navigate(GAME_SCENE_KEY), true);
     button(layout.menu, 'HOOFDMENU', () => navigate(MENU_SCENE_KEY));
-    // Native canvas backup: reliable for touch and mouse even if Phaser misses
-    // a pointer during a scene hand-off. It reuses the exact rendered bounds.
-    const handleCanvasPointer = (event: PointerEvent): void => {
-      const point = clientPointInGame(event.clientX, event.clientY,
-        this.game.canvas.getBoundingClientRect(), GAME_WIDTH, GAME_HEIGHT);
-      if (!point) return;
-      if (containsScreenPoint(layout.replay, point.x, point.y)) navigate(GAME_SCENE_KEY);
-      else if (containsScreenPoint(layout.menu, point.x, point.y)) navigate(MENU_SCENE_KEY);
+
+    // Native HTML controls sit over the canvas buttons. They are intentionally
+    // transparent: Phaser keeps drawing the visuals, while the browser handles
+    // mouse, touch, keyboard activation and accessibility consistently.
+    const domButtons: Array<{
+      element: HTMLButtonElement;
+      bounds: typeof layout.replay;
+    }> = [];
+    const addDomButton = (bounds: typeof layout.replay, label: string,
+      callback: () => void): void => {
+      const element = document.createElement('button');
+      element.type = 'button';
+      element.setAttribute('aria-label', label);
+      element.title = label;
+      Object.assign(element.style, {
+        position: 'fixed',
+        zIndex: '1000',
+        margin: '0',
+        padding: '0',
+        border: '0',
+        background: 'transparent',
+        color: 'transparent',
+        cursor: 'pointer',
+        touchAction: 'manipulation',
+      });
+      element.addEventListener('click', callback);
+      document.body.appendChild(element);
+      domButtons.push({ element, bounds });
     };
-    this.game.canvas.addEventListener('pointerdown', handleCanvasPointer);
+    const syncDomButtons = (): void => {
+      const canvasBounds = this.game.canvas.getBoundingClientRect();
+      for (const domButton of domButtons) {
+        const bounds = clientBoundsForGameButton(domButton.bounds, canvasBounds,
+          GAME_WIDTH, GAME_HEIGHT);
+        if (!bounds) continue;
+        domButton.element.style.left = `${bounds.left}px`;
+        domButton.element.style.top = `${bounds.top}px`;
+        domButton.element.style.width = `${bounds.width}px`;
+        domButton.element.style.height = `${bounds.height}px`;
+      }
+    };
+    addDomButton(layout.replay, 'Opnieuw spelen', () => navigate(GAME_SCENE_KEY));
+    addDomButton(layout.menu, 'Hoofdmenu', () => navigate(MENU_SCENE_KEY));
+    syncDomButtons();
+    window.addEventListener('resize', syncDomButtons);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.game.canvas.removeEventListener('pointerdown', handleCanvasPointer);
+      window.removeEventListener('resize', syncDomButtons);
+      for (const domButton of domButtons) domButton.element.remove();
     });
     this.add.text(centerX, 811, 'Alleen opgeraapt goud telt mee — eenmaal opgeslagen', {
       fontFamily, fontSize: '10px', color: '#cbd5e1',
