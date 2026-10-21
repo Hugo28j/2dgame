@@ -88,6 +88,16 @@ export class VirtualJoystick {
     this.centerThumb();
   }
 
+  /** Fully hide joystick art and remove its hit surface during cinematics. */
+  public setEnabled(enabled: boolean): void {
+    this.reset();
+    this.base.setVisible(enabled);
+    this.thumb.setVisible(enabled);
+    this.label.setVisible(enabled);
+    if (enabled) this.zone.setInteractive();
+    else this.zone.disableInteractive();
+  }
+
   public destroy(): void {
     this.zone.off(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, this.handleDown);
     this.scene.input.off(Phaser.Input.Events.POINTER_MOVE, this.handleMove);

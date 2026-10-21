@@ -177,6 +177,9 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
     });
   }
 
+  /** Cinematic bosses may remain on-screen after their gameplay death. */
+  protected keepBodyOnDefeat(): boolean { return false; }
+
   public playDefeat(): void {
     if (this.aiState === 'defeated') {
       return;
@@ -189,6 +192,10 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
       body.enable = false;
     }
     this.scene.events.emit(ENEMY_DEFEATED_EVENT, this);
+    if (this.keepBodyOnDefeat()) {
+      this.setVelocity(0, 0);
+      return;
+    }
 
     this.scene.tweens.add({
       targets: this,

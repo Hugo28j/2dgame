@@ -202,6 +202,22 @@ export class AbilityController {
     return !this.blocked() && now < this.timeWarpUntil ? 0.36 : 1;
   }
 
+  /** Hide / deactivate every ability input element; no invisible tappable zones. */
+  public setControlsVisible(visible: boolean): void {
+    this.aimHold = undefined;
+    this.aimPreview.clear().setVisible(visible);
+    this.shieldHud.setVisible(visible);
+    this.buttons.forEach(button => {
+      button.background.setVisible(visible);
+      if (visible) button.background.setInteractive();
+      else button.background.disableInteractive();
+      button.icon.setVisible(visible);
+      button.hint.setVisible(visible);
+      button.overlay.setVisible(visible);
+      button.cooldownText.setVisible(visible);
+    });
+  }
+
   public cancelMotion(): void {
     this.dash.cancel();
     this.dashTrailKind = undefined;
