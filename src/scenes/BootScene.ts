@@ -98,7 +98,6 @@ export class BootScene extends Phaser.Scene {
     const colors: Record<string, number> = {
       'bolt-projectile': 0xfca5a5,
       'magic-projectile': 0xc084fc,
-      'dagger-projectile': 0xe2e8f0,
       'lightning-projectile': 0x67e8f9,
       'rune-projectile': 0xe9d5ff,
       'ember-projectile': 0xfb923c,
@@ -123,6 +122,38 @@ export class BootScene extends Phaser.Scene {
       graphics.generateTexture(key, 24, 24);
       graphics.destroy();
     });
+
+    // Fase 7: a translucent, sharpened ice-spike rather than a grey dagger.
+    // The long axis is horizontal so Phaser projectile rotation aims the tip.
+    const spikeKey = 'dagger-projectile';
+    if (!this.textures.exists(spikeKey)) {
+      const g = this.make.graphics({ x: 0, y: 0 }, false);
+      // Soft frosted crystal aura, narrower than its collision-free bloom.
+      g.fillStyle(0x7dd3fc, 0.17);
+      g.fillTriangle(0, 11, 19, 1, 48, 11);
+      g.fillTriangle(0, 11, 19, 21, 48, 11);
+      // Crystal shell facets: a thick heel tapers to a single bright point.
+      g.fillStyle(0x74cce8, 0.76);
+      g.fillTriangle(4, 11, 17, 3, 46, 11);
+      g.fillStyle(0xd6f7ff, 0.81);
+      g.fillTriangle(4, 11, 17, 19, 46, 11);
+      g.fillStyle(0x4eaccd, 0.65);
+      g.fillTriangle(12, 11, 17, 19, 34, 12);
+      g.fillStyle(0xf0fdff, 0.89);
+      g.fillTriangle(12, 10, 17, 5, 45, 11);
+      // Fine inner lattice and icy refraction streaks.
+      g.lineStyle(1.3, 0xffffff, 0.94);
+      g.lineBetween(6, 11, 46, 11);
+      g.lineBetween(17, 3, 28, 11);
+      g.lineBetween(17, 19, 28, 11);
+      g.lineStyle(1, 0x399bbd, 0.8);
+      g.lineBetween(25, 8, 36, 11);
+      g.lineBetween(25, 14, 36, 11);
+      g.fillStyle(0xffffff, 0.8);
+      g.fillCircle(18, 11, 2);
+      g.generateTexture(spikeKey, 48, 22);
+      g.destroy();
+    }
   }
 
   private createEnemyTextures(): void {

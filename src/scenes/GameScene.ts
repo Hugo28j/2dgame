@@ -324,6 +324,7 @@ export class GameScene extends Phaser.Scene {
 
     for (const child of this.projectiles.getChildren()) {
       if (!(child instanceof Projectile) || !child.active) continue;
+      child.updateIceSpikeTrail(this.time.now);
       const flight = child.consumeFlightSegment();
       const blocker = this.findProtectingTreant(flight.from, flight.to);
       if (blocker) {
