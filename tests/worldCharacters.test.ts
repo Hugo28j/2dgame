@@ -32,13 +32,13 @@ describe('themed world enemies and bosses', () => {
     expect(getWorldCharacter(5, 'bomber').name).toBe('Singularity');
   });
 
-  it('gives all 35 bosses unique names and sprites across 30-room worlds', () => {
+  it('gives all 34 active bosses unique names and sprites across 30-room worlds', () => {
     const bosses = WORLDS.flatMap(world =>
       [5, 10, 15, 20, 25, 30].flatMap(room =>
-        Array.from({ length: room === 15 ? 2 : 1 }, (_, slot) =>
+        Array.from({ length: room === 15 && world.id !== 2 ? 2 : 1 }, (_, slot) =>
           getWorldCharacter(world.id, 'boss', room, slot))));
-    expect(new Set(bosses.map(boss => boss.name)).size).toBe(35);
-    expect(new Set(bosses.map(boss => boss.textureKey)).size).toBe(35);
+    expect(new Set(bosses.map(boss => boss.name)).size).toBe(34);
+    expect(new Set(bosses.map(boss => boss.textureKey)).size).toBe(34);
     for (const boss of bosses) {
       expect(boss.kind).toBe('boss');
       expect(boss.textureKey.startsWith(`world-${boss.worldId}-boss-`)).toBe(true);
