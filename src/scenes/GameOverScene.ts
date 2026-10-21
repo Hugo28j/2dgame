@@ -1,171 +1,199 @@
 import Phaser from 'phaser';
 import {
-  GAME_HEIGHT, GAME_OVER_SCENE_KEY, GAME_SCENE_KEY, GAME_WIDTH, MENU_SCENE_KEY,
+  GAME_HEIGHT, GAME_OVER_SCENE_KEY, GAME_WIDTH, MENU_SCENE_KEY,
 } from '../config/constants';
 import type { RunReport } from '../progression/RunLedger';
 import { progressStore } from '../progression/ProgressStore';
 import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
 import { getWorld } from '../worlds/worldConfig';
-import {
-  clientPointInGame, containsScreenPoint, endScreenLayout, sceneKeyForEndScreenAction,
-} from '../ui/endScreenLayout';
+import { homeButtonLayout, homeButtonClientBounds } from '../ui/homeButtonLayout';
 
 interface GameOverData {
   report: RunReport;
   chosenUpgrades: { name: string; stacks: number }[];
 }
+
+/**
+ * A fresh, self-contained end screen shared by death and victory.
+ * The single HOME control is a REAL HTML button, not a Phaser graphics hitbox
+ * or a transparent overlay. It stays aligned to the scaled canvas on phones
+ * and desktops and reloads to BootScene -> MainMenuScene reliably.
+ */
 export class GameOverScene extends Phaser.Scene {
   private dataForRun?: GameOverData;
-  public constructor() { super(GAME_OVER_SCENE_KEY); }
-  public init(data: GameOverData): void { this.dataForRun = data; }
+
+  public constructor() {
+    super(GAME_OVER_SCENE_KEY);
+  }
+
+  public init(data: GameOverData): void {
+    this.dataForRun = data;
+  }
 
   public create(): void {
-    const data = this.dataForRun;
-    if (!data) {
+    if (!this.dataForRun) {
       this.scene.start(MENU_SCENE_KEY);
       return;
     }
-    // First show the menu immediately; dispose of the sleeping combat scene
-    // only after the first Game Over frame can render. This prevents a heavy
-    // 30-enemy teardown from blocking the death screen.
-    this.time.delayedCall(180, () => {
-      if (this.scene.isSleeping(GAME_SCENE_KEY)) this.scene.stop(GAME_SCENE_KEY);
-    });
-    const { report } = data;
-    const profile = progressStore.current;
+
+    const { report } = this.dataForRun;
     const world = getWorld(report.worldId);
-    const fontFamily = 'system-ui, sans-serif';
-    const layout = endScreenLayout(GAME_WIDTH);
-    const centerX = layout.centerX;
-    this.input.enabled = true;
-    this.input.setTopOnly(true);
+    const profile = progressStore.current;
+    const win = report.victory;
+    const accent = win ? 0x5de2c0 : 0xff8190;
+    const accentHex = win ? '#75f6d5' : '#ff9aaa';
+    const panelWidth = Math.min(GAME_WIDTH - 34, 446);
+    const cx = GAME_WIDTH / 2;
+    const font = 'system-ui, sans-serif';
+
+    // Opaque backdrop hides the sleeping gameplay without a costly combat
+    // teardown during the death frame. The full reload handles teardown.
     this.cameras.main.setScroll(0, 0);
-    this.cameras.main.setBackgroundColor('#17324b');
-    this.add.rectangle(centerX, 422, GAME_WIDTH, GAME_HEIGHT, 0x17324b)
-      .setScrollFactor(0);
-    this.add.circle(centerX + 130, 95, 220, report.victory ? 0x0e7490 : 0x9f3040, 0.16)
-      .setScrollFactor(0);
-    this.add.circle(centerX - 145, 760, 190, 0x25668a, 0.13).setScrollFactor(0);
-    const panel = this.add.rectangle(centerX, 422, 364, 760, 0x23415f)
-      .setStrokeStyle(3, report.victory ? 0x67e8f9 : 0xfb7185);
-    panel.setScale(0.92).setAlpha(0.72);
-    this.tweens.add({ targets: panel, scaleX: 1, scaleY: 1, alpha: 0.98,
-      duration: 380, ease: 'Back.easeOut' });
-    const headline = this.add.text(centerX, 87, report.victory ? 'CHAPTER VOLTOOID!' : 'GAME OVER', {
-      fontFamily, fontSize: '28px', fontStyle: 'bold',
-      color: report.victory ? '#a5f3fc' : '#fecdd3',
-    }).setOrigin(0.5).setScale(0.5).setAlpha(0);
-    this.tweens.add({ targets: headline, scaleX: 1, scaleY: 1, alpha: 1,
-      duration: 600, delay: 120, ease: 'Back.easeOut' });
-    this.add.text(centerX, 128, 'JE RUN-RESULTAAT', {
-      fontFamily, fontSize: '14px', color: '#e2e8f0',
+    this.cameras.main.setBackgroundColor('#102338');
+    this.add.rectangle(cx, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x102338);
+    this.add.circle(cx - panelWidth / 2, 135, 160, 0x31b9e0, 0.10);
+    this.add.circle(cx + panelWidth / 2, 690, 200, accent, 0.08);
+
+    const grid = this.add.graphics();
+    grid.lineStyle(1, 0x9cd6e9, 0.075);
+    for (let x = 0; x <= GAME_WIDTH; x += 38) grid.lineBetween(x, 0, x, GAME_HEIGHT);
+    for (let y = 0; y <= GAME_HEIGHT; y += 38) grid.lineBetween(0, y, GAME_WIDTH, y);
+
+    this.add.rectangle(cx, 421, panelWidth, 654, 0x1b344a, 0.98)
+      .setStrokeStyle(2, 0x47708a, 0.95);
+    this.add.rectangle(cx, 108, panelWidth - 38, 4, accent, 0.95);
+
+    this.add.text(cx, 140, 'DUNGEON ASCENT', {
+      fontFamily: font, fontSize: '14px', fontStyle: 'bold',
+      color: '#c9e9fa', letterSpacing: 2,
     }).setOrigin(0.5);
 
-    const rows = [
-      ['Wereld', world.id + '/5 · ' + world.name],
-      ['Bereikte kamer', String(report.reachedRoom) + '/' + CHAPTER_ROOM_COUNT],
-      ['Kamers voltooid', String(report.roomsCleared)],
-      ['Vijanden verslagen', String(report.enemiesDefeated)],
-      ['Bosses verslagen', String(report.bossesDefeated) + '/7'],
-      ['Totale schade', String(report.totalDamage)],
-      ['VERDIEND DEZE RUN', '+' + report.earnedGold + ' G'],
-      ['TOTAAL OOIT VERDIEND', profile.totalGoldEarned.toLocaleString('nl-BE') + ' G'],
-      ['Huidig goudsaldo', profile.gold.toLocaleString('nl-BE') + ' G'],
-      ['Wereldrecord', 'Kamer ' + profile.worldBestRooms[world.id - 1]],
-    ];
-    rows.forEach(([label, value], index) => {
-      const y = 162 + index * 33;
-      this.add.text(layout.panelLeft, y, label ?? '', {
-        fontFamily, fontSize: index === 6 || index === 7 ? '12px' : '13px',
-        fontStyle: index === 6 || index === 7 ? 'bold' : 'normal',
-        color: index === 6 || index === 7 ? '#fef08a' : '#cbd5e1',
-      });
-      this.add.text(layout.panelRight, y, value ?? '', {
-        fontFamily, fontSize: '13px', fontStyle: 'bold',
-        color: index === 6 || index === 7 ? '#fef08a' : '#ffffff',
-      }).setOrigin(1, 0);
-    });
+    const emblem = this.add.circle(cx, 207, 38, win ? 0x235e64 : 0x613c55)
+      .setStrokeStyle(3, accent);
+    this.add.circle(cx, 207, 29, win ? 0x2e807b : 0x844a64, 0.65);
+    this.add.text(cx, 205, win ? '★' : '✕', {
+      fontFamily: font, fontSize: '39px', fontStyle: 'bold',
+      color: accentHex,
+    }).setOrigin(0.5);
+    // Keep a subtle arrival animation without animating interactive controls.
+    this.tweens.add({ targets: emblem, scale: { from: 0.88, to: 1 },
+      duration: 420, ease: 'Back.easeOut' });
 
-    if (report.victory && world.id < 5) {
-      this.add.text(centerX, 629, '✦  WERELD ' + (world.id + 1) + ' ONTGRENDELD!  ✦', {
-        fontFamily, fontSize: '15px', fontStyle: 'bold', color: '#86efac',
+    this.add.text(cx, 264, win ? 'OVERWINNING!' : 'GAME OVER', {
+      fontFamily: font, fontSize: '30px', fontStyle: 'bold',
+      color: '#f8fbff',
+    }).setOrigin(0.5);
+    this.add.text(cx, 300,
+      win ? 'Je hebt deze wereld overwonnen.' : 'Je avontuur eindigt hier.',
+      { fontFamily: font, fontSize: '14px', color: '#c1d7e5' },
+    ).setOrigin(0.5);
+    this.add.text(cx, 338, world.name.toUpperCase(), {
+      fontFamily: font, fontSize: '16px', fontStyle: 'bold',
+      color: accentHex,
+    }).setOrigin(0.5);
+
+    const gap = 12;
+    const cardWidth = (panelWidth - 52 - gap) / 2;
+    const left = cx - gap / 2 - cardWidth / 2;
+    const right = cx + gap / 2 + cardWidth / 2;
+    const stat = (x: number, y: number, label: string, value: string): void => {
+      this.add.rectangle(x, y, cardWidth, 76, 0x25445e)
+        .setStrokeStyle(1, 0x56748b);
+      this.add.text(x, y - 16, label, {
+        fontFamily: font, fontSize: '11px', color: '#b9cedf',
       }).setOrigin(0.5);
-    }
-    this.add.text(centerX, 566, 'ARMOR: VERSLA VIJANDEN EN RAAP LOOT OP', {
-      fontFamily, fontSize: '10px', color: '#cbd5e1',
+      this.add.text(x, y + 12, value, {
+        fontFamily: font, fontSize: '22px', fontStyle: 'bold', color: '#ffffff',
+      }).setOrigin(0.5);
+    };
+    stat(left, 408, 'BEREIKTE KAMER', report.reachedRoom + '/' + CHAPTER_ROOM_COUNT);
+    stat(right, 408, 'VIJANDEN VERSLAGEN', String(report.enemiesDefeated));
+    stat(left, 496, 'KAMERS VOLTOOID', String(report.roomsCleared));
+    stat(right, 496, 'BOSSEN VERSLAGEN', String(report.bossesDefeated));
+
+    this.add.rectangle(cx, 591, panelWidth - 52, 82, 0x2b4e64)
+      .setStrokeStyle(1, 0xa67c34);
+    this.add.text(cx, 570, 'GOUD VERDIEND DEZE RUN', {
+      fontFamily: font, fontSize: '12px', fontStyle: 'bold', color: '#fbd68d',
     }).setOrigin(0.5);
-    const upgrades = data.chosenUpgrades;
-    this.add.text(layout.panelLeft, 503, 'TIJDELIJKE UPGRADES', {
-      fontFamily, fontSize: '13px', fontStyle: 'bold', color: '#7dd3fc',
+    this.add.text(cx, 605, '+' + report.earnedGold.toLocaleString('nl-BE') + ' G', {
+      fontFamily: font, fontSize: '27px', fontStyle: 'bold', color: '#ffdc73',
+    }).setOrigin(0.5);
+
+    this.add.text(cx, 645,
+      'Goudsaldo: ' + profile.gold.toLocaleString('nl-BE') + ' G',
+      { fontFamily: font, fontSize: '13px', color: '#c7dde9' },
+    ).setOrigin(0.5);
+
+    this.add.text(cx, 802, 'Je voortgang en uitrusting blijven bewaard', {
+      fontFamily: font, fontSize: '11px', color: '#b5cddd',
+    }).setOrigin(0.5);
+
+    this.createHomeButton();
+  }
+
+  private createHomeButton(): void {
+    const bounds = homeButtonLayout(GAME_WIDTH);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = '⌂   HOME';
+    button.setAttribute('aria-label', 'HOME - terug naar het beginscherm');
+    Object.assign(button.style, {
+      position: 'fixed',
+      zIndex: '2147483647',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      margin: '0',
+      padding: '0',
+      border: '2px solid #90edff',
+      borderRadius: '13px',
+      background: 'linear-gradient(110deg, #098fac, #0db1cb)',
+      boxShadow: '0 7px 0 #07556f, 0 12px 30px rgba(0,0,0,0.24)',
+      color: '#ffffff',
+      fontFamily: 'system-ui, sans-serif',
+      fontWeight: '800',
+      letterSpacing: '1px',
+      cursor: 'pointer',
+      touchAction: 'manipulation',
+      userSelect: 'none',
+      WebkitUserSelect: 'none',
+      pointerEvents: 'auto',
     });
-    this.add.text(layout.panelLeft, 526,
-      upgrades.length ? upgrades.map(u => u.name + (u.stacks > 1 ? ' ×' + u.stacks : '')).join(', ') : 'Geen',
-      { fontFamily, fontSize: '12px', color: '#e2e8f0', wordWrap: { width: 310 } },
-    );
+    // A real visible DOM button handles clicks, taps, Space, Enter and assistive
+    // devices natively. A page reload re-enters BootScene -> MainMenuScene and
+    // cannot be blocked by Phaser's old sleeping scene or pointer coordinates.
+    let goingHome = false;
+    button.addEventListener('click', () => {
+      if (goingHome) return;
+      goingHome = true;
+      window.location.reload();
+    });
+    const syncPosition = (): void => {
+      const client = homeButtonClientBounds(bounds,
+        this.game.canvas.getBoundingClientRect(), GAME_WIDTH, GAME_HEIGHT);
+      if (!client) return;
+      button.style.left = client.left + 'px';
+      button.style.top = client.top + 'px';
+      button.style.width = client.width + 'px';
+      button.style.height = client.height + 'px';
+      button.style.fontSize = Math.max(14, 21 * client.width / bounds.width) + 'px';
+    };
+    document.body.appendChild(button);
+    syncPosition();
 
-    // One hit surface per button, in world/screen canvas coordinates.
-    // A graphics object positioned at zero can have a misaligned interactive
-    // hit area in Phaser; use an explicit Zone for input instead.
-    let navigating = false;
-    const navigate = (target: string): void => {
-      if (navigating) return;
-      navigating = true;
-      // The old run is sleeping under this scene. Stop it before creating
-      // the new game or menu, otherwise stale input/cameras can survive.
-      if (this.scene.isSleeping(GAME_SCENE_KEY) || this.scene.isActive(GAME_SCENE_KEY)) {
-        this.scene.stop(GAME_SCENE_KEY);
-      }
-      this.scene.start(target);
-    };
-    const button = (bounds: typeof layout.replay, label: string,
-      target: string, primary = false): void => {
-      const plate = this.add.graphics().setDepth(30).setScrollFactor(0);
-      const drawPlate = (pressed: boolean): void => {
-        plate.clear();
-        plate.fillStyle(primary ? (pressed ? 0x0891b2 : 0x0e7490) :
-          (pressed ? 0x475569 : 0x334155), 1);
-        plate.fillRoundedRect(bounds.x - bounds.width / 2,
-          bounds.y - bounds.height / 2, bounds.width, bounds.height, 8);
-        plate.lineStyle(3, primary ? 0x67e8f9 : 0x94a3b8, 1);
-        plate.strokeRoundedRect(bounds.x - bounds.width / 2,
-          bounds.y - bounds.height / 2, bounds.width, bounds.height, 8);
-      };
-      drawPlate(false);
-      this.add.text(bounds.x, bounds.y, label, {
-        fontFamily, fontSize: '17px', fontStyle: 'bold', color: '#fff',
-      }).setOrigin(0.5).setDepth(31).setScrollFactor(0);
-      const hitZone = this.add.zone(bounds.x, bounds.y, bounds.width, bounds.height)
-        .setDepth(100).setScrollFactor(0).setInteractive({ useHandCursor: true });
-      hitZone.on('pointerover', () => drawPlate(true));
-      hitZone.on('pointerout', () => drawPlate(false));
-      // Both mouse and touch fire pointerdown without requiring pointerup.
-      hitZone.on('pointerdown', () => navigate(target));
-    };
-    button(layout.replay, 'OPNIEUW SPELEN',
-      sceneKeyForEndScreenAction('replay'), true);
-    button(layout.menu, 'HOOFDMENU', sceneKeyForEndScreenAction('menu'));
-
-    // Browser-level fallback: touches/clicks outside Phaser's pointer dispatch
-    // still work (e.g. certain mobile browsers after scene sleep). Map client
-    // coordinates to the actual scaled canvas rect, not viewport coordinates.
-    const fallback = (event: PointerEvent): void => {
-      if (navigating || !this.scene.isActive()) return;
-      const rect = this.game.canvas.getBoundingClientRect();
-      const pt = clientPointInGame(event.clientX, event.clientY, rect,
-        GAME_WIDTH, GAME_HEIGHT);
-      if (!pt) return;
-      if (containsScreenPoint(layout.replay, pt.x, pt.y)) {
-        navigate(sceneKeyForEndScreenAction('replay'));
-      } else if (containsScreenPoint(layout.menu, pt.x, pt.y)) {
-        navigate(sceneKeyForEndScreenAction('menu'));
-      }
-    };
-    window.addEventListener('pointerdown', fallback, true);
+    const observer = typeof ResizeObserver === 'undefined' ? undefined :
+      new ResizeObserver(syncPosition);
+    observer?.observe(this.game.canvas);
+    window.addEventListener('resize', syncPosition);
+    window.addEventListener('orientationchange', syncPosition);
+    window.visualViewport?.addEventListener('resize', syncPosition);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      window.removeEventListener('pointerdown', fallback, true);
+      observer?.disconnect();
+      window.removeEventListener('resize', syncPosition);
+      window.removeEventListener('orientationchange', syncPosition);
+      window.visualViewport?.removeEventListener('resize', syncPosition);
+      button.remove();
     });
-    this.add.text(centerX, 811, 'Alleen opgeraapt goud telt mee — eenmaal opgeslagen', {
-      fontFamily, fontSize: '10px', color: '#cbd5e1',
-    }).setOrigin(0.5);
   }
 }
