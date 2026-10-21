@@ -61,6 +61,7 @@ import { BRAMBLE_CINEMATIC, amplifiedTwinVolleyIndex, brambleDamageAllowed,
 import { drawFrozenFloor } from '../worlds/iceFloorArt';
 import { ICE_ENEMY_STEERING, iceVelocity } from '../worlds/iceMotion';
 import { findChainTargets } from '../weapons/chainLightning';
+import { runeBounceTarget } from '../weapons/runeTome';
 import { upgradeCardBounds } from '../ui/upgradeLayout';
 import { displayedHp } from '../ui/displayValues';
 
@@ -322,9 +323,17 @@ export class GameScene extends Phaser.Scene {
     }
     this.updateBossHud();
 
+    // One snapshot per frame: both gentle aim assist and bounce seek only
+    // actually alive enemies, not defeated or removed corpses.
+    const runeEnemies = this.enemies.getChildren()
+      .filter((enemy): enemy is Slime => enemy instanceof Slime &&
+        enemy.active && enemy.aiState !== 'defeated')
+      .map(enemy => ({enemyId:enemy.enemyId,x:enemy.x,y:enemy.y}));
     for (const child of this.projectiles.getChildren()) {
       if (!(child instanceof Projectile) || !child.active) continue;
       child.updateIceSpikeTrail(this.time.now);
+      child.updateRuneFlight(this.time.now, delta, runeEnemies);
+      if (!child.active) continue;
       const flight = child.consumeFlightSegment();
       const blocker = this.findProtectingTreant(flight.from, flight.to);
       if (blocker) {
@@ -961,14 +970,14 @@ export class GameScene extends Phaser.Scene {
     }
     // The front shield is struck before any enemy standing behind it.
     // This also prevents piercing shots from passing through the wood plate.
-    const blocker = this.findProtectingTreant(projectileObject.launchOrigin, targetObject);
+    const blocker = this.findProtectingTreant(projectileObject.shieldOrigin, targetObject);
     if (blocker) {
       this.hitTreantShield(projectileObject, blocker);
       return;
     }
-    if (!projectileObject.registerHit(targetObject.enemyId)) {
-      return;
-    }
+    // Save this before registerHit: a second rune impact destroys the sprite.
+    const runeSecond = projectileObject.runeSecondHit;
+    if (!projectileObject.registerHit(targetObject.enemyId)) return;
 
     const result = this.damageSystem.apply(targetObject, projectileObject.attack);
     this.showDamageNumber(targetObject.x, targetObject.y, result);
@@ -980,7 +989,30 @@ export class GameScene extends Phaser.Scene {
     if (projectileObject.effect === 'chain-lightning') {
       this.applyChainLightning(targetObject, projectileObject.attack);
     }
+    if (projectileObject.isRuneOrb) {
+      this.showRuneImpact(targetObject.x,targetObject.y,runeSecond);
+      if (projectileObject.runeAwaitingBounce) {
+        const eligible=this.enemies?.getChildren()
+          .filter((enemy): enemy is Slime => enemy instanceof Slime &&
+            enemy.active && enemy.aiState!=='defeated' &&
+            enemy.enemyId!==targetObject.enemyId &&
+            !this.findProtectingTreant(targetObject,enemy))
+          .map(enemy=>({enemyId:enemy.enemyId,x:enemy.x,y:enemy.y}))??[];
+        const target=runeBounceTarget(targetObject,targetObject.enemyId,eligible);
+        projectileObject.beginRuneBounce(target,this.time.now);
+      }
+    }
   };
+
+  /** One short, contained hit flash on first and second impacts. */
+  private showRuneImpact(x:number,y:number,second:boolean): void {
+    const ring=this.add.circle(x,y,second?15:12,0xc084fc,0.18)
+      .setStrokeStyle(2.5,0xf5d0fe,0.92).setDepth(30);
+    const point=this.add.star(x,y,5,3,second?13:10,0xffffff,0.78).setDepth(31);
+    this.tweens.add({targets:[ring,point],alpha:0,scale:1.65,
+      duration:210,ease:'Sine.easeOut',
+      onComplete:()=>{ring.destroy();point.destroy();}});
+  }
 
   private readonly handleMeleeHit = (
     target: Slime,
