@@ -49,7 +49,7 @@ export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number,
     ...base, roomNumber: number,
     // Phase 3: current base defense is doubled only in worlds 1 and 2.
     defense: base.defense * (worldId === 1 || worldId === 2 ? 2 : 1),
-    maxHp: Math.round(base.maxHp *
+    maxHp: Math.round(Math.round(base.maxHp *
       (worldId === 2 && kind === 'mage' ? 3 :
         worldId === 2 && kind === 'archer' ? 1.5 * FROZEN_BALANCE.rangerHpMultiplier :
         worldId === 2 && kind === 'tank' ? FROZEN_BALANCE.golemHpMultiplier :
@@ -65,7 +65,10 @@ export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number,
       (kind === 'boss' && worldId === 2 && number === 5 ? FROZEN_BALANCE.glacierWardenHpMultiplier :
         kind === 'boss' && worldId === 2 && number === 15 ? FROZEN_BALANCE.snowSentinelHpMultiplier : 1) *
       (kind === 'boss' && worldId === 1 && number === 15 ? 1.5 * 1.5 :
-        kind === 'boss' && worldId === 1 && number === 30 ? 2 : 1)),
+        kind === 'boss' && worldId === 1 && number === 30 ? 2 : 1)) *
+      // Two Bloom Sentinels are summoned later at level 20, both with
+      // exactly +50% of their existing, already rounded, HP.
+      (kind === 'boss' && worldId === 1 && number === 20 && bossSlot === 1 ? 1.5 : 1)),
     damage: Math.round(base.damage * (worldId === 2 && kind === 'archer' ? 2 * FROZEN_BALANCE.rangerDamageMultiplier :
       worldId === 1 && kind === 'archer' ? WORLD1_BRIAR_DAMAGE_MULTIPLIER : 1) *
       (1 + completed * SLIME_DIFFICULTY.damagePerRoom) *

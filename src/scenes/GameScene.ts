@@ -4,7 +4,7 @@ import { AbilityController } from '../abilities/AbilityController';
 import { DamageSystem, type DamageResult } from '../combat/damage';
 import { shouldParryHit } from '../combat/parry';
 import { addAndLaunch } from '../combat/launchProjectile';
-import { GAME_SCENE_KEY, GAME_TITLE, GAME_OVER_SCENE_KEY, GAME_WIDTH } from '../config/constants';
+import { GAME_SCENE_KEY, GAME_TITLE, GAME_OVER_SCENE_KEY, GAME_WIDTH, GAME_HEIGHT } from '../config/constants';
 import { EnemySpawner } from '../enemies/EnemySpawner';
 import { getBossProfile, getBossTier } from '../enemies/bossProfiles';
 import { MOSS_DASH, ROOT_BRANCH, rootBurstAngles } from '../enemies/worldOneBossBalance';
@@ -54,6 +54,8 @@ import { coinDropsForEnemy } from '../progression/coinRewards';
 import { roomClearHealing } from '../progression/roomHealing';
 import { RunUpgradeDeck, type RunUpgradeId } from '../progression/runUpgrades';
 import { getWorld, getWorldBossName, type WorldId } from '../worlds/worldConfig';
+import { BRAMBLE_CINEMATIC, amplifiedTwinVolleyIndex, brambleDamageAllowed,
+  brambleWindLanding, nextBrambleStage, type BrambleStage } from '../enemies/brambleCinematic';
 import { drawFrozenFloor } from '../worlds/iceFloorArt';
 import { ICE_ENEMY_STEERING, iceVelocity } from '../worlds/iceMotion';
 import { findChainTargets } from '../weapons/chainLightning';
@@ -106,6 +108,15 @@ export class GameScene extends Phaser.Scene {
     radius: number; startAt: number; nextTickAt: number; damage: number;
   }>();
   private activeBosses: AdvancedEnemy[] = [];
+  /** One lifecycle, not overlapping stage booleans. */
+  private brambleStage: BrambleStage = 'idle';
+  private brambleCutsceneUsed = false;
+  private brambleSequence = 0;
+  private brambleBoss?: AdvancedEnemy;
+  private brambleOverlay?: Phaser.GameObjects.Container;
+  private brambleMessage?: Phaser.GameObjects.Text;
+  private readonly brambleEffects = new Set<Phaser.GameObjects.GameObject>();
+  private readonly brambleTimers = new Set<Phaser.Time.TimerEvent>();
   private readonly bossHealthBars: Phaser.GameObjects.Graphics[] = [];
   private readonly bossNameTexts: Phaser.GameObjects.Text[] = [];
   private obstacles?: Phaser.Physics.Arcade.StaticGroup;
@@ -156,6 +167,9 @@ export class GameScene extends Phaser.Scene {
     this.transitioning = false;
     this.chapterComplete = false;
     this.choosingUpgrade = false;
+    this.brambleStage = 'idle';
+    this.brambleCutsceneUsed = false;
+    this.brambleSequence++;
     this.run = new RunLedger(undefined, this.worldId);
     this.upgrades = new RunUpgradeDeck();
     this.drawBackdrop();
@@ -198,7 +212,7 @@ export class GameScene extends Phaser.Scene {
       this.enemies, this.controls, this.damageSystem,
       (x, y, result) => this.showDamageNumber(x, y, result),
       () => this.drawPlayerHealth(),
-      () => this.gameOver || this.transitioning || this.chapterComplete || this.choosingUpgrade,
+      () => this.gameOver || this.transitioning || this.chapterComplete || this.choosingUpgrade || this.brambleStage !== 'idle',
       this.enemyProjectiles,
       () => this.currentRoom?.layout,
       (origin, target) => this.findProtectingTreant(origin, target),
@@ -218,7 +232,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    if (this.gameOver || this.transitioning || this.chapterComplete || this.choosingUpgrade) {
+    if (this.gameOver || this.transitioning || this.chapterComplete || this.choosingUpgrade || this.brambleStage !== 'idle') {
       this.player.setVelocity(0, 0);
       return;
     }
@@ -596,6 +610,8 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    this.clearBrambleCutscene();
+    this.brambleCutsceneUsed = false;
     this.abilities?.cancelMotion();
     this.weapon?.clearGroundEffects();
     this.player?.clearFrost();
@@ -999,7 +1015,7 @@ export class GameScene extends Phaser.Scene {
     // twice as quickly as the original spiral. Keep other bosses unchanged.
     const angles = this.worldId === 1 && enemy.fasterTwin &&
       enemy.stats.roomNumber === 20
-      ? [splitTwinShotAngle(volley, enemy.splitTwinIndex)]
+      ? [splitTwinShotAngle(amplifiedTwinVolleyIndex(volley), enemy.splitTwinIndex)]
       : shotAngles(pattern, angle, volley);
     const briarHunter = this.worldId === 1 && enemy.kind === 'archer';
     const speed = (enemy.kind === 'boss' ? (220 + getBossTier(enemy.stats.roomNumber) * 8) *
@@ -1794,7 +1810,8 @@ export class GameScene extends Phaser.Scene {
   };
 
   private damagePlayer(attack: Readonly<Projectile['attack']>, iframeMs = 650): void {
-    if (!this.player || this.gameOver || !this.player.canReceiveContactDamage(this.time.now)) return;
+    if (!this.player || this.gameOver || !brambleDamageAllowed(this.brambleStage) ||
+        !this.player.canReceiveContactDamage(this.time.now)) return;
     if (shouldParryHit(this.player.heroId, Math.random())) {
       // A parried hit deals zero damage and consumes the same i-frame window
       // as a normal hit: overlapping melee enemies cannot repeatedly reroll.
@@ -1815,7 +1832,7 @@ export class GameScene extends Phaser.Scene {
       const bar = this.bossHealthBars[slot];
       const name = this.bossNameTexts[slot];
       if (!bar || !name) continue;
-      const visible = !!boss && boss.active && boss.aiState !== 'defeated';
+      const visible = this.brambleStage === 'idle' && !!boss && boss.active && boss.aiState !== 'defeated';
       bar.setVisible(visible).clear();
       name.setVisible(visible);
       if (!visible || !boss) continue;
@@ -1829,30 +1846,225 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** All delayed stage callbacks belong to the current encounter token. */
+  private scheduleBrambleStage(ms: number, callback: () => void): void {
+    const token = this.brambleSequence;
+    let timer: Phaser.Time.TimerEvent;
+    timer = this.time.delayedCall(ms, () => {
+      this.brambleTimers.delete(timer);
+      if (token !== this.brambleSequence || !this.currentRoom ||
+          this.currentRoom.number !== 20 || this.worldId !== 1 ||
+          this.gameOver || this.transitioning || this.chapterComplete) return;
+      callback();
+    });
+    this.brambleTimers.add(timer);
+  }
+
+  private trackBrambleFx<T extends Phaser.GameObjects.GameObject>(object: T): T {
+    this.brambleEffects.add(object);
+    return object;
+  }
+
+  private setBrambleMessage(message: string): void {
+    this.brambleMessage?.setText(message);
+  }
+
+  /** Stage 1. Defer the first boss's *visual* death until after the cinematic.
+   * Its gameplay death is still recorded once by handleEnemyDefeated. */
   private startWorldOneBossSplit(enemy: AdvancedEnemy): void {
-    if (!this.currentRoom || !this.enemySpawner || !this.player) return;
-    // Reserve the two additional kills before counting the first boss's death.
+    if (this.brambleCutsceneUsed || this.brambleStage !== 'idle' ||
+        !enemy.isBrambleGunner || !this.currentRoom || !this.enemySpawner || !this.player ||
+        this.gameOver || this.transitioning) return;
+    this.brambleCutsceneUsed = true;
+    this.brambleSequence++;
+    this.brambleStage = nextBrambleStage('idle');
+    this.brambleBoss = enemy;
+    // Reserve both kills BEFORE registering Bramble's own death.
     this.roomProgress.addEnemies(2);
     this.player.heal(this.player.maxHp * 0.5);
     this.drawPlayerHealth();
+    this.player.setVelocity(0, 0);
+    this.controls?.setEnabled(false);
+    this.abilities?.cancelMotion();
+    this.abilities?.setControlsVisible(false);
+    this.weapon?.clearGroundEffects();
+    this.projectiles?.clear(true, true);
     this.enemyProjectiles?.clear(true, true);
     this.clearBossBombs();
+    this.physics.world.pause();
+    this.updateBossHud();
+    // Keep the actual defeated Gunner sprite visible until explosion, not a
+    // separate lookalike sprite that can briefly overlap with the real boss.
+    enemy.setAlpha(1).setDepth(170).setScale(1.75);
+    const shade = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2,
+      GAME_WIDTH, GAME_HEIGHT, 0x03130b, 0.48);
+    const title = this.add.text(GAME_WIDTH / 2, 214, 'DE AARDE BEEFT', {
+      fontFamily: 'system-ui, sans-serif', fontSize: '25px', fontStyle: 'bold',
+      color: '#fef3c7', stroke: '#17260a', strokeThickness: 5,
+    }).setOrigin(0.5);
+    const subtitle = this.add.text(GAME_WIDTH / 2, 253, 'BRAMBLE GUNNER ONTKETENT DE WIND', {
+      fontFamily: 'system-ui, sans-serif', fontSize: '13px', fontStyle: 'bold',
+      color: '#bef264', stroke: '#071306', strokeThickness: 4,
+    }).setOrigin(0.5);
+    this.brambleOverlay = this.add.container(0, 0, [shade, title, subtitle])
+      .setScrollFactor(0).setDepth(160);
+    this.brambleMessage = subtitle;
+    // Pan toward the Gunner so mobile players see the whole transformation.
+    this.cameras.main.pan(enemy.x, enemy.y, 650, 'Sine.easeInOut');
+    const bounds = this.currentRoom.layout.bounds;
+    const start = {x: this.player.x, y: this.player.y};
+    const dest = brambleWindLanding(enemy, this.player, bounds);
+    const ring = this.trackBrambleFx(this.add.graphics().setDepth(168));
+    const token = this.brambleSequence;
+    this.tweens.addCounter({
+      from: 0, to: 1, duration: BRAMBLE_CINEMATIC.windMs, ease: 'Sine.easeOut',
+      onUpdate: tween => {
+        if (token !== this.brambleSequence || this.brambleStage !== 'wind' || !ring.active) return;
+        const t = tween.getValue() ?? 0;
+        ring.clear();
+        for (let band = 0; band < 5; band++) {
+          const radius = 20 + t * (145 + band * 72);
+          ring.lineStyle(4 + band, band % 2 ? 0xc4e792 : 0xfafde2, (1-t)*0.76);
+          ring.strokeCircle(enemy.x, enemy.y, radius);
+        }
+        if (!this.player?.active) return;
+        // Explicit tweened displacement while physics is paused; no damage.
+        const x = Phaser.Math.Linear(start.x, dest.x, t);
+        const y = Phaser.Math.Linear(start.y, dest.y, t);
+        const body = this.player.body;
+        if (body instanceof Phaser.Physics.Arcade.Body) body.reset(x, y);
+        else this.player.setPosition(x, y);
+      },
+    });
+    this.scheduleBrambleStage(BRAMBLE_CINEMATIC.windMs, () => {
+      ring.clear();
+      this.startBrambleGrowth(enemy);
+    });
+  }
+
+  /** Stage 2: visible growth, energy and a cinematic HP gauge at screen top. */
+  private startBrambleGrowth(enemy: AdvancedEnemy): void {
+    if (this.brambleStage !== 'wind' || !enemy.active) return;
+    this.brambleStage = nextBrambleStage(this.brambleStage);
+    this.setBrambleMessage('DE GUNNER ABSORBEERT DE KRACHT VAN HET BOS');
+    const bar = this.trackBrambleFx(this.add.graphics().setDepth(180).setScrollFactor(0));
+    bar.fillStyle(0x051408, 0.97).fillRoundedRect((GAME_WIDTH-290)/2, 142, 290, 20, 8);
+    bar.lineStyle(2, 0xd9f99d, 1).strokeRoundedRect((GAME_WIDTH-290)/2, 142, 290, 20, 8);
+    bar.fillStyle(0x84cc16, 0.94).fillRoundedRect((GAME_WIDTH-286)/2, 146, 286, 12, 6);
+    this.trackBrambleFx(this.add.text(GAME_WIDTH/2, 128, 'BRAMBLE GUNNER · ONTWAKEN', {
+      fontFamily: 'system-ui, sans-serif', fontSize: '12px', fontStyle: 'bold',
+      color: '#fef9c3', stroke: '#020617', strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(181).setScrollFactor(0));
+    this.tweens.add({targets: enemy,
+      scaleX: BRAMBLE_CINEMATIC.gunnerGrowthScale,
+      scaleY: BRAMBLE_CINEMATIC.gunnerGrowthScale,
+      duration: BRAMBLE_CINEMATIC.growthMs, ease: 'Cubic.easeInOut'});
+    const energy = this.trackBrambleFx(this.add.graphics().setDepth(169));
+    const token = this.brambleSequence;
+    this.tweens.addCounter({
+      from: 0, to: 1, duration: BRAMBLE_CINEMATIC.growthMs,
+      onUpdate: tween => {
+        if (token !== this.brambleSequence || this.brambleStage !== 'growth' ||
+            !energy.active) return;
+        const t = tween.getValue() ?? 0;
+        energy.clear();
+        energy.lineStyle(4, 0xd9f99d, 0.28 + t * .65);
+        for (let i = 0; i < 8; i++) {
+          const angle = i * Math.PI / 4 + t * Math.PI;
+          const r = 40 + 38 * t + 8 * Math.sin(t * 12 + i);
+          energy.lineBetween(enemy.x + Math.cos(angle)*r,
+            enemy.y + Math.sin(angle)*r,
+            enemy.x + Math.cos(angle)*(r+30),
+            enemy.y + Math.sin(angle)*(r+30));
+        }
+        energy.fillStyle(0x84cc16, 0.06 + t * 0.18);
+        energy.fillCircle(enemy.x, enemy.y, 56 + t * 62);
+      },
+    });
+    this.scheduleBrambleStage(BRAMBLE_CINEMATIC.growthMs,
+      () => this.startBrambleExplosion(enemy));
+  }
+
+  /** Stage 3: near full-screen shockwave with light, smoke and foliage. */
+  private startBrambleExplosion(enemy: AdvancedEnemy): void {
+    if (this.brambleStage !== 'growth') return;
+    this.brambleStage = nextBrambleStage(this.brambleStage);
+    this.setBrambleMessage('BLOOM SENTINELS ONTWAKEN');
+    this.cameras.main.shake(350, 0.006);
+    const flash = this.trackBrambleFx(this.add.rectangle(GAME_WIDTH/2, GAME_HEIGHT/2,
+      GAME_WIDTH, GAME_HEIGHT, 0xe2f9b8, 0).setDepth(205).setScrollFactor(0));
+    this.tweens.add({targets: flash, alpha: 0.96, duration: 240, yoyo: true,
+      hold: 150, ease: 'Sine.easeInOut'});
+    const foliage = this.trackBrambleFx(this.add.graphics().setDepth(204).setScrollFactor(0));
+    const token = this.brambleSequence;
+    this.tweens.addCounter({
+      from: 0, to: 1, duration: BRAMBLE_CINEMATIC.explosionMs,
+      onUpdate: tween => {
+        if (token !== this.brambleSequence || this.brambleStage !== 'explosion' ||
+            !foliage.active) return;
+        const t = tween.getValue() ?? 0;
+        foliage.clear();
+        const size = 60 + t*GAME_HEIGHT;
+        foliage.fillStyle(0xb6ef87, 0.36*(1-t));
+        foliage.fillCircle(GAME_WIDTH/2, GAME_HEIGHT/2, size);
+        for (let i = 0; i < 22; i++) {
+          const angle = i*Math.PI*2/22;
+          const radius = 16 + t*(290 + (i % 4)*58);
+          const x = GAME_WIDTH/2 + Math.cos(angle)*radius;
+          const y = GAME_HEIGHT/2 + Math.sin(angle)*radius;
+          foliage.fillStyle(i%2 ? 0x457a2c : 0xd9f99d, 0.7*(1-t));
+          foliage.fillEllipse(x,y,15+t*18,6+t*8);
+        }
+      },
+    });
+    this.scheduleBrambleStage(BRAMBLE_CINEMATIC.explosionMs,
+      () => this.spawnBrambleTwins(enemy));
+  }
+
+  /** Stage 4: only now replace the body with exactly two living bosses. */
+  private spawnBrambleTwins(enemy: AdvancedEnemy): void {
+    if (this.brambleStage !== 'explosion' || !this.currentRoom ||
+        !this.enemySpawner || !this.player) return;
+    this.brambleStage = nextBrambleStage(this.brambleStage);
     const bounds = this.currentRoom.layout.bounds;
     const x = Phaser.Math.Clamp(enemy.x, bounds.x + 125, bounds.x + bounds.width - 125);
     const y = Phaser.Math.Clamp(enemy.y, bounds.y + 90, bounds.y + bounds.height - 90);
-    const points = [{ x: x - 90, y }, { x: x + 90, y }];
-    const flash = this.add.circle(x, y, 34, 0xa78bfa, 0.5)
-      .setStrokeStyle(5, 0xf5d0fe).setDepth(32);
-    this.tweens.add({ targets: flash, scaleX: 4, scaleY: 4, alpha: 0,
-      duration: 450, ease: 'Cubic.easeOut', onComplete: () => flash.destroy() });
-    this.time.delayedCall(420, () => {
-      if (!this.currentRoom || this.currentRoom.number !== 20 ||
-          this.gameOver || this.transitioning) return;
-      const twins = this.enemySpawner?.spawnSplitBosses(points, 20) ?? [];
-      this.activeBosses = twins;
+    enemy.destroy();
+    this.brambleBoss = undefined;
+    const points = [{x:x-90,y}, {x:x+90,y}];
+    const twins = this.enemySpawner.spawnSplitBosses(points, 20);
+    this.activeBosses = twins;
+    this.updateEnemyCount();
+    this.setBrambleMessage('TWEE BLOOM SENTINELS VERSCHIJNEN');
+    if (this.brambleOverlay) {
+      this.tweens.add({targets: this.brambleOverlay, alpha: 0,
+        duration: BRAMBLE_CINEMATIC.handoffMs});
+    }
+    this.scheduleBrambleStage(BRAMBLE_CINEMATIC.handoffMs, () => {
+      this.clearBrambleCutscene();
       this.updateBossHud();
-      this.updateEnemyCount();
     });
+  }
+
+  /** Reverts ALL input/physics/FX on finish, room changes and scene shutdown. */
+  private clearBrambleCutscene(): void {
+    this.brambleSequence++;
+    for (const timer of this.brambleTimers) timer.remove(false);
+    this.brambleTimers.clear();
+    this.brambleOverlay?.destroy(true);
+    this.brambleOverlay = undefined;
+    this.brambleMessage = undefined;
+    for (const fx of this.brambleEffects) {
+      this.tweens.killTweensOf(fx);
+      if (fx.active) fx.destroy();
+    }
+    this.brambleEffects.clear();
+    if (this.brambleBoss?.active) this.brambleBoss.destroy();
+    this.brambleBoss = undefined;
+    this.brambleStage = 'idle';
+    this.physics.world.resume();
+    this.controls?.setEnabled(true);
+    this.abilities?.setControlsVisible(true);
   }
 
   private spawnSplitSnowPuffs(enemy: AdvancedEnemy): void {
@@ -1878,7 +2090,7 @@ export class GameScene extends Phaser.Scene {
     this.spawnXp(enemy.x, enemy.y, kind);
     this.spawnArmor(enemy, kind);
     if (this.worldId === 1 && this.roomProgress.roomNumber === 20 &&
-        enemy instanceof AdvancedEnemy && enemy.isBoss && enemy.bossSlot === 0) {
+        enemy instanceof AdvancedEnemy && enemy.isBrambleGunner) {
       this.startWorldOneBossSplit(enemy);
     }
     if (this.worldId === 2 && enemy instanceof AdvancedEnemy && enemy.kind === 'tank') {
@@ -2337,6 +2549,7 @@ export class GameScene extends Phaser.Scene {
   private endRun(): void { this.completeRun(false); }
 
   private shutdown(): void {
+    this.clearBrambleCutscene();
     this.physics.world.resume();
     this.clearCoins();
     if (this.levelUpGlow) {

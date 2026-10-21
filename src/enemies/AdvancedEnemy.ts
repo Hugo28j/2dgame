@@ -11,6 +11,7 @@ import { CHARGER_DASH, WORLD1_BEETLE_DASH } from './enemyBalance';
 import { MOSS_DASH, ROOT_BRANCH, SPORE_THROW_INTERVAL_MS } from './worldOneBossBalance';
 import { FROZEN_EARLY } from './frozenEarlyGame';
 import { FROZEN_BALANCE } from './frozenBalance';
+import { BRAMBLE_CINEMATIC } from './brambleCinematic';
 import { sporePatrolVelocity } from './sporeMovement';
 import type { BulletPattern } from './projectilePatterns';
 export type { BulletPattern } from './projectilePatterns';
@@ -83,6 +84,11 @@ export class AdvancedEnemy extends Slime {
   }
 
   public get isBoss(): boolean { return this.kind === 'boss'; }
+  public get isBrambleGunner(): boolean {
+    return this.isBoss && this.worldId === 1 && this.roomNumber === 20 &&
+      this.bossSlot === 0 && !this.fasterTwin;
+  }
+  protected override keepBodyOnDefeat(): boolean { return this.isBrambleGunner; }
   /** Scripted warnings and dashes should not be slowed by ordinary ice steering. */
   public get hasScriptedMotion(): boolean {
     return this.windupEndsAt > 0 || this.dashEndsAt > 0;
@@ -290,7 +296,7 @@ export class AdvancedEnemy extends Slime {
           this.bossVolleys++;
           const scaledInterval = this.stats.attackIntervalMs * mode.tempo;
           this.nextShotAt = now + (this.isPoisonAlchemist ? SPORE_THROW_INTERVAL_MS :
-            Math.max(100, scaledInterval / (this.fasterTwin ? 1.5 :
+            Math.max(100, scaledInterval / (this.fasterTwin ? BRAMBLE_CINEMATIC.sentinelAttackRateMultiplier :
               this.worldId === 1 && this.roomNumber === 25 ? 1.5 : 1)));
         }
         // Only explicitly charging bosses use dash logic; other nine archetypes

@@ -12,7 +12,9 @@ describe('world-1 Bramble Gunner health balance', () => {
     const bramble = getEnemyStatsForRoom('boss', 20, 1, 0);
     const bloom = getEnemyStatsForRoom('boss', 20, 1, 1);
     expect(BRAMBLE_GUNNER_HP_MULTIPLIER).toBe(0.7);
-    expect(bramble.maxHp).toBe(Math.round(bloom.maxHp * 0.7));
+    const oldBloomHp = Math.round(bloom.maxHp / 1.5);
+    expect(bramble.maxHp).toBe(Math.round(oldBloomHp * 0.7));
+    expect(bloom.maxHp).toBe(Math.round(oldBloomHp * 1.5));
     expect(bramble.damage).toBe(bloom.damage);
     expect(bramble.attackIntervalMs).toBe(bloom.attackIntervalMs);
 

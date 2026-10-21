@@ -19,6 +19,7 @@ export class InputController {
   private readonly keyboard: Phaser.Input.Keyboard.KeyboardPlugin;
   private lastAim: Vector2Value = { x: 1, y: 0 };
   private lastTouchTime = -Infinity;
+  private enabled = true;
 
   private readonly reset = (): void => {
     this.movementJoystick.reset();
@@ -29,6 +30,7 @@ export class InputController {
   };
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
+    if (!this.enabled) return;
     if (event.ctrlKey || event.altKey || event.metaKey) return;
     const key = normalizeBindKey(event.key);
     if (!key) return;
@@ -49,6 +51,7 @@ export class InputController {
   };
 
   private readonly onMouseDown = (event: MouseEvent): void => {
+    if (!this.enabled) return;
     // Browsers may synthesize a mouse click after a mobile touch. Do not fire
     // an extra bullet or skill when using touch joysticks and ability buttons.
     if (Date.now() - this.lastTouchTime < 850) return;
@@ -129,6 +132,14 @@ export class InputController {
     document.addEventListener('visibilitychange', this.handleVisibilityChange);
   }
 
+  public setEnabled(enabled: boolean): void {
+    if (this.enabled === enabled) return;
+    this.enabled = enabled;
+    this.reset();
+    this.movementJoystick.setEnabled(enabled);
+    this.aimJoystick.setEnabled(enabled);
+  }
+
   public cancelTouches(): void {
     this.movementJoystick.reset();
     this.aimJoystick.reset();
@@ -137,18 +148,21 @@ export class InputController {
   }
 
   public getMovement(): Vector2Value {
+    if (!this.enabled) return {x: 0, y: 0};
     if (this.movementJoystick.isActive) return { ...this.movementJoystick.vector };
     return keyboardVector(this.heldKeys, this.bindings);
   }
 
   /** Consumes one key press; holding the key never repeats a skill. */
   public consumeAbilityPressed(action: 'dash' | 'fireNova' | 'iceBlast'): boolean {
+    if (!this.enabled) return false;
     const pressed = this.pressedAbilities.has(action);
     this.pressedAbilities.delete(action);
     return pressed;
   }
 
   public consumeAbilityReleased(action: 'fireNova' | 'iceBlast'): boolean {
+    if (!this.enabled) return false;
     const released = this.releasedAbilities.has(action);
     this.releasedAbilities.delete(action);
     return released;
@@ -177,6 +191,7 @@ export class InputController {
   }
 
   public isShooting(): boolean {
+    if (!this.enabled) return false;
     if (this.aimJoystick.isActive) {
       const aim = this.aimJoystick.vector;
       return Math.hypot(aim.x, aim.y) > 0;
