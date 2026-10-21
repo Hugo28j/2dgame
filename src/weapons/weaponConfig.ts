@@ -24,7 +24,7 @@ const melee = (config: Omit<WeaponConfig, 'attackMode' | 'projectileSpeed' | 'pr
 }): WeaponConfig => ({ ...config, attackMode: 'melee', projectileSpeed: 0, projectileRange: 0 });
 
 export const WEAPONS: Readonly<Record<WeaponId, WeaponConfig>> = {
-  bow: projectile({ id: 'bow', heroId: 'ranger', name: 'Ascent Bow', description: 'Snelle, precieze pijlen',
+  bow: projectile({ id: 'bow', heroId: 'ranger', name: 'Ascent Bow', description: 'Snelle precieze pijlen; vanaf level 20 twee tegelijk',
     damage: 12, fireRate: 3.5, projectileSpeed: 470, projectileCount: 1, piercing: 0,
     criticalChanceModifier: 0.05, criticalMultiplier: 1.75, specialEffects: [], upgradeLevel: 1,
     unlockCost: 0, projectileRange: 700, effect: 'none', textureKey: 'arrow-placeholder', color: 0x7dd3fc }),
@@ -40,7 +40,7 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponConfig>> = {
     damage: 19, fireRate: 2.2, projectileSpeed: 390, projectileCount: 1, piercing: 0,
     criticalChanceModifier: 0.06, criticalMultiplier: 1.8, specialEffects: ['magic', 'ricochet'], upgradeLevel: 1,
     unlockCost: 145, projectileRange: 650, effect: 'magic', textureKey: 'rune-projectile', color: 0xe9d5ff }),
-  sunblade: melee({ id: 'sunblade', heroId: 'guardian', name: 'Dawnblade', description: 'Snelle whoosh met extra bereik en knockback',
+  sunblade: melee({ id: 'sunblade', heroId: 'guardian', name: 'Dawnblade', description: 'Zwaardzwaai met knockback; bereik verdubbelt geleidelijk tot level 30',
     damage: 42, fireRate: 1.75, projectileCount: 1, piercing: 0, criticalChanceModifier: 0.02,
     criticalMultiplier: 1.7, specialEffects: ['melee', 'knockback'], upgradeLevel: 1, unlockCost: 0,
     effect: 'none', textureKey: 'sun-slash', meleeRange: 96, meleeArc: 1.75, color: 0xfbbf24 }),
@@ -49,8 +49,8 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponConfig>> = {
     damage: 125, fireRate: 0.42, projectileCount: 1, piercing: 0, criticalChanceModifier: 0,
     criticalMultiplier: 1.65, specialEffects: ['melee', 'ground-crack', 'slow'], upgradeLevel: 1, unlockCost: 160,
     effect: 'none', textureKey: 'hammer-swing', meleeRange: 260, meleeArc: 0, color: 0xfde68a }),
-  daggers: projectile({ id: 'daggers', heroId: 'frostblade', name: 'Ice Daggers', description: 'Twee snelle ijsspiezen met groter vliegbereik',
-    damage: 14, fireRate: 5.1, projectileSpeed: 550, projectileCount: 2, piercing: 0,
+  daggers: projectile({ id: 'daggers', heroId: 'frostblade', name: 'Ice Daggers', description: 'Eén snelle ijsdolk; vanaf level 20 twee tegelijk',
+    damage: 14, fireRate: 5.1, projectileSpeed: 550, projectileCount: 1, piercing: 0,
     criticalChanceModifier: 0.09, criticalMultiplier: 1.75, specialEffects: ['spread'], upgradeLevel: 1,
     unlockCost: 135, projectileRange: 365, effect: 'none', textureKey: 'dagger-projectile', color: 0xe0f2fe }),
   iceblade: melee({ id: 'iceblade', heroId: 'frostblade', name: 'Big Wave',
@@ -171,7 +171,9 @@ export function getWeaponStats(id: WeaponId, level: number): WeaponConfig {
 
   return {
     ...base, upgradeLevel: extra + 1, damage, fireRate,
-    projectileCount: id === 'staff' && extra + 1 >= 20 ? 2 : base.projectileCount,
-    meleeRange: id === 'fireorbs' ? rounded(105 + 75 * progress) : base.meleeRange,
+    projectileCount: (id === 'staff' || id === 'bow' || id === 'daggers') &&
+      extra + 1 >= 20 ? 2 : base.projectileCount,
+    meleeRange: id === 'sunblade' ? rounded(base.meleeRange * (1 + progress))
+      : id === 'fireorbs' ? rounded(105 + 75 * progress) : base.meleeRange,
   };
 }

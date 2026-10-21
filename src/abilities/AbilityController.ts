@@ -82,6 +82,8 @@ export class AbilityController {
   private timeWarpUntil = 0;
   private frostSlowUntil = 0;
   private shotgunBuffUntil = 0;
+  private rangerBoostUntil = 0;
+  private rangerBoostMultiplier = 1;
   private readonly phase9Hud: Phaser.GameObjects.Text;
   private readonly shotgunAura: Phaser.GameObjects.Graphics;
   private readonly whiteoutEffects = new Set<Phaser.GameObjects.Graphics>();
@@ -197,6 +199,15 @@ export class AbilityController {
           x+Math.cos(a-.06)*44,y+Math.sin(a-.06)*44);
       }
       this.phase9Hud.setText('SHOTGUN ×7  '+((this.shotgunBuffUntil-now)/1000).toFixed(1)+'s');
+    } else if (!this.blocked() && now < this.rangerBoostUntil) {
+      const x = this.player.x, y = this.player.y;
+      const flicker = Math.sin(now / 105) * 3;
+      this.shotgunAura.lineStyle(3, 0x22d3ee, 0.8);
+      this.shotgunAura.strokeCircle(x, y, 30 + flicker);
+      this.shotgunAura.lineStyle(2, 0xffffff, 0.55);
+      this.shotgunAura.strokeCircle(x, y, 23 + flicker * 0.5);
+      this.phase9Hud.setText('⚡ OVERDRIVE ×' + this.rangerBoostMultiplier.toFixed(2) +
+        '  ' + ((this.rangerBoostUntil - now) / 1000).toFixed(1) + 's');
     } else if (!this.blocked() && now < this.frostSlowUntil) {
       this.phase9Hud.setText('❄ SLOW MOTION  '+((this.frostSlowUntil-now)/1000).toFixed(1)+'s');
     } else this.phase9Hud.setText('');
@@ -266,6 +277,8 @@ export class AbilityController {
     this.timeWarpUntil = 0;
     this.frostSlowUntil = 0;
     this.shotgunBuffUntil = 0;
+    this.rangerBoostUntil = 0;
+    this.rangerBoostMultiplier = 1;
     this.phase9Hud.setText('');
     this.shotgunAura.clear();
     for (const effect of this.whiteoutEffects) {
@@ -404,7 +417,11 @@ export class AbilityController {
         this.pulse(this.player.x, this.player.y, stats.radius, stats.color, stats.durationMs);
         break;
       case 'rapidFire':
-        this.player.boostAttackSpeed(now, stats.durationMs);
+        this.player.boostAttackSpeed(now, stats.durationMs, stats.attackSpeedMultiplier);
+        if (id === 'ranger-volley') {
+          this.rangerBoostUntil = now + stats.durationMs;
+          this.rangerBoostMultiplier = stats.attackSpeedMultiplier;
+        }
         this.pulse(this.player.x, this.player.y, 70, stats.color, 380);
         break;
       case 'sprint':

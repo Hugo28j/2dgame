@@ -294,8 +294,10 @@ export class MainMenuScene extends Phaser.Scene {
       const shownFireRate = 1000 / weaponBaseAttackIntervalMs(stats);
       const attackLabel = id === 'fireorbs'
         ? 'CONTINU · ' + stats.meleeRange.toFixed(0) + ' RANGE'
-        : shownFireRate.toFixed(2) + '/S' + (id === 'staff'
-          ? ' · ' + stats.projectileCount + ' BOLLEN' : '');
+        : shownFireRate.toFixed(2) + '/S' +
+          (id === 'sunblade' ? ' · ' + stats.meleeRange.toFixed(0) + ' RANGE' :
+            (id === 'staff' || id === 'bow' || id === 'daggers')
+              ? ' · ' + stats.projectileCount + ' PROJECTIELEN' : '');
       this.fittedText(98, y - 10, 'LV.' + level + ' · DMG ' + stats.damage +
         ' · ' + attackLabel, 10, COLOR.secondary, 222);
       this.fittedText(43, y + 15, unlocked ? weapon.description :
@@ -440,8 +442,9 @@ export class MainMenuScene extends Phaser.Scene {
         const secondsPerAttack = weaponBaseAttackIntervalMs(stats) / 1000;
         return 'DMG ' + stats.damage.toFixed(1) +
           ' · ' + secondsPerAttack.toFixed(2) + ' SEC/AANVAL' +
-          ' · ' + stats.projectileCount +
-          (stats.attackMode === 'melee' ? ' SLAG' : ' SCHOTEN');
+          (id === 'sunblade' ? ' · RANGE ' + stats.meleeRange.toFixed(0) :
+            ' · ' + stats.projectileCount +
+            (stats.attackMode === 'melee' ? ' SLAG' : ' SCHOTEN'));
       })(),
       level: profile.weaponLevels[id], max: MAX_WEAPON_LEVEL,
       cost: weaponUpgradeCost(profile.weaponLevels[id]),

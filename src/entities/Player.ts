@@ -23,6 +23,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   public readonly maxShieldHp = SHIELD_MAX_HP;
   private readonly invulnerability = new InvulnerabilityWindow();
   private rapidFireUntil = 0;
+  private rapidFireMultiplier = 2.15;
   private sprintUntil = 0;
   private chilledUntil = 0;
   private frozenUntil = 0;
@@ -41,8 +42,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
     this.setVelocity(0, 0);
   }
 
-  public boostAttackSpeed(now: number, durationMs: number): void {
+  public boostAttackSpeed(now: number, durationMs: number, multiplier = 2.15): void {
+    if (!Number.isFinite(durationMs) || durationMs <= 0 ||
+        !Number.isFinite(multiplier) || multiplier <= 0) return;
     this.rapidFireUntil = Math.max(this.rapidFireUntil, now + durationMs);
+    this.rapidFireMultiplier = multiplier;
   }
 
   public boostMovementSpeed(now: number, durationMs: number): void {
@@ -50,7 +54,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   }
 
   public attackSpeedAt(now: number): number {
-    return this.attackSpeed * (now < this.rapidFireUntil ? 2.15 : 1);
+    return this.attackSpeed * (now < this.rapidFireUntil ? this.rapidFireMultiplier : 1);
   }
 
   public movementSpeedAt(now: number): number {

@@ -36,7 +36,8 @@ describe('Frostblade Big Wave replaces the old three-strike sword', () => {
     expect(WEAPONS.daggers.damage).toBe(14);
     expect(WEAPONS.daggers.fireRate).toBe(5.1);
     expect(WEAPONS.daggers.projectileSpeed).toBe(550);
-    expect(WEAPONS.daggers.projectileCount).toBe(2);
+    expect(WEAPONS.daggers.projectileCount).toBe(1);
+    expect(getWeaponStats('daggers', 20).projectileCount).toBe(2);
     expect(WEAPONS.daggers.projectileRange).toBe(365);
   });
 });

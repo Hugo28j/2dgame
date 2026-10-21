@@ -27,7 +27,7 @@ describe('phase 5 heroes and weapons', () => {
     expect(WEAPON_IDS).toHaveLength(14);
     for (const id of HERO_IDS) expect(HERO_WEAPONS[id]).toHaveLength(2);
     expect(WEAPONS.crossbow.piercing).toBeGreaterThan(0);
-    expect(WEAPONS.daggers.projectileCount).toBe(2);
+    expect(WEAPONS.daggers.projectileCount).toBe(1);
     expect(WEAPONS.lightning.effect).toBe('chain-lightning');
     expect(WEAPONS.sunblade.attackMode).toBe('melee');
     expect(getWeaponStats('bow', 4).damage).toBeGreaterThan(getWeaponStats('bow', 1).damage);
