@@ -1018,7 +1018,7 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < FROZEN_BALANCE.snowballWallFragments; i++) {
       const angle = center + (i - 2) * .25;
       const dx = Math.cos(angle), dy = Math.sin(angle);
-      const shot = new EnemyProjectile(this, boulder.x, boulder.y, dx, dy, 245,
+      const shot = new EnemyProjectile(this, boulder.x + dx * 36, boulder.y + dy * 36, dx, dy, 245,
         boulder.owner.stats.damage * .65, 0xcffafe, 'frost-chill');
       addAndLaunch(shot, () => this.enemyProjectiles!.add(shot), { x: dx, y: dy }, 245);
     }
