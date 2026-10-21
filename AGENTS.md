@@ -23,5 +23,9 @@
 
 ## Huidige status
 
-- Actieve status: **fase 8 afgerond + heldgebonden loadouts, abilities en vernieuwde hero-art**.
-- Volgende geplande fase na afzonderlijke goedkeuring: **fase 9 – Visuele afwerking**.
+- De implementatiefases 1–9 staan op `main`.
+- Fase 10 voert een regressie-audit uit van wereld 1 en 2 (elk 30 kamers).
+- De geautomatiseerde status en de lijst van **nog vereiste handmatige browser- en
+  mobiele tests** staan in [docs/phase-10-qa.md](docs/phase-10-qa.md).
+- Geef nooit aan dat een 60-kamer-playthrough op een echte smartphone/laptop of
+  een FPS-stresstest is geslaagd op basis van alleen Vitest of een groene build.
