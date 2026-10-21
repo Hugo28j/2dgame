@@ -802,11 +802,9 @@ export class GameScene extends Phaser.Scene {
     const selected = new Set(chosen);
     this.pendingSpawnIndices = this.pendingSpawnIndices.filter(i => !selected.has(i));
     const spawned = this.enemySpawner.spawnRoom(this.currentRoom, chosen, this.worldId);
-    if (this.worldId === 2) {
-      for (const enemy of spawned) {
-        if (enemy instanceof AdvancedEnemy && enemy.isFrostWitch) this.summonFrostMinions(enemy);
-      }
-    }
+    // Summoners now own their first (350 ms) and repeated summon schedule.
+    // Do not summon at room construction as well: that would duplicate the
+    // Witch's first wave and violate the intended original cooldown.
     this.nextEnemyWaveAt = this.time.now + settings.intervalMs;
     return spawned;
   }
