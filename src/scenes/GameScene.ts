@@ -1701,7 +1701,7 @@ export class GameScene extends Phaser.Scene {
             if (!hit && t>=HEART_TREE.damageAtProgress &&
                 this.player?.active && enemy.active &&
                 enemy.aiState!=='defeated' &&
-                groveTreeHits(site,r,this.player)) {
+                groveTreeHits(site,r*t,this.player)) {
               hit=true;
               this.damagePlayer({damage:enemy.stats.damage*0.62,
                 criticalChance:0,criticalMultiplier:1});
