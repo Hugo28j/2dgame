@@ -24,7 +24,7 @@ describe('clean menu loadout navigation', () => {
     expect(abilityMenuSummary(getAbilityStats('mage-timewarp', 1)))
       .toContain('SLOW MOTION');
     expect(abilityMenuSummary(getAbilityStats('ranger-volley', 1)))
-      .toContain('AI BONDGENOOT');
+      .toContain('1.20× AANVALSSNELHEID');
   });
 
   it('shows relevant combat metrics for every hero ability', () => {
