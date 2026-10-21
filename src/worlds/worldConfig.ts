@@ -32,8 +32,8 @@ export const WORLDS: readonly WorldTheme[] = [
   },
   {
     id: 2, name: 'Frozen Hollow', subtitle: 'IJs, sneeuw en kristalgangen',
-    accent: 0x7dd3fc, floor: 0x132a39, grid: 0x346074, wall: 0x183342,
-    obstacle: 0x356076, obstacleBorder: 0xa5f3fc, bossColor: 0x38bdf8,
+    accent: 0x7dd3fc, floor: 0xd9f1fa, grid: 0xa4d5e7, wall: 0x214456,
+    obstacle: 0x80b9ce, obstacleBorder: 0xe0faff, bossColor: 0x38bdf8,
     hpMultiplier: 1.35, damageMultiplier: 1.2, speedMultiplier: 1.04, attackSpeedMultiplier: 1.05,
     bossNames: ['Glacier Warden', 'Rime Colossus', 'Blizzard Tyrant', 'Snow Sentinel',
       'Icebound Gunner', 'Whiteout Weaver', 'Frost Alchemist', 'Crystal Empress',
