@@ -61,7 +61,8 @@ export class VirtualJoystick {
         fontStyle: 'bold',
       })
       .setOrigin(0.5)
-      .setDepth(102);
+      .setDepth(102)
+      .setScrollFactor(0);
 
     this.zone = scene.add
       .zone(options.x, options.y, options.interactionSize, options.interactionSize)

@@ -17,6 +17,7 @@ import { DashState } from './DashState';
 import { inForwardRectangle, normalizedDirection, rayHitsCircle } from './directedGeometry';
 import { findTeleportDestination, safeBombBlastDistance } from './teleportDestination';
 import type { RoomLayout } from '../rooms/roomConfig';
+import { displayedHp } from '../ui/displayValues';
 
 interface AbilityButton {
   readonly id: AbilityId; readonly x: number; readonly y: number;
@@ -390,7 +391,8 @@ export class AbilityController {
     this.shieldVisual.fillCircle(this.player.x, this.player.y, 39);
     this.shieldVisual.lineStyle(3, 0xfde68a, 0.5 + ratio * 0.5);
     this.shieldVisual.strokeCircle(this.player.x, this.player.y, 39);
-    this.shieldHud.setText('🛡 ' + Math.ceil(this.player.shieldHp) + '/50');
+    this.shieldHud.setText('🛡 ' + displayedHp(this.player.shieldHp) + '/' +
+      displayedHp(this.player.maxShieldHp));
   }
 
   private liveEnemies(): Slime[] {
