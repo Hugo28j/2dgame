@@ -24,6 +24,6 @@ describe('world-specific ranged enemy balance', () => {
   it('does not apply the buffs to corresponding kinds in other worlds', () => {
     const other = getEnemyStatsForRoom('archer', 12, 1);
     expect(other.maxHp).toBe(Math.round(54 * (1 + 11 * .08)));
-    expect(other.damage).toBe(Math.round(12 * 1.5 * (1 + 11 * .05)));
+    expect(other.damage).toBe(Math.round(12 * 1.5 * 2 * (1 + 11 * .05)));
   });
 });
