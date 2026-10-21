@@ -1,4 +1,4 @@
-import type { HeroId } from '../heroes/heroConfig';
+import { HEROES, type HeroId } from '../heroes/heroConfig';
 
 export type WeaponId =
   | 'bow' | 'crossbow' | 'staff' | 'spellbook' | 'sunblade' | 'warhammer'
@@ -115,6 +115,20 @@ export const WARHAMMER_GROUND_SLAM = Object.freeze({
 });
 
 export const MAX_WEAPON_LEVEL = 20;
+/** Guardian's existing weapon damage at every level gets a flat 50% buff.
+ * Not 50% compounded per upgrade — level scaling remains its normal +12%. */
+export const GUARDIAN_WEAPON_DAMAGE_MULTIPLIER = 1.5;
+/** Normal Guardian attack interval at maximum Bulwark Hammer upgrade level,
+ * before run-specific attack speed bonuses / armor bonuses. */
+export const WARHAMMER_MAX_ATTACK_INTERVAL_MS = 1500;
+
+/** Base hero attack-speed stat is also applied by WeaponController. This
+ * reflects the actual no-buffs timing players experience in combat. */
+export function weaponBaseAttackIntervalMs(
+  config: Pick<WeaponConfig, 'fireRate' | 'heroId'>,
+): number {
+  return fireIntervalMs(config.fireRate * HEROES[config.heroId].stats.attackSpeed);
+}
 export function weaponUpgradeCost(level: number): number {
   return 30 + Math.max(0, level - 1) * 25;
 }
@@ -125,7 +139,19 @@ export function fireIntervalMs(fireRate: number): number {
 export function getWeaponStats(id: WeaponId, level: number): WeaponConfig {
   const base = WEAPONS[id];
   const extra = Math.max(0, Math.min(MAX_WEAPON_LEVEL, Math.floor(level)) - 1);
+  // Keep the hammer's original base attack rate and gradually shorten
+  // its interval so a level-20 Guardian attacks once every exactly 1.5 s.
+  // Do not round its effective fireRate: rounding to 2 decimals would
+  // noticeably alter the resulting in-game attack interval.
+  const maxHammerFireRate = 1000 /
+    (WARHAMMER_MAX_ATTACK_INTERVAL_MS * HEROES.guardian.stats.attackSpeed);
+  const fireRate = id === 'warhammer'
+    ? base.fireRate + (maxHammerFireRate - base.fireRate) *
+        (extra / (MAX_WEAPON_LEVEL - 1))
+    : Math.round(base.fireRate * (1 + 0.02 * extra) * 100) / 100;
+  const guardianDamage = base.heroId === 'guardian'
+    ? GUARDIAN_WEAPON_DAMAGE_MULTIPLIER : 1;
   return { ...base, upgradeLevel: extra + 1,
-    damage: Math.round(base.damage * (1 + 0.12 * extra) * 10) / 10,
-    fireRate: Math.round(base.fireRate * (1 + 0.02 * extra) * 100) / 100 };
+    damage: Math.round(base.damage * (1 + 0.12 * extra) * guardianDamage * 10) / 10,
+    fireRate };
 }
