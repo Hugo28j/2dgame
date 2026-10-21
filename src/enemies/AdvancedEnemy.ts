@@ -81,6 +81,10 @@ export class AdvancedEnemy extends Slime {
   }
 
   public get isBoss(): boolean { return this.kind === 'boss'; }
+  /** Scripted warnings and dashes should not be slowed by ordinary ice steering. */
+  public get hasScriptedMotion(): boolean {
+    return this.windupEndsAt > 0 || this.dashEndsAt > 0;
+  }
   public get isGlacierWarden(): boolean {
     return this.isBoss && this.worldId === 2 && this.roomNumber === 5;
   }
