@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { DESKTOP_GAME_WIDTH, MOBILE_GAME_WIDTH } from '../src/config/constants';
+import {
+  DESKTOP_GAME_WIDTH, GAME_SCENE_KEY, MENU_SCENE_KEY, MOBILE_GAME_WIDTH,
+} from '../src/config/constants';
 import { displayedHp } from '../src/ui/displayValues';
 import {
   clientBoundsForGameButton, clientPointInGame, containsScreenPoint, endScreenLayout,
+  sceneKeyForEndScreenAction,
 } from '../src/ui/endScreenLayout';
 
 describe('visible HP values', () => {
@@ -20,6 +23,11 @@ describe('visible HP values', () => {
 });
 
 describe('win and death screen button geometry', () => {
+  it('routes replay to the game and menu to the main menu', () => {
+    expect(sceneKeyForEndScreenAction('replay')).toBe(GAME_SCENE_KEY);
+    expect(sceneKeyForEndScreenAction('menu')).toBe(MENU_SCENE_KEY);
+  });
+
   it('centers the visual and touch targets at mobile and desktop widths', () => {
     for (const width of [MOBILE_GAME_WIDTH, DESKTOP_GAME_WIDTH]) {
       const layout = endScreenLayout(width);

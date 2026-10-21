@@ -7,7 +7,7 @@ import { progressStore } from '../progression/ProgressStore';
 import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
 import { getWorld } from '../worlds/worldConfig';
 import {
-  clientBoundsForGameButton, endScreenLayout,
+  clientBoundsForGameButton, endScreenLayout, sceneKeyForEndScreenAction,
 } from '../ui/endScreenLayout';
 
 interface GameOverData {
@@ -148,8 +148,10 @@ export class GameOverScene extends Phaser.Scene {
       if (this.scene.isSleeping(GAME_SCENE_KEY)) this.scene.stop(GAME_SCENE_KEY);
       this.scene.start(target);
     };
-    button(layout.replay, 'OPNIEUW SPELEN', () => navigate(GAME_SCENE_KEY), true);
-    button(layout.menu, 'HOOFDMENU', () => navigate(MENU_SCENE_KEY));
+    button(layout.replay, 'OPNIEUW SPELEN',
+      () => navigate(sceneKeyForEndScreenAction('replay')), true);
+    button(layout.menu, 'HOOFDMENU',
+      () => navigate(sceneKeyForEndScreenAction('menu')));
 
     // Native HTML controls sit over the canvas buttons. They are intentionally
     // transparent: Phaser keeps drawing the visuals, while the browser handles
@@ -191,8 +193,10 @@ export class GameOverScene extends Phaser.Scene {
         domButton.element.style.height = `${bounds.height}px`;
       }
     };
-    addDomButton(layout.replay, 'Opnieuw spelen', () => navigate(GAME_SCENE_KEY));
-    addDomButton(layout.menu, 'Hoofdmenu', () => navigate(MENU_SCENE_KEY));
+    addDomButton(layout.replay, 'Opnieuw spelen',
+      () => navigate(sceneKeyForEndScreenAction('replay')));
+    addDomButton(layout.menu, 'Hoofdmenu',
+      () => navigate(sceneKeyForEndScreenAction('menu')));
     syncDomButtons();
     window.addEventListener('resize', syncDomButtons);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
