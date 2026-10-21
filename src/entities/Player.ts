@@ -3,7 +3,7 @@ import Phaser from 'phaser';
 import type { Damageable } from '../combat/damage';
 import { InvulnerabilityWindow } from '../combat/InvulnerabilityWindow';
 import { SHIELD_MAX_HP, absorbWithShield } from '../abilities/ShieldHealth';
-import { FROZEN_EARLY } from '../enemies/frozenEarlyGame';
+import { FROZEN_EARLY, frostMovementFactor } from '../enemies/frozenEarlyGame';
 import { HEROES, getHeroStats, type HeroId } from '../heroes/heroConfig';
 import type { Vector2Value } from '../input/vectorMath';
 import { ICE_PLAYER_STEERING, iceVelocity } from '../worlds/iceMotion';
@@ -26,16 +26,25 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   private rapidFireMultiplier = 2.15;
   private sprintUntil = 0;
   private chilledUntil = 0;
+  private witchSlowedUntil = 0;
   private frozenUntil = 0;
   public get isFrozen(): boolean { return this.scene.time.now < this.frozenUntil; }
-  public get isChilled(): boolean { return this.scene.time.now < this.chilledUntil; }
+  public get isChilled(): boolean {
+    return this.scene.time.now < this.chilledUntil || this.scene.time.now < this.witchSlowedUntil;
+  }
   public clearFrost(): void {
     this.chilledUntil = 0;
+    this.witchSlowedUntil = 0;
     this.frozenUntil = 0;
   }
 
   public chill(now: number): void {
     this.chilledUntil = Math.max(this.chilledUntil, now + FROZEN_EARLY.chillDurationMs);
+  }
+  /** Witch ice-burst slows for three seconds; it never stops movement. */
+  public slowFromWitch(now: number): void {
+    this.witchSlowedUntil = Math.max(this.witchSlowedUntil,
+      now + FROZEN_EARLY.witchSlowDurationMs);
   }
   public freeze(now: number): void {
     this.frozenUntil = Math.max(this.frozenUntil, now + FROZEN_EARLY.freezeDurationMs);
@@ -59,8 +68,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
 
   public movementSpeedAt(now: number): number {
     if (now < this.frozenUntil) return 0;
-    return this.movementSpeed * (now < this.sprintUntil ? 1.65 : 1) *
-      (now < this.chilledUntil ? FROZEN_EARLY.chillSpeedFactor : 1);
+    // Concurrent Archer and Witch slows never combine into near-paralysis.
+    const frostFactor = frostMovementFactor(now, this.chilledUntil, this.witchSlowedUntil);
+    return this.movementSpeed * (now < this.sprintUntil ? 1.65 : 1) * frostFactor;
   }
 
   public constructor(

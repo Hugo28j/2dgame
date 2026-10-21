@@ -12,7 +12,9 @@ export const FROZEN_EARLY = Object.freeze({
   witchOrbDamageFactor: 0.8,
   chillDurationMs: 1900,
   chillSpeedFactor: 0.55,
-  freezeDurationMs: 2300,
+  freezeDurationMs: 2300, // Legacy hard-freeze setting; witches no longer use it.
+  witchSlowDurationMs: 3000,
+  witchSlowSpeedFactor: 0.5,
 });
 
 export function earlyFrozenEnemy(room: number, spawnIndex: number): 'archer' | 'mage' | 'boss' {
@@ -28,4 +30,13 @@ export function canSummonFrostMinions(
   return count > 0 &&
     aliveSummons + count <= FROZEN_EARLY.maxActiveSummonsPerRoom &&
     summonedByWitch + count <= FROZEN_EARLY.maxSummonsPerWitch;
+}
+
+/** Concurrent Archer/Witch chills never multiply into an unintended root. */
+export function frostMovementFactor(now: number, archerChilledUntil: number,
+  witchSlowedUntil: number): number {
+  return Math.min(
+    now < archerChilledUntil ? FROZEN_EARLY.chillSpeedFactor : 1,
+    now < witchSlowedUntil ? FROZEN_EARLY.witchSlowSpeedFactor : 1,
+  );
 }
