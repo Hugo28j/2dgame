@@ -39,9 +39,9 @@ describe('Guardian Dawnblade', () => {
     const edgeEnemy = { x: 90 * Math.cos(nearArcEdge), y: 90 * Math.sin(nearArcEdge) };
     expect(isInsideMeleeSwing(origin, aim, edgeEnemy, range, arc)).toBe(false);
     expect(isInsideMeleeSwing(origin, aim, edgeEnemy, range, arc, 20)).toBe(true);
-    // No change for other weapons, which still use centre-only geometry.
-    expect(isInsideMeleeSwing(origin, aim, { x: 80, y: 0 },
-      WEAPONS.iceblade.meleeRange, WEAPONS.iceblade.meleeArc)).toBe(false);
+    // Normal sector-based melee still uses center-point geometry; Big Wave uses its own hitbox.
+    expect(isInsideMeleeSwing(origin, aim, { x: 130, y: 0 },
+      WEAPONS.stormlance.meleeRange, WEAPONS.stormlance.meleeArc)).toBe(false);
   });
 
   it('has slightly longer range and a distinct knockback effect', () => {

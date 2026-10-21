@@ -31,7 +31,7 @@ describe('phase 5 heroes and weapons', () => {
     expect(WEAPONS.lightning.effect).toBe('chain-lightning');
     expect(WEAPONS.sunblade.attackMode).toBe('melee');
     expect(getWeaponStats('bow', 4).damage).toBeGreaterThan(getWeaponStats('bow', 1).damage);
-    expect(getWeaponStats('bow', 100)).toEqual(getWeaponStats('bow', 20));
+    expect(getWeaponStats('bow', 100)).toEqual(getWeaponStats('bow', 30));
     expect(weaponUpgradeCost(3)).toBeGreaterThan(weaponUpgradeCost(2));
   });
 });

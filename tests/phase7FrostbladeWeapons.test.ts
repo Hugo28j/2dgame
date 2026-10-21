@@ -1,65 +1,47 @@
 import { describe, expect, it } from 'vitest';
-import {
-  GLACIAL_COMBO, glacialStrikeDelayMs, glacialStrikeHits, glacialStrikeShape,
-  nextGlacialStrike, type GlacialStrike,
-} from '../src/weapons/glacialCombo';
+import { BIG_WAVE, bigWaveHitKind } from '../src/weapons/elementalMelee';
 import { ICE_SPIKE, iceSpikeCollisionSize } from '../src/weapons/iceSpike';
-import { WEAPONS, getWeaponStats } from '../src/weapons/weaponConfig';
+import { HEROES } from '../src/heroes/heroConfig';
+import { WEAPONS, getWeaponStats, weaponBaseAttackIntervalMs } from '../src/weapons/weaponConfig';
 
-describe('Phase 7 Glacial Blade three-stage combo', () => {
-  it('executes exactly slash, opposite slash, thrust and loops', () => {
-    let strike: GlacialStrike = 0;
-    const sequence: number[] = [];
-    for (let i=0;i<7;i++) {
-      sequence.push(strike);
-      strike = nextGlacialStrike(strike);
-    }
-    expect(sequence).toEqual([0,1,2,0,1,2,0]);
-    expect(glacialStrikeShape(0,72).kind).toBe('slash');
-    expect(glacialStrikeShape(1,72).kind).toBe('slash');
-    expect(glacialStrikeShape(2,72).kind).toBe('thrust');
+describe('Frostblade Big Wave replaces the old three-strike sword', () => {
+  it('uses a short travelling melee wave, with splash edges and knockback', () => {
+    const wave = WEAPONS.iceblade;
+    expect(wave.name).toBe('Big Wave');
+    expect(wave.attackMode).toBe('melee');
+    expect(wave.meleeRange).toBe(130);
+    expect(wave.specialEffects).toContain('splash');
+    expect(wave.specialEffects).toContain('knockback');
+    expect(BIG_WAVE.durationMs).toBeGreaterThan(200);
+    const owner={x:0,y:0},direction={x:1,y:0};
+    expect(bigWaveHitKind(owner,direction,{x:65,y:20},60,130)).toBe('direct');
+    expect(bigWaveHitKind(owner,direction,{x:100,y:92},130,130)).toBe('splash');
+    expect(bigWaveHitKind(owner,direction,{x:100,y:125},130,130)).toBeNull();
+    expect(bigWaveHitKind(owner,direction,{x:110,y:0},50,130)).toBeNull();
+    expect(bigWaveHitKind(owner,direction,{x:185,y:0},130,130)).toBeNull();
+    expect(bigWaveHitKind(owner,direction,{x:-35,y:0},130,130)).toBeNull();
+    expect(bigWaveHitKind(owner,{x:0,y:1},{x:18,y:90},130,130)).toBe('direct');
   });
-  it('third thrust has substantially more forward reach and less sideways width', () => {
-    const first=glacialStrikeShape(0,72);
-    const second=glacialStrikeShape(1,72);
-    const third=glacialStrikeShape(2,72);
-    expect(first.reach).toBeGreaterThan(72);
-    expect(second.reach).toBeGreaterThan(72);
-    expect(third.reach).toBeGreaterThan(second.reach * 1.8);
-    expect(third.halfWidth).toBeLessThan(20);
-    const owner={x:0,y:0},aim={x:1,y:0};
-    expect(glacialStrikeHits(0,owner,aim,{x:50,y:0},72,0)).toBe(true);
-    expect(glacialStrikeHits(0,owner,aim,{x:82,y:0},72,0)).toBe(true);
-    expect(glacialStrikeHits(1,owner,aim,{x:91,y:0},72,0)).toBe(true);
-    expect(glacialStrikeHits(2,owner,aim,{x:165,y:0},72,0)).toBe(true);
-    expect(glacialStrikeHits(1,owner,aim,{x:50,y:0},72,0)).toBe(true);
-    expect(glacialStrikeHits(0,owner,aim,{x:112,y:0},72,0)).toBe(false);
-    expect(glacialStrikeHits(1,owner,aim,{x:112,y:0},72,0)).toBe(false);
-    expect(glacialStrikeHits(2,owner,aim,{x:112,y:0},72,0)).toBe(true);
-    expect(glacialStrikeHits(2,owner,aim,{x:55,y:22},72,0)).toBe(false);
-    expect(glacialStrikeHits(2,owner,aim,{x:-9,y:0},72,0)).toBe(false);
-    expect(glacialStrikeHits(2,owner,aim,{x:155,y:0},72,0.2)).toBe(true);
+  it('scales weapon damage from 30 to 120 and real attack speed from 0.7 to 1.3 per second', () => {
+    const initial=getWeaponStats('iceblade',1),max=getWeaponStats('iceblade',30);
+    expect(initial.damage).toBe(30);
+    expect(max.damage).toBe(120);
+    expect(1000/weaponBaseAttackIntervalMs(initial)).toBeCloseTo(.7,8);
+    expect(1000/weaponBaseAttackIntervalMs(max)).toBeCloseTo(1.3,8);
+    expect(initial.fireRate*HEROES.frostblade.stats.attackSpeed).toBeCloseTo(.7,8);
+    expect(getWeaponStats('iceblade',20).damage).toBeGreaterThan(30);
+    expect(getWeaponStats('iceblade',20).damage).toBeLessThan(120);
   });
-  it('has a longer recovery after stab, scaled by speed upgrades', () => {
-    const rate=getWeaponStats('iceblade',1).fireRate;
-    expect(GLACIAL_COMBO.recoveryAnimationMs).toBeGreaterThan(GLACIAL_COMBO.slashAnimationMs);
-    expect(glacialStrikeDelayMs(2,rate)).toBeGreaterThan(glacialStrikeDelayMs(1,rate)*2);
-    expect(glacialStrikeDelayMs(0,rate*1.5)).toBeLessThan(glacialStrikeDelayMs(0,rate));
-    expect(glacialStrikeDelayMs(2,rate*1.5)).toBeLessThan(glacialStrikeDelayMs(2,rate));
-  });
-  it('does not change other weapons or Frostblade Ice Dagger balance', () => {
-    expect(WEAPONS.iceblade.attackMode).toBe('melee');
+  it('preserves the separate Ice Daggers', () => {
     expect(WEAPONS.daggers.damage).toBe(14);
     expect(WEAPONS.daggers.fireRate).toBe(5.1);
     expect(WEAPONS.daggers.projectileSpeed).toBe(550);
     expect(WEAPONS.daggers.projectileCount).toBe(2);
     expect(WEAPONS.daggers.projectileRange).toBe(365);
-    expect(WEAPONS.iceblade.meleeRange).toBe(72);
-    expect(WEAPONS.sunblade.fireRate).toBe(1.75);
   });
 });
 
-describe('Phase 7 Ice Daggers sharp crystal form and collider', () => {
+describe('Ice Daggers crystal form and collider', () => {
   it('uses an elongated narrow core, without a huge invisible body', () => {
     expect(ICE_SPIKE.textureWidth).toBeGreaterThan(ICE_SPIKE.textureHeight*2);
     expect(ICE_SPIKE.coreLength).toBeLessThan(ICE_SPIKE.textureWidth);

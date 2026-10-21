@@ -30,7 +30,7 @@ describe('Guardian — both weapons +50% damage at EVERY upgrade level', () => {
     expect(getWeaponStats('sunblade', 20).damage).toBe(206.7);
   });
 
-  it('caps both weapons at level 20 for saved max-level characters', () => {
+  it('caps both weapons at level 30 for saved max-level characters', () => {
     for (const id of HERO_WEAPONS.guardian) {
       expect(getWeaponStats(id, MAX_WEAPON_LEVEL)).toEqual(getWeaponStats(id, 999));
       expect(getWeaponStats(id, 1)).toEqual(getWeaponStats(id, -2));
@@ -39,27 +39,28 @@ describe('Guardian — both weapons +50% damage at EVERY upgrade level', () => {
 });
 
 describe('Bulwark Hammer upgrades gradually speed up the actual attacks', () => {
-  it('starts with its original speed and reaches 1.50 seconds on a base Guardian at level 20', () => {
+  it('reaches 1.50 seconds at level 20, then 1.25 seconds at level 30', () => {
     expect(getWeaponStats('warhammer', 1).fireRate).toBe(WEAPONS.warhammer.fireRate);
     expect(WARHAMMER_MAX_ATTACK_INTERVAL_MS).toBe(1500);
-    const hammer20 = getWeaponStats('warhammer', MAX_WEAPON_LEVEL);
-    // This is the exact rate used in WeaponController, including Guardian's
-    // native 0.92 attack-speed multiplier, before any run/armor bonuses.
+    const hammer20 = getWeaponStats('warhammer', 20);
+    const hammer30 = getWeaponStats('warhammer', 30);
+    // Both milestones use the Guardian's native 0.92 multiplier.
     const actualInterval = fireIntervalMs(
       hammer20.fireRate * HEROES.guardian.stats.attackSpeed);
     expect(actualInterval).toBeCloseTo(1500, 8);
     expect(weaponBaseAttackIntervalMs(hammer20)).toBeCloseTo(1500, 8);
+    expect(weaponBaseAttackIntervalMs(hammer30)).toBeCloseTo(1250, 8);
     expect(weaponBaseAttackIntervalMs(getWeaponStats('warhammer', 1))).toBeGreaterThan(2500);
   });
 
-  it('has no plateaus or sudden regressions from upgrades 1 through 20', () => {
+  it('has no plateaus or sudden regressions from upgrades 1 through 30', () => {
     let lastRate=0,lastInterval=Infinity;
     for (let level=1;level<=MAX_WEAPON_LEVEL;level++){
       const config=getWeaponStats('warhammer',level);
       const interval=weaponBaseAttackIntervalMs(config);
       expect(config.fireRate).toBeGreaterThan(lastRate);
       expect(interval).toBeLessThan(lastInterval);
-      expect(interval).toBeGreaterThanOrEqual(1500-1e-7);
+      expect(interval).toBeGreaterThanOrEqual(1250-1e-7);
       lastRate=config.fireRate;
       lastInterval=interval;
     }
@@ -69,7 +70,7 @@ describe('Bulwark Hammer upgrades gradually speed up the actual attacks', () => 
     expect(getWeaponStats('sunblade',20).fireRate).toBe(
       Math.round(WEAPONS.sunblade.fireRate*(1+0.02*19)*100)/100);
     for(const [id,weapon] of Object.entries(WEAPONS)) {
-      if (id === 'warhammer') continue;
+      if (id === 'warhammer' || id === 'iceblade' || id === 'fireorbs') continue;
       for(const level of [1,3,10,20]){
         const extra=level-1;
         expect(getWeaponStats(weapon.id,level).fireRate).toBe(

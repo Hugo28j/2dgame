@@ -32,7 +32,7 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponConfig>> = {
     damage: 46, fireRate: 1.45, projectileSpeed: 590, projectileCount: 1, piercing: 1,
     criticalChanceModifier: 0.03, criticalMultiplier: 1.9, specialEffects: ['pierce'], upgradeLevel: 1,
     unlockCost: 110, projectileRange: 760, effect: 'none', textureKey: 'bolt-projectile', color: 0xfca5a5 }),
-  staff: projectile({ id: 'staff', heroId: 'mage', name: 'Arcane Staff', description: 'Gebalanceerde magische bollen',
+  staff: projectile({ id: 'staff', heroId: 'mage', name: 'Arcane Staff', description: 'Magische bollen; vanaf wapenlevel 20 twee tegelijk',
     damage: 31, fireRate: 2.5, projectileSpeed: 360, projectileCount: 1, piercing: 0,
     criticalChanceModifier: 0.04, criticalMultiplier: 1.8, specialEffects: ['magic'], upgradeLevel: 1,
     unlockCost: 0, projectileRange: 680, effect: 'magic', textureKey: 'magic-projectile', color: 0xc084fc }),
@@ -53,18 +53,23 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponConfig>> = {
     damage: 14, fireRate: 5.1, projectileSpeed: 550, projectileCount: 2, piercing: 0,
     criticalChanceModifier: 0.09, criticalMultiplier: 1.75, specialEffects: ['spread'], upgradeLevel: 1,
     unlockCost: 135, projectileRange: 365, effect: 'none', textureKey: 'dagger-projectile', color: 0xe0f2fe }),
-  iceblade: melee({ id: 'iceblade', heroId: 'frostblade', name: 'Glacial Blade', description: 'Snelle ijzige melee-combo',
-    damage: 33, fireRate: 2.7, projectileCount: 1, piercing: 0, criticalChanceModifier: 0.1,
-    criticalMultiplier: 2, specialEffects: ['melee'], upgradeLevel: 1, unlockCost: 0,
-    effect: 'none', textureKey: 'ice-slash', meleeRange: 72, meleeArc: 1.35, color: 0x7dd3fc }),
+  iceblade: melee({ id: 'iceblade', heroId: 'frostblade', name: 'Big Wave',
+    description: 'Brede ijsgolf die vooruit rolt, splash damage doet en vijanden terugduwt',
+    damage: 30, fireRate: 0.7 / HEROES.frostblade.stats.attackSpeed, projectileCount: 1,
+    piercing: 0, criticalChanceModifier: 0.1, criticalMultiplier: 2,
+    specialEffects: ['melee', 'wave', 'knockback', 'splash'], upgradeLevel: 1, unlockCost: 0,
+    effect: 'none', textureKey: 'ice-slash', meleeRange: 130, meleeArc: 1.4, color: 0x7dd3fc }),
   emberstaff: projectile({ id: 'emberstaff', heroId: 'pyromancer', name: 'Ember Staff', description: 'Zware vuurbollen met veel schade',
     damage: 39, fireRate: 1.9, projectileSpeed: 345, projectileCount: 1, piercing: 0,
     criticalChanceModifier: 0.03, criticalMultiplier: 1.85, specialEffects: ['magic'], upgradeLevel: 1,
     unlockCost: 0, projectileRange: 620, effect: 'magic', textureKey: 'ember-projectile', color: 0xfb923c }),
-  fireorbs: projectile({ id: 'fireorbs', heroId: 'pyromancer', name: 'Phoenix Orbs', description: 'Drie vurige projectielen in een waaier',
-    damage: 18, fireRate: 1.7, projectileSpeed: 390, projectileCount: 3, piercing: 0,
-    criticalChanceModifier: 0.04, criticalMultiplier: 1.8, specialEffects: ['magic', 'spread'], upgradeLevel: 1,
-    unlockCost: 190, projectileRange: 600, effect: 'magic', textureKey: 'fire-projectile', color: 0xfdba74 }),
+  fireorbs: melee({ id: 'fireorbs', heroId: 'pyromancer', name: 'Inferno Flamethrower',
+    description: 'Doorlopende vuurkegel: vlamschade en brandtikken elke seconde',
+    damage: 10, fireRate: 1, projectileCount: 0, piercing: 0,
+    criticalChanceModifier: 0.04, criticalMultiplier: 1.8,
+    specialEffects: ['melee', 'flame', 'burn'], upgradeLevel: 1,
+    unlockCost: 190, effect: 'none', textureKey: 'fire-projectile',
+    meleeRange: 105, meleeArc: 1.0, color: 0xfdba74 }),
   lightning: projectile({ id: 'lightning', heroId: 'stormstrider', name: 'Storm Wand', description: 'Bliksem springt naar extra vijanden',
     damage: 27, fireRate: 2.2, projectileSpeed: 440, projectileCount: 1, piercing: 0,
     criticalChanceModifier: 0.04, criticalMultiplier: 1.8, specialEffects: ['chain-lightning'], upgradeLevel: 1,
@@ -114,13 +119,13 @@ export const WARHAMMER_GROUND_SLAM = Object.freeze({
   crackAnimationMs: 650,
 });
 
-export const MAX_WEAPON_LEVEL = 20;
+export const MAX_WEAPON_LEVEL = 30;
 /** Guardian's existing weapon damage at every level gets a flat 50% buff.
  * Not 50% compounded per upgrade — level scaling remains its normal +12%. */
 export const GUARDIAN_WEAPON_DAMAGE_MULTIPLIER = 1.5;
-/** Normal Guardian attack interval at maximum Bulwark Hammer upgrade level,
- * before run-specific attack speed bonuses / armor bonuses. */
+/** Preserve the old level-20 hammer attack time, then continue improving to level 30. */
 export const WARHAMMER_MAX_ATTACK_INTERVAL_MS = 1500;
+export const WARHAMMER_LEVEL30_ATTACK_INTERVAL_MS = 1250;
 
 /** Base hero attack-speed stat is also applied by WeaponController. This
  * reflects the actual no-buffs timing players experience in combat. */
@@ -136,25 +141,37 @@ export function fireIntervalMs(fireRate: number): number {
   if (fireRate <= 0) throw new Error('Fire rate must be greater than zero.');
   return 1000 / fireRate;
 }
+/** Existing weapons keep their first 20 levels and extend naturally through level 30.
+ * Special weapons use explicit end-point interpolation for requested combat tuning. */
 export function getWeaponStats(id: WeaponId, level: number): WeaponConfig {
   const base = WEAPONS[id];
   const extra = Math.max(0, Math.min(MAX_WEAPON_LEVEL, Math.floor(level)) - 1);
-  // Keep the hammer's original base attack rate and gradually shorten
-  // its interval so a level-20 Guardian attacks once every exactly 1.5 s.
-  // Do not round its effective fireRate: rounding to 2 decimals would
-  // noticeably alter the resulting in-game attack interval.
-  const maxHammerFireRate = 1000 /
+  const progress = extra / (MAX_WEAPON_LEVEL - 1);
+  const rounded = (value: number): number => Math.round(value * 10) / 10;
+
+  const hammerLevel20 = 1000 /
     (WARHAMMER_MAX_ATTACK_INTERVAL_MS * HEROES.guardian.stats.attackSpeed);
-  const fireRate = id === 'warhammer'
-    ? base.fireRate + (maxHammerFireRate - base.fireRate) *
-        (extra / (MAX_WEAPON_LEVEL - 1))
+  const hammerLevel30 = 1000 /
+    (WARHAMMER_LEVEL30_ATTACK_INTERVAL_MS * HEROES.guardian.stats.attackSpeed);
+  const hammerRate = extra <= 19
+    ? base.fireRate + (hammerLevel20 - base.fireRate) * extra / 19
+    : hammerLevel20 + (hammerLevel30 - hammerLevel20) * (extra - 19) / 10;
+  const fireRate = id === 'warhammer' ? hammerRate
+    : id === 'iceblade' ? (0.7 + 0.6 * progress) / HEROES.frostblade.stats.attackSpeed
+    : id === 'fireorbs' ? base.fireRate // Continuous contact flame: no discrete cooldown.
     : Math.round(base.fireRate * (1 + 0.02 * extra) * 100) / 100;
-  // First apply the EXISTING level scaling/rounding, then boost that
-  // level's original damage by 50%. This preserves precisely the same
-  // level-to-level growth and avoids compounding a bonus per upgrade.
-  const previousDamage = Math.round(base.damage * (1 + 0.12 * extra) * 10) / 10;
-  const damage = base.heroId === 'guardian'
-    ? Math.round(previousDamage * GUARDIAN_WEAPON_DAMAGE_MULTIPLIER * 10) / 10
-    : previousDamage;
-  return { ...base, upgradeLevel: extra + 1, damage, fireRate };
+
+  // Guardian's existing 50% buff applies once, including the new ten levels.
+  const normallyScaled = rounded(base.damage * (1 + 0.12 * extra));
+  const damage = id === 'iceblade' ? rounded(30 + 90 * progress)
+    : id === 'fireorbs' ? rounded(10 + 90 * progress)
+    : base.heroId === 'guardian'
+      ? rounded(normallyScaled * GUARDIAN_WEAPON_DAMAGE_MULTIPLIER)
+      : normallyScaled;
+
+  return {
+    ...base, upgradeLevel: extra + 1, damage, fireRate,
+    projectileCount: id === 'staff' && extra + 1 >= 20 ? 2 : base.projectileCount,
+    meleeRange: id === 'fireorbs' ? rounded(105 + 75 * progress) : base.meleeRange,
+  };
 }
