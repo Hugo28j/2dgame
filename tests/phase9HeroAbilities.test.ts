@@ -45,8 +45,13 @@ describe('Phase 9 — Ranger eight-second shotgun',()=>{
     expect(WEAPONS.bow.id).toBe('bow');
     expect(WEAPONS.crossbow.id).toBe('crossbow');
     const p=defaultProfile();
+    // A valid Ranger/crossbow profile requires chapter progress 10 and
+    // Ranger hero level 10 before the alternate weapon is selectable.
     const rangerProfile=validateProfile({...p,selectedHero:'ranger',
+      highestRoom:10,worldBestRooms:[10,...p.worldBestRooms.slice(1)],
+      heroLevels:{...p.heroLevels,ranger:20},
       selectedWeapon:'crossbow',selectedWeapons:{...p.selectedWeapons,ranger:'crossbow'},
+      unlockedHeroes:[...p.unlockedHeroes,'ranger'],
       unlockedWeapons:[...p.unlockedWeapons,'crossbow']});
     expect(rangerProfile.selectedWeapon).toBe('crossbow');
   });
