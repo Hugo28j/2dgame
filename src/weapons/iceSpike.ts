@@ -14,7 +14,7 @@ export const ICE_SPIKE = Object.freeze({
 export function iceSpikeCollisionSize(angle: number): { width: number; height: number } {
   const cos = Math.abs(Math.cos(angle)), sin = Math.abs(Math.sin(angle));
   return {
-    width: Math.max(6, Math.ceil(ICE_SPIKE.coreLength * cos + ICE_SPIKE.coreThickness * sin)),
-    height: Math.max(6, Math.ceil(ICE_SPIKE.coreLength * sin + ICE_SPIKE.coreThickness * cos)),
+    width: Math.max(6, Math.ceil(ICE_SPIKE.coreLength * cos + ICE_SPIKE.coreThickness * sin - 1e-8)),
+    height: Math.max(6, Math.ceil(ICE_SPIKE.coreLength * sin + ICE_SPIKE.coreThickness * cos - 1e-8)),
   };
 }
