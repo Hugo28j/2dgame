@@ -12,7 +12,9 @@ export const FROZEN_EARLY = Object.freeze({
   witchOrbDamageFactor: 0.8,
   chillDurationMs: 1900,
   chillSpeedFactor: 0.55,
-  freezeDurationMs: 2300,
+  freezeDurationMs: 2300, // Legacy hard-freeze setting; witches no longer use it.
+  witchSlowDurationMs: 3000,
+  witchSlowSpeedFactor: 0.5,
 });
 
 export function earlyFrozenEnemy(room: number, spawnIndex: number): 'archer' | 'mage' | 'boss' {
