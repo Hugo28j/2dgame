@@ -38,7 +38,7 @@ export class WeaponController {
   public get attackMode(): 'melee' | 'projectile' { return this.config.attackMode; }
   public get config() { return getWeaponStats(this.weaponId, this.upgradeLevel); }
   /** Transient override: never alters weaponId, weapon level, save data or inventory. */
-  public activateShotgunBuff(now: number, damage: number, durationMs = SHOTGUN_TRANSFORM.durationMs): boolean {
+  public activateShotgunBuff(now: number, damage: number, durationMs: number = SHOTGUN_TRANSFORM.durationMs): boolean {
     if (this.owner.heroId !== 'ranger' || !(durationMs > 0) || !(damage > 0) ||
         !Number.isFinite(now) || now < 0 || now < this.shotgunUntil) return false;
     this.shotgunUntil = now + durationMs;
