@@ -8,16 +8,19 @@ import type { Vector2Value } from '../input/vectorMath';
 import { fireIntervalMs, getWeaponStats, WARHAMMER_GROUND_SLAM, type WeaponId } from './weaponConfig';
 import { isInsideMeleeSwing } from './meleeCombat';
 import { inForwardRectangle, normalizedDirection } from '../abilities/directedGeometry';
-import { GLACIAL_COMBO, glacialStrikeDelayMs, glacialStrikeHits,
-  glacialStrikeShape, nextGlacialStrike, type GlacialStrike } from './glacialCombo';
+import { BIG_WAVE, FLAMETHROWER, bigWaveHitKind, flameConeHits } from './elementalMelee';
 import { SHOTGUN_TRANSFORM, shotgunVolleyAngles } from '../abilities/phase9Balance';
 
 export class WeaponController {
   private nextShotAt = 0;
   private shotgunUntil = 0;
   private shotgunDamage = 0;
-  private glacialStrike: GlacialStrike = 0;
-  private lastGlacialStrikeAt = -Infinity;
+  /** Sustained cone graphics are reused each frame rather than recreated. */
+  private flameEffect?: Phaser.GameObjects.Graphics;
+  private nextFlameContactAt = 0;
+  private readonly burning = new Map<Slime, {
+    expiresAt: number; nextTickAt: number; damage: number;
+  }>();
   private readonly groundEffects = new Set<Phaser.GameObjects.Graphics>();
   public extraProjectiles = 0;
   public extraPiercing = 0;
@@ -52,6 +55,7 @@ export class WeaponController {
   }
 
   public update(time: number, firing: boolean, direction: Readonly<Vector2Value>): void {
+    this.tickBurning(time);
     if (this.shotgunUntil > 0 && time >= this.shotgunUntil) {
       this.shotgunUntil = 0;
       this.shotgunDamage = 0;
@@ -66,29 +70,21 @@ export class WeaponController {
       }
       return;
     }
-    if (!firing) {
-      // Releasing the trigger for a while resets the *next* sequence, but does
-      // not bypass the third strike's mandatory recovery.
-      if (this.weaponId === 'iceblade' && time - this.lastGlacialStrikeAt > 650)
-        this.glacialStrike = 0;
+    if (this.weaponId === 'fireorbs') {
+      // This is a true held melee flame, not a rapid sequence of fake projectiles.
+      if (firing) this.updateFlamethrower(time, direction);
+      else this.hideFlamethrower();
       return;
     }
-    if (time < this.nextShotAt) return;
+    if (!firing || time < this.nextShotAt) return;
     const config = this.config;
-    if (this.weaponId === 'iceblade') {
-      const strike = this.glacialStrike;
-      this.animateGlacialStrike(strike, direction);
-      this.glacialStrike = nextGlacialStrike(strike);
-      this.lastGlacialStrikeAt = time;
-      this.nextShotAt = time + glacialStrikeDelayMs(strike,
-        config.fireRate * this.owner.attackSpeedAt(time) * this.permanentSpeed);
-      return; // Never also execute generic melee/swing for Glacial Blade.
-    }
-    if (this.weaponId === 'warhammer') this.groundSlam(direction, time);
+    if (this.weaponId === 'iceblade') this.launchBigWave(direction);
+    else if (this.weaponId === 'warhammer') this.groundSlam(direction, time);
     else if (config.attackMode === 'melee') this.swing(direction);
     else this.fire(direction);
     this.nextShotAt = time + fireIntervalMs(config.fireRate * this.owner.attackSpeedAt(time) * this.permanentSpeed);
   }
+
   private fire(direction: Readonly<Vector2Value>): void {
     const config = this.config;
     const attack = this.createAttack();
@@ -172,113 +168,163 @@ export class WeaponController {
       onComplete: () => arc.destroy() });
   }
 
-  /** Short slash, reverse slash, then a long fencing thrust. Each strike
-   * resolves once at the visual contact frame with its own hitbox geometry. */
-  private animateGlacialStrike(strike: GlacialStrike,
-    direction: Readonly<Vector2Value>): void {
+  /** The wave crest travels forward from the Frostblade, covering a short wide strip.
+   * Each enemy can be hit only once per cast; edge contacts receive splash damage. */
+  private launchBigWave(direction: Readonly<Vector2Value>): void {
     const aim = normalizedDirection(direction);
-    const config = this.config;
-    const shape = glacialStrikeShape(strike,config.meleeRange*(1+this.extraMeleeRange));
-    const angle = Math.atan2(aim.y,aim.x);
-    const effect = this.scene.add.graphics().setDepth(27);
+    const origin = { x: this.owner.x, y: this.owner.y };
+    const range = this.config.meleeRange * (1 + this.extraMeleeRange);
+    const attack = this.createAttack();
+    const hit = new Set<Slime>();
+    const effect = this.scene.add.graphics().setDepth(26);
     this.groundEffects.add(effect);
-    let applied=false;
-    const duration = strike === 2 ? GLACIAL_COMBO.thrustAnimationMs :
-      GLACIAL_COMBO.slashAnimationMs;
-    this.scene.tweens.addCounter({
-      from:0,to:1,duration,ease: 'Cubic.easeOut',
-      onUpdate: tween => {
-        if (!effect.active || !this.owner.active) return;
-        const progress=tween.getValue()??0;
-        if (!applied && progress >= (strike===2 ? 0.56 : 0.83)) {
-          applied=true;
-          this.hitGlacialStrike(strike,aim);
+    const applyHits = (distance: number): void => {
+      for (const child of this.meleeTargets?.getChildren() ?? []) {
+        if (!(child instanceof Slime) || !child.active || child.aiState === 'defeated' ||
+          hit.has(child)) continue;
+        const kind = bigWaveHitKind(origin, aim, child, distance, range);
+        if (!kind) continue;
+        hit.add(child);
+        const splash = kind === 'splash';
+        this.onMeleeHit?.(child, splash
+          ? { ...attack, damage: attack.damage * BIG_WAVE.splashMultiplier } : attack);
+        if (child.active && child.healthRatio > 0) {
+          if (this.meleeStunMs > 0) child.applyStun(this.scene.time.now, this.meleeStunMs);
+          child.applyKnockback(this.scene.time.now, BIG_WAVE.knockbackMs,
+            aim.x, aim.y, BIG_WAVE.knockbackSpeed * (splash ? 0.8 : 1));
         }
-        const ox=this.owner.x,oy=this.owner.y;
-        const fade=Math.min(1, (1-progress)*2.5);
+      }
+    };
+    this.scene.tweens.addCounter({
+      from: 0, to: 1, duration: BIG_WAVE.durationMs, ease: 'Sine.easeOut',
+      onUpdate: tween => {
+        if (!effect.active) return;
+        const progress = tween.getValue() ?? 0;
+        const reached = 22 + (range - 22) * progress;
+        applyHits(reached);
         effect.clear();
-        if (strike !== 2) {
-          // Two crescent slashes sweep in opposite directions.
-          const forward=strike===0?progress:1-progress;
-          const center=angle - shape.arc/2 + forward*shape.arc;
-          const first= strike===0 ? Math.max(angle-shape.arc/2,center-.42) :
-            Math.min(angle+shape.arc/2,center+.42);
-          const a=Math.min(first,center), b=Math.max(first,center);
-          effect.lineStyle(16,0x38bdf8,.27*fade);
-          effect.beginPath();effect.arc(ox,oy,shape.reach-4,a,b);effect.strokePath();
-          effect.lineStyle(7,0xb5f4ff,.94*fade);
-          effect.beginPath();effect.arc(ox,oy,shape.reach-1,a,b);effect.strokePath();
-          effect.lineStyle(2.5,0xffffff,.96*fade);
-          effect.beginPath();effect.arc(ox,oy,shape.reach+3,a,b);effect.strokePath();
-          effect.fillStyle(0xe0faff,fade);
-          effect.fillCircle(ox+Math.cos(center)*shape.reach,
-            oy+Math.sin(center)*shape.reach,3);
-        } else {
-          // The stabbing tip reaches its FULL hitbox exactly at the
-          // contact frame (0.56). Previously the damage landed at 62% of
-          // the drawn sword length, leaving a misleading invisible reach.
-          const extension = Math.min(1, progress / 0.56);
-          const retract = progress <= 0.72 ? 1 : 1 - 0.38 * (progress - 0.72) / 0.28;
-          const reach = shape.reach * (.14 + .86 * extension) * retract;
-          const sx=ox+aim.x*18, sy=oy+aim.y*18;
-          const tx=ox+aim.x*reach,ty=oy+aim.y*reach;
-          // Only a thin straight thrust is painted; width matches hitbox.
-          effect.lineStyle(shape.halfWidth*2,0x38bdf8,.16*fade);
-          effect.lineBetween(sx,sy,tx,ty);
-          effect.lineStyle(9,0x7dd3fc,.68*fade);
-          effect.lineBetween(sx,sy,tx,ty);
-          effect.lineStyle(3,0xf0faff,fade);
-          effect.lineBetween(sx,sy,tx,ty);
-          const nx=-aim.y,ny=aim.x;
-          effect.fillStyle(0xe0ffff,.9*fade);
-          effect.fillTriangle(tx+aim.x*11,ty+aim.y*11,
-            tx+nx*7,ty+ny*7,tx-nx*7,ty-ny*7);
+        const right = { x: -aim.y, y: aim.x };
+        // Three animated curves and foam droplets make the crest visibly
+        // advance, rather than an invisible rectangular melee hitbox.
+        for (let layer = 0; layer < 3; layer++) {
+          const shifted = reached - layer * 12;
+          const fade = Math.min(1, (1 - progress) * 2.6) * (1 - layer * 0.23);
+          effect.lineStyle(layer === 0 ? 12 : 21,
+            layer === 0 ? 0xd6ffff : layer === 1 ? 0x57caff : 0x2260b4,
+            (layer === 0 ? 0.95 : 0.27) * fade);
+          effect.beginPath();
+          for (let index = 0; index <= 18; index++) {
+            const t = (index / 18) * 2 - 1;
+            const ripple = Math.sin(t * Math.PI * 2.1 + progress * 7 - layer) * 5;
+            const bow = Math.cos(t * Math.PI / 2) * 11;
+            const d = shifted + ripple + bow;
+            const side = t * BIG_WAVE.halfWidth;
+            const px = origin.x + aim.x * d + right.x * side;
+            const py = origin.y + aim.y * d + right.y * side;
+            if (index === 0) effect.moveTo(px, py);
+            else effect.lineTo(px, py);
+          }
+          effect.strokePath();
+        }
+        effect.fillStyle(0xe7ffff, Math.max(0, 0.82 - progress * 0.62));
+        for (let j = -3; j <= 3; j++) {
+          const across = j * BIG_WAVE.halfWidth / 3;
+          const d = reached + Math.sin(j * 1.9 + progress * 11) * 9;
+          effect.fillCircle(
+            origin.x + aim.x * d - aim.y * across,
+            origin.y + aim.y * d + aim.x * across,
+            2.5 + Math.abs(j % 3));
         }
       },
-      onComplete:()=>{
-        // Don't lose hits when a lag spike advances past the contact frame.
-        if (!applied && this.owner.active) this.hitGlacialStrike(strike,aim);
+      onComplete: () => {
+        if (effect.active) applyHits(range);
         this.groundEffects.delete(effect);
-        if(effect.active) effect.destroy();
-        if(strike===2 && this.owner.active) this.animateGlacialRecovery();
+        if (effect.active) effect.destroy();
       },
     });
   }
 
-  private hitGlacialStrike(strike: GlacialStrike,
-    aim: Readonly<Vector2Value>): void {
-    const attack=this.createAttack();
-    const range=this.config.meleeRange;
-    for(const child of this.meleeTargets?.getChildren()??[]){
-      if (!(child instanceof Slime)||!child.active||child.aiState==='defeated')continue;
-      if(!glacialStrikeHits(strike,this.owner,aim,child,range,this.extraMeleeRange))continue;
-      this.onMeleeHit?.(child,attack);
-      if(this.meleeStunMs>0&&child.active)
-        child.applyStun(this.scene.time.now,this.meleeStunMs);
+  /** Damage remains continuous while held, independent of any shot cooldown.
+   * A 200 ms contact step yields the configured damage PER SECOND, with an
+   * additional independent burn tick every full second. */
+  private updateFlamethrower(time: number, direction: Readonly<Vector2Value>): void {
+    const aim = normalizedDirection(direction);
+    const origin = { x: this.owner.x, y: this.owner.y };
+    const range = this.config.meleeRange * (1 + this.extraMeleeRange);
+    if (!this.flameEffect || !this.flameEffect.active) {
+      this.flameEffect = this.scene.add.graphics().setDepth(25);
+      this.groundEffects.add(this.flameEffect);
+    }
+    const flame = this.flameEffect;
+    const side = { x: -aim.y, y: aim.x };
+    const tip = { x: origin.x + aim.x * range, y: origin.y + aim.y * range };
+    const flicker = Math.sin(time / FLAMETHROWER.visualFlickerMs);
+    flame.clear();
+    // Layered hot-core / orange / red plume, tapering from the caster out.
+    for (let layer = 0; layer < 3; layer++) {
+      const width = FLAMETHROWER.coneEndHalfWidth * (1 - layer * 0.22);
+      const length = range * (1 - layer * 0.1 + flicker * 0.025);
+      const tx = origin.x + aim.x * length, ty = origin.y + aim.y * length;
+      flame.fillStyle([0xff5124, 0xff9f29, 0xffec89][layer]!,
+        [0.32, 0.46, 0.55][layer]!);
+      flame.fillTriangle(
+        origin.x + side.x * 13, origin.y + side.y * 13,
+        tx + side.x * width, ty + side.y * width,
+        tx - side.x * width, ty - side.y * width);
+    }
+    for (let i = 0; i < 7; i++) {
+      const fraction = (i + 1) / 8;
+      const wobble = Math.sin(time * 0.014 + i * 2.32) * fraction * 27;
+      flame.fillStyle(i % 2 ? 0xffd34e : 0xff6b23, 0.45);
+      flame.fillCircle(
+        origin.x + aim.x * range * fraction + side.x * wobble,
+        origin.y + aim.y * range * fraction + side.y * wobble,
+        7 + fraction * 13);
+    }
+
+    if (time < this.nextFlameContactAt) return;
+    this.nextFlameContactAt = time + FLAMETHROWER.damageTickMs;
+    const fullAttack = this.createAttack();
+    const contact = { ...fullAttack,
+      damage: fullAttack.damage * FLAMETHROWER.damageTickMs / 1000 };
+    for (const target of this.meleeTargets?.getChildren() ?? []) {
+      if (!(target instanceof Slime) || !target.active || target.aiState === 'defeated' ||
+        !flameConeHits(origin, aim, target, range)) continue;
+      this.onMeleeHit?.(target, contact);
+      if (!target.active || target.healthRatio <= 0) continue;
+      if (this.meleeStunMs > 0) target.applyStun(time, this.meleeStunMs);
+      const existing = this.burning.get(target);
+      if (existing) {
+        existing.expiresAt = time + FLAMETHROWER.burnDurationMs;
+        existing.damage = fullAttack.damage * FLAMETHROWER.burnRatio;
+      } else {
+        this.burning.set(target, {
+          expiresAt: time + FLAMETHROWER.burnDurationMs,
+          nextTickAt: time + FLAMETHROWER.burnTickMs,
+          damage: fullAttack.damage * FLAMETHROWER.burnRatio,
+        });
+      }
     }
   }
 
-  /** Visible settling frost after the forward stab, within the long cooldown. */
-  private animateGlacialRecovery(): void {
-    const effect=this.scene.add.graphics().setDepth(26);
-    this.groundEffects.add(effect);
-    this.scene.tweens.addCounter({
-      from:0,to:1,duration:GLACIAL_COMBO.recoveryAnimationMs,
-      onUpdate:tween=>{
-        if(!effect.active||!this.owner.active)return;
-        const t=tween.getValue()??0;
-        effect.clear();
-        effect.lineStyle(2.5,0xb6ecff,.65*(1-t));
-        effect.strokeCircle(this.owner.x,this.owner.y,20+t*8);
-        effect.fillStyle(0xffffff,.45*(1-t));
-        for(let i=0;i<5;i++){
-          const a=i*2*Math.PI/5;
-          effect.fillCircle(this.owner.x+Math.cos(a)*(21+t*17),
-            this.owner.y+Math.sin(a)*(21+t*17),2.4);
-        }
-      },
-      onComplete:()=>{this.groundEffects.delete(effect);if(effect.active)effect.destroy()},
-    });
+  private tickBurning(time: number): void {
+    for (const [target, burn] of this.burning) {
+      if (!target.active || target.aiState === 'defeated' || time > burn.expiresAt) {
+        this.burning.delete(target);
+        continue;
+      }
+      if (time < burn.nextTickAt) continue;
+      burn.nextTickAt = time + FLAMETHROWER.burnTickMs;
+      this.onMeleeHit?.(target, {
+        damage: burn.damage, criticalChance: 0, criticalMultiplier: 1,
+      });
+      if (!target.active || target.aiState === 'defeated') this.burning.delete(target);
+    }
+  }
+
+  private hideFlamethrower(): void {
+    this.flameEffect?.clear();
+    this.nextFlameContactAt = 0;
   }
 
   /** A short, travelling crescent rather than a static sector that lingers. */
@@ -435,8 +481,9 @@ export class WeaponController {
     this.groundEffects.clear();
     this.shotgunUntil = 0;
     this.shotgunDamage = 0;
-    this.glacialStrike = 0;
-    this.lastGlacialStrikeAt = -Infinity;
+    this.flameEffect = undefined;
+    this.nextFlameContactAt = 0;
+    this.burning.clear();
   }
 
   private createAttack(): AttackData {
