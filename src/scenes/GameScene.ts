@@ -11,6 +11,8 @@ import { MOSS_DASH, ROOT_BRANCH, rootBurstAngles } from '../enemies/worldOneBoss
 import { SPORE_POISON, poisonActive, poisonCovers, poisonTickDue } from '../enemies/poisonHazard';
 import { AdvancedEnemy, type BulletPattern } from '../enemies/AdvancedEnemy';
 import { EnemyProjectile } from '../enemies/EnemyProjectile';
+import { ricochetAxis } from '../enemies/enemyRicochet';
+import { WORLD1_BRIAR_ARROW_SPEED_MULTIPLIER } from '../enemies/enemyBalance';
 import { HomingEnemyProjectile } from '../enemies/HomingEnemyProjectile';
 import { coverIsClose, firstShieldOnPath, type ShieldPoint } from '../enemies/treantShield';
 import { ICE_WALL, HOMING_ORB, wallGapCenter, wallHitsCircle, wallXAt } from '../enemies/frozenBossAttacks';
@@ -281,7 +283,11 @@ export class GameScene extends Phaser.Scene {
         }
         if (!child.active) continue;
         child.setSlowMotion(this.abilities?.enemyProjectileFactor(this.time.now) ?? 1);
-        if (child.isOutsideArena()) child.destroy();
+        if (child.isOutsideArena()) {
+          // The Briar Hunter's first arena-wall impact is a true reflection.
+          if (child.bounceAtArenaEdge()) this.showBriarRicochet(child.x, child.y);
+          else child.destroy();
+        }
       }
     }
     this.updateBossHud();
@@ -991,13 +997,17 @@ export class GameScene extends Phaser.Scene {
       enemy.stats.roomNumber === 15
       ? [splitTwinShotAngle(volley, enemy.splitTwinIndex)]
       : shotAngles(pattern, angle, volley);
+    const briarHunter = this.worldId === 1 && enemy.kind === 'archer';
     const speed = (enemy.kind === 'boss' ? (220 + getBossTier(enemy.stats.roomNumber) * 8) *
       (enemy.stats.roomNumber === 30 ? 1.25 : 1) :
-      enemy.kind === 'mage' ? 220 : 320) * speedFactor;
+      enemy.kind === 'mage' ? 220 : 320) * speedFactor *
+      (briarHunter ? WORLD1_BRIAR_ARROW_SPEED_MULTIPLIER : 1);
     const frostArcher = this.worldId === 2 && enemy.kind === 'archer';
     const frostWitch = enemy.isFrostWitch;
-    const effect = frostWitch ? 'frost-burst' : frostArcher ? 'frost-chill' : 'none';
+    const effect = frostWitch ? 'frost-burst' : frostArcher ? 'frost-chill' :
+      briarHunter ? 'briar-ricochet' : 'none';
     const color = frostWitch ? 0x93c5fd : frostArcher ? 0x38bdf8 :
+      briarHunter ? 0xa3e635 :
       enemy.isBoss ? getBossProfile(enemy.stats.roomNumber, enemy.bossSlot).color :
       enemy.kind === 'mage' ? 0xa78bfa : 0xfb7185;
     for (const direction of angles) {
@@ -1681,10 +1691,38 @@ export class GameScene extends Phaser.Scene {
     }
   };
 
+  /** Small, short-lived spark when a Briar arrow reflects off a wall. */
+  private showBriarRicochet(x: number, y: number): void {
+    const spark = this.add.circle(x, y, 8, 0xd9f99d, 0.65)
+      .setStrokeStyle(2, 0x65a30d, 0.92).setDepth(22);
+    this.tweens.add({
+      targets: spark, scale: 1.6, alpha: 0, duration: 185,
+      onComplete: () => spark.destroy(),
+    });
+  }
+
   private readonly handleEnemyBulletObstacle = (
     projectileObject: ArcadeCollisionObject,
+    obstacleObject: ArcadeCollisionObject,
   ): void => {
     if (!(projectileObject instanceof EnemyProjectile) || !projectileObject.active) return;
+    if (projectileObject.effect === 'briar-ricochet') {
+      const body = projectileObject.body;
+      const touch = body instanceof Phaser.Physics.Arcade.Body ? body.touching : {};
+      const obstacle = obstacleObject instanceof Phaser.GameObjects.Rectangle
+        ? { x: obstacleObject.x, y: obstacleObject.y,
+          width: obstacleObject.width, height: obstacleObject.height } : undefined;
+      const axis = ricochetAxis(projectileObject,
+        projectileObject.travelVelocity, touch, obstacle);
+      if (projectileObject.tryRicochet(axis)) {
+        // Move out of the impact face so this collision cannot trigger twice.
+        const v = projectileObject.travelVelocity;
+        projectileObject.setPosition(projectileObject.x + Math.sign(v.x) * 4,
+          projectileObject.y + Math.sign(v.y) * 4);
+        this.showBriarRicochet(projectileObject.x, projectileObject.y);
+        return;
+      }
+    }
     const effect = projectileObject.effect;
     const x = projectileObject.x, y = projectileObject.y;
     const attack = projectileObject.attack;
