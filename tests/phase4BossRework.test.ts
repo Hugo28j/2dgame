@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getBossArchetypeIndex, getBossProfile } from '../src/enemies/bossProfiles';
 import { getWorldBossName } from '../src/worlds/worldConfig';
-import { getWorldCharacter } from '../src/enemies/worldCharacters';
+import { getWorldCharacter, getWorldBossArtRoster } from '../src/enemies/worldCharacters';
 import { getEnemyStatsForRoom } from '../src/enemies/enemyConfig';
 import { selectPoisonLocations, poisonZonesOverlap } from '../src/enemies/poisonPlacement';
 import { rootWavePoint, rootTipHits } from '../src/enemies/rootGrowth';
@@ -23,6 +23,9 @@ describe('phase 4 boss encounter migration', () => {
     expect(getWorldCharacter(1, 'boss', 15).textureKey).toBe('world-1-boss-7');
     expect(getWorldCharacter(1, 'boss', 20, 0).textureKey).toBe('world-1-boss-5');
     expect(getWorldCharacter(1, 'boss', 20, 1).textureKey).toBe('world-1-boss-4');
+    const generatedTextures = new Set(getWorldBossArtRoster(1).map(boss => boss.textureKey));
+    for (const tier of [1, 3, 4, 5, 7, 8, 10])
+      expect(generatedTextures.has('world-1-boss-' + tier)).toBe(true);
     for (const world of [2,3,4,5] as const) {
       expect(getBossArchetypeIndex(15, 0, world)).toBe(4);
       expect(getBossArchetypeIndex(20, 0, world)).toBe(6);

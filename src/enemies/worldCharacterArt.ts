@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import { WORLDS, type WorldId } from '../worlds/worldConfig';
-import { BOSS_ENCOUNTER_ARCHETYPES } from './bossProfiles';
-import { getWorldCharacter, getWorldCharacterRoster, type CharacterLook } from './worldCharacters';
+import { getWorldBossArtRoster, getWorldCharacterRoster, type CharacterLook } from './worldCharacters';
 
 /** Original hand-drawn vector sprites. All generated once at boot; no network
  * textures, runtime canvas animation, or per-frame graphics allocations. */
@@ -136,8 +135,7 @@ export function createWorldCharacterTextures(scene: Phaser.Scene): void {
   for (const world of WORLDS) {
     const roster = [
       ...getWorldCharacterRoster(world.id),
-      ...Object.entries(BOSS_ENCOUNTER_ARCHETYPES).flatMap(([room, indices]) =>
-        indices.map((_, slot) => getWorldCharacter(world.id, 'boss', Number(room), slot))),
+      ...getWorldBossArtRoster(world.id),
     ];
     for (const look of roster) {
       if (scene.textures.exists(look.textureKey)) continue;
