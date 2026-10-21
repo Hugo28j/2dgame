@@ -140,13 +140,13 @@ export class GameOverScene extends Phaser.Scene {
     const navigate = (target: string): void => {
       if (navigating) return;
       navigating = true;
-      // Use the global scene manager so this works even while the Game Over
-      // scene is being shut down. Starting GameScene constructs a fresh run in
-      // room 1 while ProgressStore keeps the selected hero and world intact.
-      const sceneManager = this.game.scene;
-      sceneManager.stop(GAME_SCENE_KEY);
-      sceneManager.stop(GAME_OVER_SCENE_KEY);
-      sceneManager.start(target);
+      // Dispose of the sleeping run first, then let this scene's plugin replace
+      // GameOverScene. Stopping GameOverScene manually before starting the
+      // target can leave its final canvas frame frozen in Phaser's transition
+      // queue. A new GameScene starts in room 1 while ProgressStore preserves
+      // the selected hero and world.
+      if (this.scene.isSleeping(GAME_SCENE_KEY)) this.scene.stop(GAME_SCENE_KEY);
+      this.scene.start(target);
     };
     button(layout.replay, 'OPNIEUW SPELEN', () => navigate(GAME_SCENE_KEY), true);
     button(layout.menu, 'HOOFDMENU', () => navigate(MENU_SCENE_KEY));
