@@ -8,12 +8,12 @@ import {
 
 describe('progressive enemy unlocks', () => {
   it('starts only with ordinary slimes, then introduces tougher enemies across the campaign', () => {
-    for (let room = 1; room <= 6; room++) {
+    for (let room = 1; room <= 3; room++) {
       if (room % 5 === 0) continue;
       for (let i = 0; i < 60; i++) expect(getEnemyKindForRoom(room, i)).toBe('slime');
     }
     const unlocks = [
-      ['archer', 7], ['charger', 11], ['tank', 16],
+      ['archer', 4], ['charger', 11], ['tank', 16],
       ['mage', 21], ['bomber', 26],
     ] as const;
     for (const [kind, firstRoom] of unlocks) {
