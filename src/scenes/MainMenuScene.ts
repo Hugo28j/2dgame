@@ -24,6 +24,7 @@ import {
   isAbilityUnlocked,
 } from '../abilities/abilityConfig';
 import { abilityMenuSummary } from '../ui/menuPresentation';
+import { displayedHp } from '../ui/displayValues';
 
 type MenuTab = 'worlds' | 'heroes' | 'weapons' | 'upgrades' | 'settings';
 type ButtonStyle = 'normal' | 'selected' | 'primary' | 'danger' | 'quiet';
@@ -217,7 +218,7 @@ export class MainMenuScene extends Phaser.Scene {
           ? 'MAX' : heroXpRequirement(profile.heroLevels[id])), 10, COLOR.secondary, 168);
       this.fittedText(44, y + 14, 'PASSIEF: ' + hero.passive, 10, '#fcd34d', 304);
       const stats = getHeroStats(id, profile.heroLevels[id]);
-      this.fittedText(44, y + 32, 'HP ' + stats.maxHp +
+      this.fittedText(44, y + 32, 'HP ' + displayedHp(stats.maxHp) +
         '   ·   SCHADE ' + stats.damage + '   ·   DEF ' + stats.defense,
         10, COLOR.secondary, 302);
       const label = selected ? 'ACTIEF' : unlocked ? 'KIES' :

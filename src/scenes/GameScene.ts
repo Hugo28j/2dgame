@@ -52,6 +52,7 @@ import { RunUpgradeDeck, type RunUpgradeId } from '../progression/runUpgrades';
 import { getWorld, getWorldBossName, type WorldId } from '../worlds/worldConfig';
 import { findChainTargets } from '../weapons/chainLightning';
 import { upgradeCardBounds } from '../ui/upgradeLayout';
+import { displayedHp } from '../ui/displayValues';
 
 type ArcadeCollisionObject =
   | Phaser.Types.Physics.Arcade.GameObjectWithBody
@@ -1983,7 +1984,9 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(121).setScrollFactor(0);
-    this.healthText.setText(`${this.player.currentHp} / ${this.player.maxHp}`);
+    this.healthText.setText(
+      `${displayedHp(this.player.currentHp)} / ${displayedHp(this.player.maxHp)}`,
+    );
   }
 
   private showPlayerParry(): void {
