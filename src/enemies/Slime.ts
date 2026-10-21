@@ -67,6 +67,10 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
 
     this.healthBar = scene.add.graphics().setDepth(12);
     this.drawHealthBar();
+    if (textureKey.startsWith('world-3-')) {
+      scene.tweens.add({ targets: this, scaleX: 1.06, scaleY: 0.94,
+        duration: 310, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
+    }
     scene.events.emit(ENEMY_SPAWNED_EVENT, this);
   }
 
@@ -168,6 +172,7 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
   }
 
   public showHit(): void {
+    this.playEmberHitFx();
     this.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
     this.scene.time.delayedCall(70, () => {
       if (this.active && this.aiState === 'chasing') {
@@ -186,6 +191,7 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
     }
 
     this.aiState = 'defeated';
+    this.playEmberDeathFx();
     this.healthBar.clear();
     const body = this.body;
     if (body instanceof Phaser.Physics.Arcade.Body) {
@@ -197,6 +203,8 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
       return;
     }
 
+    // Stop idle/squash loops so the one-shot death animation owns the scale.
+    this.scene.tweens.killTweensOf(this);
     this.scene.tweens.add({
       targets: this,
       alpha: 0,
@@ -221,5 +229,39 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
     this.healthBar.fillRoundedRect(this.x - width / 2, this.y - 29, width, 6, 2);
     this.healthBar.fillStyle(0x84cc16, 1);
     this.healthBar.fillRoundedRect(this.x - width / 2 + 1, this.y - 28, (width - 2) * ratio, 4, 1);
+  }
+
+  private isEmberEnemy(): boolean { return this.texture.key.startsWith('world-3-'); }
+
+  private playEmberHitFx(): void {
+    if (!this.isEmberEnemy()) return;
+    const ring = this.scene.add.circle(this.x, this.y, 8, 0xfbbf24, 0.28)
+      .setStrokeStyle(2, 0xffedd5, 0.9).setDepth(27);
+    this.scene.tweens.add({ targets: ring, scale: 1.8, alpha: 0, duration: 135,
+      onComplete: () => ring.destroy() });
+    for (let i = 0; i < 3; i++) {
+      const angle = (i * Math.PI * 2) / 3 + this.scene.time.now / 180;
+      const spark = this.scene.add.circle(this.x, this.y, 2.5, i === 0 ? 0xfef08a : 0xf97316)
+        .setDepth(28);
+      this.scene.tweens.add({ targets: spark, x: this.x + Math.cos(angle) * 20,
+        y: this.y + Math.sin(angle) * 20, alpha: 0, duration: 170,
+        onComplete: () => spark.destroy() });
+    }
+  }
+
+  private playEmberDeathFx(): void {
+    if (!this.isEmberEnemy()) return;
+    const flash = this.scene.add.circle(this.x, this.y, 15, 0xf97316, 0.55)
+      .setStrokeStyle(3, 0xfef08a).setDepth(28);
+    this.scene.tweens.add({ targets: flash, scale: 2.2, alpha: 0, duration: 300,
+      onComplete: () => flash.destroy() });
+    for (let i = 0; i < 8; i++) {
+      const angle = i * Math.PI / 4;
+      const ember = this.scene.add.circle(this.x, this.y, 3 + i % 2, i % 3 ? 0xea580c : 0xfde047)
+        .setDepth(29);
+      this.scene.tweens.add({ targets: ember, x: this.x + Math.cos(angle) * (30 + i * 2),
+        y: this.y + Math.sin(angle) * (30 + i * 2) - 8, alpha: 0,
+        duration: 280 + i * 18, onComplete: () => ember.destroy() });
+    }
   }
 }

@@ -27,7 +27,7 @@ describe('themed world enemies and bosses', () => {
     expect(mobNames.size).toBe(30);
     expect(textures.size).toBe(30);
     expect(getWorldCharacter(2, 'tank').name).toBe('Glacier Golem');
-    expect(getWorldCharacter(3, 'charger').name).toBe('Magma Hound');
+    expect(getWorldCharacter(3, 'charger').name).toBe('Blazehound');
     expect(getWorldCharacter(4, 'mage').name).toBe('Thunder Seer');
     expect(getWorldCharacter(5, 'bomber').name).toBe('Singularity');
   });

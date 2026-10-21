@@ -6,6 +6,7 @@ import { BRAMBLE_GUNNER_HP_MULTIPLIER, WORLD1_MOSSLING_SPEED_MULTIPLIER,
   WORLD1_SPORECAP_SPEED_MULTIPLIER } from './enemyBalance';
 import { FROZEN_EARLY, earlyFrozenEnemy } from './frozenEarlyGame';
 import { FROZEN_BALANCE, WORLD2_UNLOCK_ROOMS } from './frozenBalance';
+import { EMBER_ROSTER, emberKindForRoom } from './emberWastes';
 
 export type EnemyKind = 'slime' | 'archer' | 'charger' | 'mage' | 'tank' | 'bomber' | 'boss';
 
@@ -41,7 +42,7 @@ export const SLIME_DIFFICULTY = Object.freeze({ hpPerRoom: 0.08, damagePerRoom: 
 
 export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number,
   worldId: WorldId = 1, bossSlot = 0): SlimeRuntimeStats => {
-  const base = ENEMY_CONFIGS[kind];
+  const base = worldId === 3 && kind !== 'boss' ? EMBER_ROSTER[kind] : ENEMY_CONFIGS[kind];
   const number = Math.max(1, Math.floor(roomNumber));
   const completed = number - 1;
   const world = getWorld(worldId);
@@ -105,6 +106,7 @@ export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number,
     return 'boss';
   }
   const index = Math.max(0, Math.floor(spawnIndex));
+  if (worldId === 3) return emberKindForRoom(room, index);
   if (worldId === FROZEN_EARLY.world && room <= FROZEN_EARLY.lastRoom) {
     return earlyFrozenEnemy(room, index);
   }

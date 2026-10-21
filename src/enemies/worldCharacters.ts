@@ -24,8 +24,8 @@ const names: Readonly<Record<WorldId, Readonly<Record<MinionKind, string>>>> = {
     mage: 'Aurora Witch', tank: 'Glacier Golem', bomber: 'Ice Bomb Thrower',
   },
   3: {
-    slime: 'Cinderling', archer: 'Ash Marksman', charger: 'Magma Hound',
-    mage: 'Flame Oracle', tank: 'Obsidian Titan', bomber: 'Volatile Ember',
+    slime: 'Ash Crawler', archer: 'Furnace Breather', charger: 'Blazehound',
+    mage: 'Cinder Warlock', tank: 'Magma Bulwark', bomber: 'Bombardier Imp',
   },
   4: {
     slime: 'Spark Sprite', archer: 'Sky Sharpshooter', charger: 'Volt Raptor',

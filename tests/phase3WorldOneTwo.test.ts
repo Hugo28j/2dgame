@@ -43,12 +43,13 @@ describe('fase 3 — Briar Hunter', () => {
         expect(getEnemyKindForRoom(room, i, 1)).not.toBe('archer');
     expect(getEnemyKindForRoom(4, 0, 1)).toBe('archer');
     expect(getWorldCharacter(1, 'archer').name).toBe('Briar Hunter');
-    for (const world of [3, 4, 5] as const) {
+    for (const world of [4, 5] as const) {
       for (const room of [1, 2, 3, 4, 6])
         for (let i = 0; i < 24; i++)
           expect(getEnemyKindForRoom(room, i, world)).not.toBe('archer');
       expect(getEnemyKindForRoom(7, 0, world)).toBe('archer');
     }
+    expect(getEnemyKindForRoom(3, 0, 3)).toBe('archer');
   });
   it('doubles CURRENT Briar damage and increases arrow speed 50%', () => {
     expect(WORLD1_BRIAR_DAMAGE_MULTIPLIER).toBe(3);

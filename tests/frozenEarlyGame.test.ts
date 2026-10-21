@@ -24,12 +24,14 @@ describe('Frozen Hollow rooms 1-10', () => {
   });
 
   it('preserves world-1 and other worlds enemy unlock progression', () => {
-    for (const world of [1, 3, 4, 5] as const) {
+    for (const world of [1, 4, 5] as const) {
       expect(getEnemyKindForRoom(1, 0, world)).toBe('slime');
       expect(getEnemyKindForRoom(3, 0, world)).toBe('slime');
       if (world === 1) expect(getEnemyKindForRoom(4, 0, world)).toBe('archer');
       else expect(getEnemyKindForRoom(7, 0, world)).toBe('archer');
     }
+    expect(getEnemyKindForRoom(1, 0, 3)).toBe('slime');
+    expect(getEnemyKindForRoom(3, 0, 3)).toBe('archer');
     expect(getEnemyKindForRoom(12, 0, 2)).toBe('slime');
   });
 
