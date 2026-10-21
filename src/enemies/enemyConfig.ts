@@ -88,6 +88,9 @@ export { WORLD2_UNLOCK_ROOMS } from './frozenBalance';
 export const ENEMY_UNLOCK_ROOMS = {
   slime: 1, archer: 4, charger: 11, tank: 16, mage: 21, bomber: 26,
 } as const;
+// The Briar Hunter's earlier unlock is exclusive to Verdant Ruins.
+// Worlds 3–5 retain their original archer progression at room 7.
+const OTHER_WORLD_UNLOCK_ROOMS = { ...ENEMY_UNLOCK_ROOMS, archer: 7 } as const;
 
 export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number,
   worldId: WorldId = 1): EnemyKind => {
@@ -102,7 +105,8 @@ export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number,
   if (worldId === FROZEN_EARLY.world && room <= FROZEN_EARLY.lastRoom) {
     return earlyFrozenEnemy(room, index);
   }
-  const entries = Object.entries(worldId === 2 ? WORLD2_UNLOCK_ROOMS : ENEMY_UNLOCK_ROOMS) as Array<
+  const entries = Object.entries(worldId === 2 ? WORLD2_UNLOCK_ROOMS :
+    worldId === 1 ? ENEMY_UNLOCK_ROOMS : OTHER_WORLD_UNLOCK_ROOMS) as Array<
     [Exclude<EnemyKind, 'boss'>, number]>;
   // A new enemy always appears when its type is first introduced.
   const newKind = entries.find(([, unlock]) => unlock === room);
