@@ -4,7 +4,7 @@ import { AbilityController } from '../abilities/AbilityController';
 import { DamageSystem, type DamageResult } from '../combat/damage';
 import { shouldParryHit } from '../combat/parry';
 import { addAndLaunch } from '../combat/launchProjectile';
-import { GAME_SCENE_KEY, GAME_TITLE, GAME_OVER_SCENE_KEY, GAME_WIDTH } from '../config/constants';
+import { GAME_SCENE_KEY, GAME_TITLE, GAME_OVER_SCENE_KEY, GAME_WIDTH, GAME_HEIGHT } from '../config/constants';
 import { EnemySpawner } from '../enemies/EnemySpawner';
 import { getBossProfile, getBossTier } from '../enemies/bossProfiles';
 import { MOSS_DASH, ROOT_BRANCH, rootBurstAngles } from '../enemies/worldOneBossBalance';
