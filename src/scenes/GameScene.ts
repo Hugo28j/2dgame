@@ -227,6 +227,7 @@ export class GameScene extends Phaser.Scene {
       this.enemyProjectiles,
       () => this.currentRoom?.layout,
       (origin, target) => this.findProtectingTreant(origin, target),
+      (now, damage, durationMs) => this.weapon?.activateShotgunBuff(now,damage,durationMs) ?? false,
     );
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
@@ -265,7 +266,7 @@ export class GameScene extends Phaser.Scene {
     this.updatePoisonPools(this.time.now);
     this.updateJadeBranches(this.time.now);
     this.updateFrozenWalls(this.time.now);
-    this.updateGlacierBoulders(delta);
+    this.updateGlacierBoulders(delta * (this.abilities?.enemyProjectileFactor(this.time.now) ?? 1));
     this.weapon.update(this.time.now, this.controls.isShooting(), aim);
 
     // Ranged world-1 mobs use nearby Ancient Treants as moving cover.
