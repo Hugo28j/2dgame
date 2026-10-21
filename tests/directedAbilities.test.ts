@@ -22,7 +22,8 @@ describe('directed hero abilities and combat balance', () => {
     expect(isAimedAbility(ABILITIES['ranger-rain'].kind)).toBe(false);
     expect(isAimedAbility(ABILITIES['mage-burst'].kind)).toBe(true);
     expect(isAimedAbility(ABILITIES['frost-ring'].kind)).toBe(false);
-    expect(ABILITIES['ranger-volley'].cooldownMs).toBeGreaterThanOrEqual(45000);
+    expect(ABILITIES['ranger-volley'].cooldownMs).toBe(25000);
+    expect(isAimedAbility(ABILITIES['ranger-volley'].kind)).toBe(false);
     expect(ABILITIES['storm-pulse'].cooldownMs).toBeGreaterThanOrEqual(30000);
   });
   it('makes starter slimes faster while keeping all heroes mobile', () => {
