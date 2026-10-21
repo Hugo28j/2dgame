@@ -22,6 +22,7 @@ import { coverIsClose, firstShieldOnPath, type ShieldPoint } from '../enemies/tr
 import { ICE_WALL, HOMING_ORB, wallGapCenter, wallHitsCircle, wallXAt } from '../enemies/frozenBossAttacks';
 import { FROZEN_EARLY, canSummonFrostMinions } from '../enemies/frozenEarlyGame';
 import { FROZEN_BALANCE } from '../enemies/frozenBalance';
+import { shouldSplitFrozenGiant } from '../enemies/frozenSplit';
 import { withinRadius } from '../enemies/enemyMovement';
 import { splitTwinShotAngle, shotAngles } from '../enemies/projectilePatterns';
 import {
@@ -2333,7 +2334,8 @@ export class GameScene extends Phaser.Scene {
         enemy instanceof AdvancedEnemy && enemy.isBrambleGunner) {
       this.startWorldOneBossSplit(enemy);
     }
-    if (this.worldId === 2 && enemy instanceof AdvancedEnemy && enemy.kind === 'tank') {
+    if (enemy instanceof AdvancedEnemy &&
+        shouldSplitFrozenGiant(this.worldId, enemy.kind, enemy.enemyId)) {
       this.spawnSplitSnowPuffs(enemy);
     }
     this.aliveEnemies = Math.max(0, this.aliveEnemies - 1);
