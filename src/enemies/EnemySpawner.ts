@@ -7,6 +7,7 @@ import { AdvancedEnemy } from './AdvancedEnemy';
 import { addBoundedEnemy } from './addBoundedEnemy';
 import { getEnemyKindForRoom, getSlimeStatsForRoom } from './enemyConfig';
 import { getWorldCharacter } from './worldCharacters';
+import { glacierBossSlot } from './frozenBalance';
 
 import type { RoomDefinition } from '../rooms/roomConfig';
 
@@ -36,7 +37,7 @@ export class EnemySpawner {
             getWorldCharacter(worldId, kind, room.number).textureKey)
         : new AdvancedEnemy(this.scene, `${kind}-${this.nextEnemyNumber++}`,
             point.x, point.y, kind, room.number, worldId,
-            kind === 'boss' ? index : 0);
+            kind === 'boss' ? (worldId === 2 ? glacierBossSlot(room.number) : index) : 0);
       addBoundedEnemy(enemy, () => this.enemyGroup.add(enemy));
       return enemy;
     });
@@ -62,6 +63,16 @@ export class EnemySpawner {
       const enemy = new Slime(this.scene, `frost-summon-${this.nextEnemyNumber++}`,
         point.x, point.y, { ...stats, maxHp: Math.round(stats.maxHp * 0.68) },
         'world-2-slime');
+      addBoundedEnemy(enemy, () => this.enemyGroup.add(enemy));
+      return enemy;
+    });
+  }
+
+  /** Glacier Golems summoned by Snow Sentinel in World 2 room 15. */
+  public summonGlacierGolems(points: readonly SpawnPoint[], room: number): readonly AdvancedEnemy[] {
+    return points.map(point => {
+      const enemy = new AdvancedEnemy(this.scene, 'sentinel-golem-' + this.nextEnemyNumber++,
+        point.x, point.y, 'tank', room, 2);
       addBoundedEnemy(enemy, () => this.enemyGroup.add(enemy));
       return enemy;
     });
