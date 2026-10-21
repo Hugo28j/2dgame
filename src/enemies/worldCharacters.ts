@@ -50,7 +50,7 @@ const minionOrder: readonly MinionKind[] = ['slime', 'archer', 'charger', 'mage'
 export function getWorldCharacter(worldId: WorldId, kind: EnemyKind, roomNumber = 1, bossSlot = 0): CharacterLook {
   const world = getWorld(worldId);
   if (kind === 'boss') {
-    const tier = getBossArchetypeIndex(roomNumber, bossSlot) + 1;
+    const tier = getBossArchetypeIndex(roomNumber, bossSlot, worldId) + 1;
     // Each archetype retains its unique texture when moving to 30-room worlds.
     return {
       name: getWorldBossName(worldId, roomNumber, bossSlot),
