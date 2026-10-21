@@ -12,6 +12,7 @@ import { MOSS_DASH, ROOT_BRANCH, SPORE_THROW_INTERVAL_MS } from './worldOneBossB
 import { FROZEN_EARLY } from './frozenEarlyGame';
 import { FROZEN_BALANCE } from './frozenBalance';
 import { BRAMBLE_CINEMATIC } from './brambleCinematic';
+import { JADE_BRANCH } from './groveAttacks';
 import { sporePatrolVelocity } from './sporeMovement';
 import type { BulletPattern } from './projectilePatterns';
 export type { BulletPattern } from './projectilePatterns';
@@ -21,6 +22,7 @@ export type EnemyExplosion = (enemy: AdvancedEnemy, radius: number) => void;
 export type EnemySummon = (enemy: AdvancedEnemy) => void;
 export type EnemyRoot = (enemy: AdvancedEnemy, attack: 'line' | 'burst', targetX: number, targetY: number, rotation: number | boolean) => void;
 export type EnemyTrail = (enemy: AdvancedEnemy, x: number, y: number) => void;
+export type EnemyJadeBranches = (enemy: AdvancedEnemy) => void;
 export type EnemyBomb = (enemy: AdvancedEnemy, targetX: number, targetY: number,
   count: number, radius: number, windupMs: number) => void;
 
@@ -31,6 +33,7 @@ export class AdvancedEnemy extends Slime {
   private nextShotAt = 0;
   private nextTrailAt = 0;
   private nextSnowfallAt = 0;
+  private nextJadeBranchesAt = 0;
   private rootStage: 'ready' | 'second' | 'third' | 'rest' = 'ready';
   public fasterTwin = false;
   /** Index of the two split Void Sentinels (0 spins clockwise, 1 counterclockwise). */
@@ -77,6 +80,7 @@ export class AdvancedEnemy extends Slime {
       this.shieldGraphic = scene.add.graphics().setDepth(13);
     }
     this.nextShotAt = scene.time.now + stats.attackIntervalMs;
+    this.nextJadeBranchesAt = scene.time.now + JADE_BRANCH.intervalMs / 2;
     this.nextSpecialAt = scene.time.now + 1500;
     this.nextSummonAt = scene.time.now + (worldId === 2 && roomNumber === 15 && kind === 'boss'
       ? FROZEN_BALANCE.sentinelSummonIntervalMs : FROZEN_EARLY.witchSummonIntervalMs);
@@ -112,6 +116,12 @@ export class AdvancedEnemy extends Slime {
   public get isPoisonAlchemist(): boolean {
     return this.isBoss && this.worldId === 1 && this.roomNumber === 15;
   }
+  public get isJadeMatriarch(): boolean {
+    return this.isBoss && this.worldId === 1 && this.roomNumber === 25;
+  }
+  public get isHeartOfGrove(): boolean {
+    return this.isBoss && this.worldId === 1 && this.roomNumber === 30;
+  }
   public get isRootTyrant(): boolean {
     return this.isBoss && this.worldId === 1 && this.roomNumber === 10;
   }
@@ -123,7 +133,8 @@ export class AdvancedEnemy extends Slime {
     fire: EnemyFire, explode: EnemyExplosion, dropBombs?: EnemyBomb,
     coverTank?: Readonly<ShieldSurface>, summon?: EnemySummon,
     rootAttack?: EnemyRoot, trailBomb?: EnemyTrail,
-    frozenSpecial?: (enemy: AdvancedEnemy, effect: 'boulder' | 'snow' | 'golems', count: number) => void): void {
+    frozenSpecial?: (enemy: AdvancedEnemy, effect: 'boulder' | 'snow' | 'golems', count: number) => void,
+    jadeBranches?: EnemyJadeBranches): void {
     if (this.aiState === 'defeated') return;
     super.chase(targetX, targetY);
     if (this.isStunned(now)) return;
@@ -285,6 +296,12 @@ export class AdvancedEnemy extends Slime {
                 targetY - this.y, this.isPoisonAlchemist ? speed * 1.7 : speed, this.orbitSign)
             : desired;
           this.setVelocity(velocity.x, velocity.y);
+        }
+        // An ADDITIONAL attack, independent of the existing bullet-pattern
+        // cycle: two warning lanes that grow across the chamber.
+        if (this.isJadeMatriarch && now >= this.nextJadeBranchesAt) {
+          jadeBranches?.(this);
+          this.nextJadeBranchesAt = now + JADE_BRANCH.intervalMs;
         }
         if (now >= this.nextShotAt && this.windupEndsAt === 0 && this.dashEndsAt === 0) {
           if (!this.isPoisonAlchemist) fire(this, mode.pattern, this.bossVolleys, mode.speed);
