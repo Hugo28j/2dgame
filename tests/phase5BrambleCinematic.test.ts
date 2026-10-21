@@ -49,7 +49,7 @@ describe('phase 5: one-time Bramble Gunner cinematic and twin handoff', () => {
     const tierScale=(1+19*.08)*(1+(4-1)*.09);
     const oldHp=Math.round(880*tierScale);
     const full=getEnemyStatsForRoom('boss',20,1,1);
-    expect(full.maxHp).toBe(Math.round(880*tierScale*1.5));
+    expect(full.maxHp).toBe(Math.round(Math.round(880*tierScale)*1.5));
     expect(full.maxHp).toBe(Math.round(oldHp*1.5));
     expect(getEnemyStatsForRoom('boss',20,1,0).maxHp).toBe(Math.round(oldHp*.7));
   });

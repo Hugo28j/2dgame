@@ -38,7 +38,8 @@ describe('phase 4 boss encounter migration', () => {
     const scale20 = (1 + 19 * .08) * (1 + (4 - 1) * .09);
     expect(getEnemyStatsForRoom('boss', 20, 1, 0).maxHp)
       .toBe(Math.round(880 * scale20 * .7));
-    expect(getEnemyStatsForRoom('boss', 20, 1, 1).maxHp).toBe(Math.round(880 * scale20));
+    expect(getEnemyStatsForRoom('boss', 20, 1, 1).maxHp)
+      .toBe(Math.round(Math.round(880 * scale20) * 1.5));
   });
 });
 describe('Root Tyrant wave and triple eight-way burst', () => {
