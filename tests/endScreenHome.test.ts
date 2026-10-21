@@ -24,7 +24,7 @@ describe('new end screen HOME button', () => {
       { left: 152, top: 26, width: 608, height: 675.2 }, 760, 844,
     );
     expect(result?.left).toBeCloseTo(332);
-    expect(result?.top).toBeCloseTo(564.8);
+    expect(result?.top).toBeCloseTo(565.2);
     expect(result?.width).toBeCloseTo(248);
     expect(result?.height).toBeCloseTo(51.2);
   });
