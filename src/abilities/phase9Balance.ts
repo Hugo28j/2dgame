@@ -41,7 +41,7 @@ export function shotgunVolleyAngles(heading: number): number[] {
   return Array.from({length: SHOTGUN_TRANSFORM.arrowsPerVolley},(_,i)=>
     heading + (i - (SHOTGUN_TRANSFORM.arrowsPerVolley-1)/2) * SHOTGUN_TRANSFORM.spreadRadians);
 }
-export function whiteoutWaveRadius(progress: number, maxRadius = WHITEOUT_WAVE.radius): number {
+export function whiteoutWaveRadius(progress: number, maxRadius: number = WHITEOUT_WAVE.radius): number {
   return maxRadius * Math.max(0,Math.min(1,progress));
 }
 /** Full visible dust-ring interior is damaging, not an unseen outside circle. */
