@@ -257,7 +257,6 @@ export class WeaponController {
     }
     const flame = this.flameEffect;
     const side = { x: -aim.y, y: aim.x };
-    const tip = { x: origin.x + aim.x * range, y: origin.y + aim.y * range };
     const flicker = Math.sin(time / FLAMETHROWER.visualFlickerMs);
     flame.clear();
     // Layered hot-core / orange / red plume, tapering from the caster out.
@@ -318,7 +317,7 @@ export class WeaponController {
       this.onMeleeHit?.(target, {
         damage: burn.damage, criticalChance: 0, criticalMultiplier: 1,
       });
-      if (!target.active || target.aiState === 'defeated') this.burning.delete(target);
+      if (!target.active || target.healthRatio <= 0) this.burning.delete(target);
     }
   }
 
