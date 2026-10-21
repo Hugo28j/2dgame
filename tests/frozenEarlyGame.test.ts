@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FROZEN_EARLY, canSummonFrostMinions } from '../src/enemies/frozenEarlyGame';
+import { FROZEN_EARLY, canSummonFrostMinions, frostMovementFactor } from '../src/enemies/frozenEarlyGame';
 import { getEnemyKindForRoom } from '../src/enemies/enemyConfig';
 import { getWorldCharacter } from '../src/enemies/worldCharacters';
 import { RoomProgress } from '../src/rooms/RoomProgress';
@@ -56,11 +56,22 @@ describe('Frozen Hollow rooms 1-10', () => {
     expect(room.doorOpen).toBe(true);
   });
 
-  it('applies temporary chill on ranger hit and frost freeze after witch explosion', () => {
-    expect(FROZEN_EARLY.chillSpeedFactor).toBeLessThan(1);
-    expect(FROZEN_EARLY.chillSpeedFactor).toBeGreaterThan(0);
-    expect(FROZEN_EARLY.chillDurationMs).toBeGreaterThan(500);
-    expect(FROZEN_EARLY.freezeDurationMs).toBeGreaterThan(2000);
+  it('keeps Archer chill separate from the Witch explosion 50% slow for three seconds', () => {
+    expect(FROZEN_EARLY.chillSpeedFactor).toBe(0.55);
+    expect(FROZEN_EARLY.chillDurationMs).toBe(1900);
+    expect(FROZEN_EARLY.witchSlowSpeedFactor).toBe(0.5);
+    expect(FROZEN_EARLY.witchSlowDurationMs).toBe(3000);
     expect(FROZEN_EARLY.witchOrbRadius).toBeGreaterThan(40);
+    const now = 1000;
+    expect(frostMovementFactor(now, 0, now + FROZEN_EARLY.witchSlowDurationMs)).toBe(0.5);
+    expect(frostMovementFactor(now + 2999, 0, now + 3000)).toBe(0.5);
+    expect(frostMovementFactor(now + 3000, 0, now + 3000)).toBe(1);
+  });
+
+  it('does not stack Witch slow and Archer chill into near-immobility', () => {
+    expect(frostMovementFactor(1000, 2000, 4000)).toBe(0.5);
+    expect(frostMovementFactor(2500, 2000, 4000)).toBe(0.5);
+    expect(frostMovementFactor(4000, 2000, 4000)).toBe(1);
+    expect(frostMovementFactor(1000, 2200, 0)).toBe(0.55);
   });
 });
