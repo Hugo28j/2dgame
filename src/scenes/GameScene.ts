@@ -11,6 +11,8 @@ import { MOSS_DASH, ROOT_BRANCH, rootBurstAngles } from '../enemies/worldOneBoss
 import { SPORE_POISON, poisonActive, poisonCovers, poisonTickDue } from '../enemies/poisonHazard';
 import { selectPoisonLocations, type PoisonCircle } from '../enemies/poisonPlacement';
 import { rootWavePoint, rootTipHits } from '../enemies/rootGrowth';
+import { JADE_BRANCH, HEART_TREE, jadeBranchLanes, groveBranchTip,
+  groveBranchHits, groveTreeHits, type GroveBranchLane } from '../enemies/groveAttacks';
 import { AdvancedEnemy, type BulletPattern } from '../enemies/AdvancedEnemy';
 import { EnemyProjectile } from '../enemies/EnemyProjectile';
 import { ricochetAxis } from '../enemies/enemyRicochet';
@@ -92,6 +94,14 @@ export class GameScene extends Phaser.Scene {
   private readonly fallingSnowballs = new Set<Phaser.GameObjects.Container>();
   private readonly bombWarnings = new Set<Phaser.GameObjects.Arc>();
   private readonly rootEffects = new Set<Phaser.GameObjects.Graphics>();
+  private readonly jadeBranches = new Set<{
+    lane: GroveBranchLane; graphic: Phaser.GameObjects.Graphics;
+    owner: AdvancedEnemy; startsAt: number; expiresAt: number; nextHitAt: number;
+  }>();
+  /** Includes telegraphing and growing trees, not only finished attacks. */
+  private readonly groveTreeZones = new Set<{
+    site: PoisonCircle; graphic: Phaser.GameObjects.Graphics;
+  }>();
   private readonly frozenWalls = new Set<{
     warning: Phaser.GameObjects.Graphics; ice: Phaser.GameObjects.Graphics;
     bounds: { x: number; y: number; width: number; height: number };
@@ -252,6 +262,7 @@ export class GameScene extends Phaser.Scene {
     this.abilities?.update(this.time.now, delta);
     if (this.player.isFrozen) this.player.setVelocity(0, 0);
     this.updatePoisonPools(this.time.now);
+    this.updateJadeBranches(this.time.now);
     this.updateFrozenWalls(this.time.now);
     this.updateGlacierBoulders(delta);
     this.weapon.update(this.time.now, this.controls.isShooting(), aim);
@@ -270,7 +281,8 @@ export class GameScene extends Phaser.Scene {
         child.updateAI(this.player.x, this.player.y, this.time.now,
           this.fireEnemyProjectiles, this.explodeEnemy, this.dropBossBombs,
           nearestCover?.shieldSurface, this.summonFrostMinions,
-          this.performRootAttack, this.dropDashTrailBomb, this.frozenBossSpecial);
+          this.performRootAttack, this.dropDashTrailBomb, this.frozenBossSpecial,
+          this.performJadeBranches);
       } else {
         child.chase(this.player.x, this.player.y);
       }
@@ -1505,6 +1517,10 @@ export class GameScene extends Phaser.Scene {
       this.throwPoisonBottles(enemy, count, radius);
       return;
     }
+    if (enemy.isHeartOfGrove) {
+      this.growHeartTrees(enemy, targetX, targetY, count, radius, windupMs);
+      return;
+    }
     const bounds = this.currentRoom?.layout.bounds;
     if (!bounds) return;
     for (let i = 0; i < count; i++) {
@@ -1538,6 +1554,191 @@ export class GameScene extends Phaser.Scene {
       this.bombTimers.add(timer);
     }
   };
+
+  /** Existing Jade projectiles stay untouched. Every independent cycle adds
+   * exactly two warning corridors and living branches crossing the arena. */
+  private readonly performJadeBranches = (enemy: AdvancedEnemy): void => {
+    if (this.worldId !== 1 || !enemy.isJadeMatriarch || !this.currentRoom ||
+        this.gameOver || this.transitioning || this.roomProgress.doorOpen ||
+        this.choosingUpgrade) return;
+    const lanes = jadeBranchLanes(this.currentRoom.layout.bounds, Math.random);
+    for (const lane of lanes) {
+      const telegraph = this.add.graphics().setDepth(24);
+      this.rootEffects.add(telegraph);
+      const dx = lane.end.x-lane.start.x, dy = lane.end.y-lane.start.y;
+      const length = Math.hypot(dx,dy);
+      const nx = length > 0 ? -dy/length : 0, ny = length > 0 ? dx/length : 0;
+      telegraph.fillStyle(0xc4b5fd,0.15);
+      telegraph.fillTriangle(lane.start.x+nx*20,lane.start.y+ny*20,
+        lane.end.x+nx*20,lane.end.y+ny*20,
+        lane.end.x-nx*20,lane.end.y-ny*20);
+      telegraph.fillTriangle(lane.start.x+nx*20,lane.start.y+ny*20,
+        lane.start.x-nx*20,lane.start.y-ny*20,
+        lane.end.x-nx*20,lane.end.y-ny*20);
+      // Dotted warning remains visible for the full preparation time.
+      telegraph.lineStyle(3,0xe9d5ff,0.96);
+      for (let i=0;i<18;i+=2){
+        const a=groveBranchTip(lane,i/18), b=groveBranchTip(lane,(i+1)/18);
+        telegraph.lineBetween(a.x,a.y,b.x,b.y);
+      }
+      let timer: Phaser.Time.TimerEvent;
+      timer = this.time.delayedCall(JADE_BRANCH.warningMs,() => {
+        this.bombTimers.delete(timer);
+        this.rootEffects.delete(telegraph);
+        telegraph.destroy();
+        if (!enemy.active || enemy.aiState==='defeated' || this.gameOver ||
+            this.transitioning || this.roomProgress.doorOpen || this.choosingUpgrade) return;
+        const now=this.time.now;
+        const graphic=this.add.graphics().setDepth(28);
+        this.jadeBranches.add({lane,graphic,owner:enemy,
+          startsAt:now, expiresAt:now+JADE_BRANCH.growthMs+JADE_BRANCH.activeMs,
+          nextHitAt:now});
+      });
+      this.bombTimers.add(timer);
+    }
+  };
+
+  private updateJadeBranches(now: number): void {
+    for (const active of this.jadeBranches) {
+      const {graphic,lane,owner}=active;
+      if (!graphic.active || now>=active.expiresAt || !owner.active ||
+          owner.aiState==='defeated' || this.roomProgress.doorOpen ||
+          this.gameOver || this.transitioning) {
+        graphic.destroy();
+        this.jadeBranches.delete(active);
+        continue;
+      }
+      const t=Math.min(1,Math.max(0,(now-active.startsAt)/JADE_BRANCH.growthMs));
+      const tip=groveBranchTip(lane,t);
+      graphic.clear();
+      // All side shoots emerge only on the already visible part of the branch.
+      graphic.lineStyle(JADE_BRANCH.thickness,0x694122,0.96);
+      graphic.lineBetween(lane.start.x,lane.start.y,tip.x,tip.y);
+      graphic.lineStyle(7,0xa5be74,0.95);
+      graphic.lineBetween(lane.start.x,lane.start.y,tip.x,tip.y);
+      for(let fraction=0.1;fraction<=t;fraction+=0.115){
+        const p=groveBranchTip(lane,fraction);
+        const direction=(Math.floor(fraction*100)%2?1:-1);
+        const along=lane.orientation==='horizontal';
+        graphic.lineStyle(5,0x6f4827,1);
+        graphic.lineBetween(p.x,p.y,p.x+(along?0:direction*22),
+          p.y+(along?direction*22:0));
+        graphic.fillStyle(0x86b96a,0.83);
+        graphic.fillEllipse(p.x+(along?0:direction*22),
+          p.y+(along?direction*22:0),12,9);
+      }
+      graphic.fillStyle(0xd9f99d,0.94);
+      graphic.fillCircle(tip.x,tip.y,12);
+      if (now>=active.nextHitAt && this.player?.active &&
+          groveBranchHits(lane,t,this.player)) {
+        active.nextHitAt=now+JADE_BRANCH.hitCooldownMs;
+        this.damagePlayer({damage:owner.stats.damage*0.62,
+          criticalChance:0,criticalMultiplier:1},JADE_BRANCH.hitCooldownMs);
+      }
+    }
+  }
+
+  /** Heart of the Grove: replace its old orange blast circles with marked
+   * tree growth. Reserve each footprint before the windup to avoid ALL overlaps. */
+  private growHeartTrees(enemy: AdvancedEnemy, targetX: number, targetY: number,
+    count: number, radius: number, windupMs: number): void {
+    if (this.worldId!==1 || !enemy.isHeartOfGrove || !this.currentRoom ||
+        this.gameOver || this.transitioning || this.roomProgress.doorOpen) return;
+    const reserved=Array.from(this.groveTreeZones,zone=>zone.site);
+    const sites=selectPoisonLocations(count,radius,this.currentRoom.layout.bounds,
+      reserved,Math.random,{x:targetX,y:targetY});
+    for (const site of sites) {
+      const graphic=this.add.graphics().setDepth(28);
+      const zone={site,graphic};
+      this.groveTreeZones.add(zone);
+      const {x,y}=site;
+      const r=site.radius;
+      graphic.fillStyle(0x78350f,0.15).fillCircle(x,y,r);
+      graphic.lineStyle(3,0xfde68a,0.92).strokeCircle(x,y,r);
+      graphic.lineStyle(2,0x78350f,0.88);
+      for (let j=0;j<8;j++) {
+        const a=j*Math.PI/4,inner=r*0.14,outer=r*0.72;
+        graphic.lineBetween(x+Math.cos(a)*inner,y+Math.sin(a)*inner,
+          x+Math.cos(a+0.13)*outer,y+Math.sin(a+0.13)*outer);
+      }
+      let warningTimer: Phaser.Time.TimerEvent;
+      warningTimer=this.time.delayedCall(windupMs+HEART_TREE.warningExtraMs,()=>{
+        this.bombTimers.delete(warningTimer);
+        if (!graphic.active || !enemy.active || enemy.aiState==='defeated' ||
+            this.gameOver || this.transitioning || this.choosingUpgrade ||
+            this.roomProgress.doorOpen) {
+          graphic.destroy();
+          this.groveTreeZones.delete(zone);
+          return;
+        }
+        let hit=false;
+        this.tweens.addCounter({
+          from:0,to:1,duration:HEART_TREE.growthMs,ease:'Cubic.easeOut',
+          onUpdate:tween=>{
+            if (!graphic.active || this.gameOver || this.transitioning ||
+                this.roomProgress.doorOpen) return;
+            const t=tween.getValue()??0;
+            graphic.clear();
+            // Roots radiate to the entire warned circumference, matching
+            // the true circular hitbox exactly.
+            graphic.fillStyle(0x3f6212,0.11*t).fillCircle(x,y,r*t);
+            graphic.lineStyle(3,0x854d0e,0.8);
+            for(let i=0;i<9;i++){
+              const a=i*Math.PI*2/9,dist=r*t;
+              graphic.lineBetween(x,y,x+Math.cos(a)*dist,
+                y+Math.sin(a)*dist);
+            }
+            const height=r*1.22*t;
+            graphic.lineStyle(Math.max(5,r*0.24*t),0x754424,1);
+            graphic.lineBetween(x,y+8,x,y-height);
+            graphic.lineStyle(3,0xb98d53,0.82);
+            graphic.lineBetween(x-3,y+3,x-3,y-height);
+            graphic.fillStyle(0x65a30d,0.83);
+            graphic.fillEllipse(x,y-height*0.77,r*1.45*t,r*0.95*t);
+            graphic.fillStyle(0xbef264,0.6);
+            graphic.fillEllipse(x-r*0.13,y-height*0.92,r*0.7*t,r*0.35*t);
+            // The first damage frame matches the visible expanding roots.
+            if (!hit && t>=HEART_TREE.damageAtProgress &&
+                this.player?.active && enemy.active &&
+                enemy.aiState!=='defeated' &&
+                groveTreeHits(site,r,this.player)) {
+              hit=true;
+              this.damagePlayer({damage:enemy.stats.damage*0.62,
+                criticalChance:0,criticalMultiplier:1});
+            }
+          },
+          onComplete:()=>{
+            if (!graphic.active) return;
+            let holdTimer: Phaser.Time.TimerEvent;
+            holdTimer=this.time.delayedCall(HEART_TREE.holdMs,()=>{
+              this.bombTimers.delete(holdTimer);
+              if (!graphic.active) return;
+              this.tweens.add({targets:graphic,alpha:0,
+                duration:HEART_TREE.fadeMs,
+                onComplete:()=>{
+                  graphic.destroy();
+                  this.groveTreeZones.delete(zone);
+                }});
+            });
+            this.bombTimers.add(holdTimer);
+          },
+        });
+      });
+      this.bombTimers.add(warningTimer);
+    }
+  }
+
+  private clearGroveEffects(): void {
+    for(const branch of this.jadeBranches) {
+      if(branch.graphic.active)branch.graphic.destroy();
+    }
+    this.jadeBranches.clear();
+    for(const zone of this.groveTreeZones) {
+      this.tweens.killTweensOf(zone.graphic);
+      if(zone.graphic.active)zone.graphic.destroy();
+    }
+    this.groveTreeZones.clear();
+  }
 
   /** The long-range ice bomb visibly flies to its target before leaving a slow field. */
   private throwFrozenSlowBomb(enemy: AdvancedEnemy, targetX: number, targetY: number,
@@ -1680,6 +1881,7 @@ export class GameScene extends Phaser.Scene {
   private clearBossBombs(): void {
     for (const timer of this.bombTimers) timer.remove(false);
     this.bombTimers.clear();
+    this.clearGroveEffects();
     for (const warning of this.bombWarnings) if (warning.active) warning.destroy();
     for (const root of this.rootEffects) if (root.active) root.destroy();
     this.rootEffects.clear();
