@@ -26,16 +26,25 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   private rapidFireMultiplier = 2.15;
   private sprintUntil = 0;
   private chilledUntil = 0;
+  private witchSlowedUntil = 0;
   private frozenUntil = 0;
   public get isFrozen(): boolean { return this.scene.time.now < this.frozenUntil; }
-  public get isChilled(): boolean { return this.scene.time.now < this.chilledUntil; }
+  public get isChilled(): boolean {
+    return this.scene.time.now < this.chilledUntil || this.scene.time.now < this.witchSlowedUntil;
+  }
   public clearFrost(): void {
     this.chilledUntil = 0;
+    this.witchSlowedUntil = 0;
     this.frozenUntil = 0;
   }
 
   public chill(now: number): void {
     this.chilledUntil = Math.max(this.chilledUntil, now + FROZEN_EARLY.chillDurationMs);
+  }
+  /** Witch ice-burst slows for three seconds; it never stops movement. */
+  public slowFromWitch(now: number): void {
+    this.witchSlowedUntil = Math.max(this.witchSlowedUntil,
+      now + FROZEN_EARLY.witchSlowDurationMs);
   }
   public freeze(now: number): void {
     this.frozenUntil = Math.max(this.frozenUntil, now + FROZEN_EARLY.freezeDurationMs);
@@ -59,8 +68,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
 
   public movementSpeedAt(now: number): number {
     if (now < this.frozenUntil) return 0;
-    return this.movementSpeed * (now < this.sprintUntil ? 1.65 : 1) *
-      (now < this.chilledUntil ? FROZEN_EARLY.chillSpeedFactor : 1);
+    // A simultaneous Archer chill and Witch slow use the strongest factor,
+    // not multiplicative 0.55 × 0.5 immobilization.
+    const frostFactor = Math.min(
+      now < this.chilledUntil ? FROZEN_EARLY.chillSpeedFactor : 1,
+      now < this.witchSlowedUntil ? FROZEN_EARLY.witchSlowSpeedFactor : 1,
+    );
+    return this.movementSpeed * (now < this.sprintUntil ? 1.65 : 1) * frostFactor;
   }
 
   public constructor(
