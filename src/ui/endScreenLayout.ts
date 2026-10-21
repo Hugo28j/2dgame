@@ -1,3 +1,12 @@
+import { GAME_SCENE_KEY, MENU_SCENE_KEY } from '../config/constants';
+
+export type EndScreenAction = 'replay' | 'menu';
+
+/** Keep both input paths tied to the requested scene destinations. */
+export function sceneKeyForEndScreenAction(action: EndScreenAction): string {
+  return action === 'replay' ? GAME_SCENE_KEY : MENU_SCENE_KEY;
+}
+
 export interface EndScreenButtonBounds {
   readonly x: number;
   readonly y: number;
