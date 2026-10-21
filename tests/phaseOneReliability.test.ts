@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { DESKTOP_GAME_WIDTH, MOBILE_GAME_WIDTH } from '../src/config/constants';
 import { displayedHp } from '../src/ui/displayValues';
 import {
-  clientPointInGame, containsScreenPoint, endScreenLayout,
+  clientBoundsForGameButton, clientPointInGame, containsScreenPoint, endScreenLayout,
 } from '../src/ui/endScreenLayout';
 
 describe('visible HP values', () => {
@@ -44,6 +44,20 @@ describe('win and death screen button geometry', () => {
     expect(point).toEqual({ x: MOBILE_GAME_WIDTH, y: 746 });
     expect(clientPointInGame(10, 20, {
       left: 10, top: 20, width: 0, height: 422,
+    }, MOBILE_GAME_WIDTH, 844)).toBeUndefined();
+    expect(clientPointInGame(9, 20, {
+      left: 10, top: 20, width: 195, height: 422,
+    }, MOBILE_GAME_WIDTH, 844)).toBeUndefined();
+  });
+
+  it('places native browser controls over the rendered canvas buttons', () => {
+    const layout = endScreenLayout(MOBILE_GAME_WIDTH);
+    const browserBounds = clientBoundsForGameButton(layout.replay, {
+      left: 10, top: 20, width: 390, height: 844,
+    }, MOBILE_GAME_WIDTH, 844);
+    expect(browserBounds).toEqual({ left: 55, top: 676, width: 300, height: 60 });
+    expect(clientBoundsForGameButton(layout.menu, {
+      left: 0, top: 0, width: 0, height: 844,
     }, MOBILE_GAME_WIDTH, 844)).toBeUndefined();
   });
 });
