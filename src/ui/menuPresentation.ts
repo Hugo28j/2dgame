@@ -20,7 +20,9 @@ export function abilityMenuSummary(stats: Readonly<AbilityStats>): string {
     case 'dash': return 'DASH ' + stats.dashSpeed + '  ·  ' + cooldown;
     case 'heal': return '+' + stats.heal + ' HP  ·  ' + cooldown;
     case 'timewarp': return (stats.durationMs / 1000).toFixed(1) + 'S SLOW MOTION  ·  ' + cooldown;
-    case 'rapidFire': return '2.15× AANVALSSNELHEID  ·  ' + cooldown;
+    case 'rapidFire': return stats.attackSpeedMultiplier.toFixed(2) +
+      '× AANVALSSNELHEID · ' + (stats.durationMs / 1000).toFixed(1) +
+      'S DUUR · ' + cooldown;
     case 'sprint': return '1.65× LOOPSNELHEID  ·  ' + cooldown;
     case 'companion': return 'AI BONDGENOOT  ·  ' + cooldown;
     case 'slow': return stats.damage + ' DMG  ·  ' +
