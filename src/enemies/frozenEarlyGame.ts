@@ -31,3 +31,12 @@ export function canSummonFrostMinions(
     aliveSummons + count <= FROZEN_EARLY.maxActiveSummonsPerRoom &&
     summonedByWitch + count <= FROZEN_EARLY.maxSummonsPerWitch;
 }
+
+/** Concurrent Archer/Witch chills never multiply into an unintended root. */
+export function frostMovementFactor(now: number, archerChilledUntil: number,
+  witchSlowedUntil: number): number {
+  return Math.min(
+    now < archerChilledUntil ? FROZEN_EARLY.chillSpeedFactor : 1,
+    now < witchSlowedUntil ? FROZEN_EARLY.witchSlowSpeedFactor : 1,
+  );
+}
