@@ -15,21 +15,24 @@ describe('world one boss attacks', () => {
       .toBeCloseTo(360 * 1080 / 1000 * 1.5);
     expect(MOSS_DASH.phaseTwoRechargeMs).toBeLessThan(MOSS_DASH.phaseOneRechargeMs);
   });
-  it('fires two full eight-way root bursts rotated by 22.5 degrees', () => {
-    const first = rootBurstAngles(false), second = rootBurstAngles(true);
+  it('fires three rotated eight-way root bursts with 0.8s gaps and a 3s rest', () => {
+    const first = rootBurstAngles(0), second = rootBurstAngles(1), third = rootBurstAngles(2);
     expect(first).toHaveLength(8);
     expect(second).toHaveLength(8);
+    expect(third).toHaveLength(8);
     for (let i = 0; i < 8; i++)
       expect(second[i]! - first[i]!).toBeCloseTo(Math.PI / 8);
-    expect(ROOT_BRANCH.pauseAfterBurstMs).toBe(1000);
+      expect(third[i]! - second[i]!).toBeCloseTo(Math.PI / 8);
+    expect(ROOT_BRANCH.burstStaggerMs).toBe(800);
+    expect(ROOT_BRANCH.pauseAfterBurstMs).toBe(3000);
     expect(ROOT_BRANCH.lineRecoveryMs).toBe(3000);
   });
   it('shortens poison and speeds up its casts', () => {
     expect(SPORE_POISON.durationMs).toBe(1500);
     expect(SPORE_THROW_INTERVAL_MS).toBe(1000);
   });
-  it('raises world-one alchemist HP by 50% and final boss HP by 100%', () => {
-    for (const [room, multiplier] of [[20, 1.5], [30, 2]] as const) {
+  it('adds 50% to Spore original 1.5× HP at level 15 and retains final-boss HP', () => {
+    for (const [room, multiplier] of [[15, 2.25], [30, 2]] as const) {
       const stats = getEnemyStatsForRoom('boss', room, 1);
       const scaling = 1 + (room - 1) * .08;
       const tier = 1 + (Math.floor(room / 5) - 1) * .09;

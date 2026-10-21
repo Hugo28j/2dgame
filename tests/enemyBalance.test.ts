@@ -7,10 +7,10 @@ import {
 
 describe('world-1 Bramble Gunner health balance', () => {
   it('has exactly 30% less HP, without reducing Bloom Sentinel or other worlds', () => {
-    expect(getWorldBossName(1, 15, 0)).toBe('Bramble Gunner');
-    expect(getWorldBossName(1, 15, 1)).toBe('Bloom Sentinel');
-    const bramble = getEnemyStatsForRoom('boss', 15, 1, 0);
-    const bloom = getEnemyStatsForRoom('boss', 15, 1, 1);
+    expect(getWorldBossName(1, 20, 0)).toBe('Bramble Gunner');
+    expect(getWorldBossName(1, 20, 1)).toBe('Bloom Sentinel');
+    const bramble = getEnemyStatsForRoom('boss', 20, 1, 0);
+    const bloom = getEnemyStatsForRoom('boss', 20, 1, 1);
     expect(BRAMBLE_GUNNER_HP_MULTIPLIER).toBe(0.7);
     expect(bramble.maxHp).toBe(Math.round(bloom.maxHp * 0.7));
     expect(bramble.damage).toBe(bloom.damage);
@@ -20,7 +20,7 @@ describe('world-1 Bramble Gunner health balance', () => {
     const frozenSentinel = getEnemyStatsForRoom('boss', 15, 2, 1);
     expect(frozenGunner.maxHp).toBe(frozenSentinel.maxHp);
     expect(getEnemyStatsForRoom('boss', 10, 1).maxHp).toBeGreaterThan(0);
-    expect(getEnemyStatsForRoom('boss', 20, 1).maxHp).toBeGreaterThan(bloom.maxHp);
+    expect(getEnemyStatsForRoom('boss', 15, 1).maxHp).toBeGreaterThan(bloom.maxHp);
   });
 });
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { splitTwinShotAngle, shotAngles } from '../src/enemies/projectilePatterns';
 
-describe('world 1 room 15 split boss spirals', () => {
+describe('world 1 room 20 split boss spirals', () => {
   it('starts opposite and rotates in opposite directions at double speed', () => {
     const first = splitTwinShotAngle(0, 0);
     const second = splitTwinShotAngle(0, 1);
