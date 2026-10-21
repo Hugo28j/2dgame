@@ -589,7 +589,11 @@ export class AbilityController {
     const range = stats.radius;
     const dust = this.scene.add.graphics().setDepth(30);
     this.whiteoutEffects.add(dust);
+    // Track both the approached enemy and the actual damage receiver. Ancient
+    // Treants can shield multiple enemies: a single wave must not multiply its
+    // damage on the same shield just because several mobs stand behind it.
     const struck = new Set<string>();
+    const hitReceivers = new Set<string>();
     this.scene.tweens.addCounter({
       from:0,to:1,duration:WHITEOUT_WAVE.expansionMs,ease:'Cubic.easeOut',
       onUpdate:tween=>{
@@ -618,7 +622,7 @@ export class AbilityController {
           if(struck.has(enemy.enemyId) ||
              !whiteoutReaches(origin,enemy,radius)) continue;
           struck.add(enemy.enemyId);
-          const receiver=this.hitEnemy(enemy,stats,1,origin);
+          const receiver=this.hitEnemy(enemy,stats,1,origin,hitReceivers);
           if(!receiver || receiver.aiState==='defeated')continue;
           const dx=receiver.x-origin.x,dy=receiver.y-origin.y;
           const norm=Math.hypot(dx,dy);
