@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import { DESKTOP_GAME_WIDTH, MOBILE_GAME_WIDTH } from '../src/config/constants';
 import { displayedHp } from '../src/ui/displayValues';
-import { containsScreenPoint, endScreenLayout } from '../src/ui/endScreenLayout';
+import {
+  clientPointInGame, containsScreenPoint, endScreenLayout,
+} from '../src/ui/endScreenLayout';
 
 describe('visible HP values', () => {
   it('always rounds finite combat precision upward for display', () => {
@@ -33,5 +35,15 @@ describe('win and death screen button geometry', () => {
     const layout = endScreenLayout(MOBILE_GAME_WIDTH);
     expect(containsScreenPoint(layout.replay, layout.menu.x, layout.menu.y)).toBe(false);
     expect(containsScreenPoint(layout.menu, 20, 400)).toBe(false);
+  });
+
+  it('maps scaled browser touch and mouse positions to logical game coordinates', () => {
+    const point = clientPointInGame(205, 393, {
+      left: 10, top: 20, width: 195, height: 422,
+    }, MOBILE_GAME_WIDTH, 844);
+    expect(point).toEqual({ x: MOBILE_GAME_WIDTH, y: 746 });
+    expect(clientPointInGame(10, 20, {
+      left: 10, top: 20, width: 0, height: 422,
+    }, MOBILE_GAME_WIDTH, 844)).toBeUndefined();
   });
 });
