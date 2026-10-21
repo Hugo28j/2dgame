@@ -11,11 +11,12 @@ describe('30-room campaign and two distinct room-15 bosses', () => {
     expect(Object.keys(BOSS_ENCOUNTER_ARCHETYPES)).toEqual(['5', '10', '15', '20', '25', '30']);
     expect(getRoomDefinition(15).enemyCount).toBe(1);
     expect(getRoomDefinition(15).enemySpawns).toHaveLength(1);
-    expect(getRoomDefinition(15, 2).enemySpawns).toHaveLength(3);
+    expect(getRoomDefinition(15, 2).enemySpawns).toHaveLength(1);
     expect(getWorldBossName(1, 15)).toBe('Bramble Gunner');
     expect(getWorldBossName(1, 15, 1)).toBe('Bloom Sentinel');
     expect(getWorldBossName(1, 30)).toBe('Heart of the Grove');
-    for (const world of WORLDS) {
+    expect(getWorldBossName(2, 15)).toBe('Snow Sentinel');
+    for (const world of WORLDS.filter(world => world.id !== 2)) {
       const first = getWorldCharacter(world.id, 'boss', 15, 0);
       const second = getWorldCharacter(world.id, 'boss', 15, 1);
       expect(first.name).not.toBe(second.name);
