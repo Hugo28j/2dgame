@@ -20,9 +20,10 @@ describe('world one boss attacks', () => {
     expect(first).toHaveLength(8);
     expect(second).toHaveLength(8);
     expect(third).toHaveLength(8);
-    for (let i = 0; i < 8; i++)
+    for (let i = 0; i < 8; i++) {
       expect(second[i]! - first[i]!).toBeCloseTo(Math.PI / 8);
       expect(third[i]! - second[i]!).toBeCloseTo(Math.PI / 8);
+    }
     expect(ROOT_BRANCH.burstStaggerMs).toBe(800);
     expect(ROOT_BRANCH.pauseAfterBurstMs).toBe(3000);
     expect(ROOT_BRANCH.lineRecoveryMs).toBe(3000);
