@@ -18,6 +18,21 @@ export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
     scene.physics.add.existing(this);
     this.setDepth(17);
     this.setTint(color);
+    if (effect === 'frost-chill') {
+      // A real small snowball, instead of the generic colored arrow/bullet.
+      const key = 'frost-ranger-mini-snowball';
+      if (!scene.textures.exists(key)) {
+        const g = scene.add.graphics();
+        g.fillStyle(0x93c5fd, .65); g.fillCircle(10, 10, 9);
+        g.fillStyle(0xe0f2fe); g.fillCircle(10, 10, 6);
+        g.fillStyle(0xffffff); g.fillCircle(7, 7, 2.5);
+        g.lineStyle(1.5, 0x38bdf8); g.strokeCircle(10, 10, 7);
+        g.generateTexture(key, 20, 20); g.destroy();
+      }
+      this.setTexture(key).clearTint();
+      scene.tweens.add({ targets: this, angle: '+=360', duration: 1000,
+        repeat: -1, onUpdate: () => { if (!this.active) scene.tweens.killTweensOf(this); } });
+    }
     if (effect === 'frost-burst') this.setScale(1.65);
     this.setRotation(Math.atan2(dy, dx));
     const length = Math.hypot(dx, dy) || 1;
