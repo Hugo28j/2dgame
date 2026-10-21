@@ -952,7 +952,11 @@ export class GameScene extends Phaser.Scene {
   private hitTreantShield(projectile: Projectile, tank: AdvancedEnemy): void {
     if (!projectile.active || !tank.active || tank.aiState === 'defeated') return;
     // Always consumes the projectile, including piercing projectiles.
-    if (!projectile.registerHit(tank.enemyId)) return;
+    if (!projectile.registerHit(tank.enemyId)) {
+      // A rotating Ancient Treant shield still blocks a bouncing Rune Tome
+      // orb even if the orb originally locked on to the enemy behind it.
+      if (!projectile.runeSecondHit) return;
+    }
     projectile.destroy();
     const result = this.damageSystem.apply(tank, projectile.attack);
     this.showDamageNumber(tank.x, tank.y, result);
