@@ -35,7 +35,7 @@ describe('themed world enemies and bosses', () => {
   it('gives all 34 active bosses unique names and sprites across 30-room worlds', () => {
     const bosses = WORLDS.flatMap(world =>
       [5, 10, 15, 20, 25, 30].flatMap(room =>
-        Array.from({ length: room === 15 && world.id !== 2 ? 2 : 1 }, (_, slot) =>
+        Array.from({ length: (world.id === 1 && room === 20) || (world.id >= 3 && room === 15) ? 2 : 1 }, (_, slot) =>
           getWorldCharacter(world.id, 'boss', room, slot))));
     expect(new Set(bosses.map(boss => boss.name)).size).toBe(34);
     expect(new Set(bosses.map(boss => boss.textureKey)).size).toBe(34);

@@ -56,7 +56,7 @@ describe('mouse and keyboard bindings', () => {
 });
 
 describe('six boss arenas and seven original archetypes', () => {
-  it('builds 30 rooms, with two bosses on room 15', () => {
+  it('builds 30 rooms, with the world-one split encounter on room 20', () => {
     expect(CHAPTER_ROOM_COUNT).toBe(30);
     expect(BOSSES).toHaveLength(10);
     const bossRooms = Array.from({ length: CHAPTER_ROOM_COUNT }, (_, i) => i + 1)
@@ -70,9 +70,9 @@ describe('six boss arenas and seven original archetypes', () => {
     }
     expect(getBossProfile(5)).toBe(BOSSES[0]);
     expect(getBossProfile(10)).toBe(BOSSES[2]);
-    expect(getBossProfile(15)).toBe(BOSSES[4]);
-    expect(getBossProfile(15, 1)).toBe(BOSSES[3]);
-    expect(getBossProfile(20)).toBe(BOSSES[6]);
+    expect(getBossProfile(15)).toBe(BOSSES[6]);
+    expect(getBossProfile(20)).toBe(BOSSES[4]);
+    expect(getBossProfile(20, 1)).toBe(BOSSES[3]);
     expect(getBossProfile(25)).toBe(BOSSES[7]);
     expect(getBossProfile(30)).toBe(BOSSES[9]);
   });
@@ -80,7 +80,7 @@ describe('six boss arenas and seven original archetypes', () => {
   it('preserves unique phase-two attacks and speeds up Jade Matriarch', () => {
     const signatures = new Set<string>();
     for (const room of [5, 10, 15, 20, 25, 30]) {
-      const bossSlots = room === 15 ? 2 : getRoomDefinition(room).enemyCount;
+      const bossSlots = room === 20 ? 2 : getRoomDefinition(room).enemyCount;
       for (let slot = 0; slot < bossSlots; slot++) {
         const profile = getBossProfile(room, slot);
         expect(profile.phaseOne).not.toEqual(profile.phaseTwo);
@@ -90,11 +90,12 @@ describe('six boss arenas and seven original archetypes', () => {
       }
     }
     expect(signatures.size).toBe(7);
-    expect(getBossPlan(15, 1, 0).pattern).toBe('machinegun');
-    expect(getBossPlan(15, 1, 0, 1).pattern).toBe('spiral');
+    expect(getBossPlan(15, 1, 0).pattern).toBe('single');
+    expect(getBossPlan(20, 1, 0).pattern).toBe('machinegun');
+    expect(getBossPlan(20, 1, 0, 1).pattern).toBe('spiral');
     expect(getBossPlan(25, 1, 0).tempo).toBeLessThan(0.6);
     expect(getBossPlan(25, 2, 0).tempo).toBeLessThan(0.4);
-    expect(getBossPlan(20, 2, 0).bombs).toBeGreaterThan(3);
+    expect(getBossPlan(15, 2, 0).bombs).toBeGreaterThan(3);
   });
 
   it('scales boss damage and regular HP across the six boss encounters', () => {
@@ -102,12 +103,12 @@ describe('six boss arenas and seven original archetypes', () => {
     const stats = rooms.map(room => getEnemyStatsForRoom('boss', room));
     for (let i = 1; i < stats.length; i++) {
       // Bramble Gunner has reduced HP; buffed Spore Alchemist can exceed the following Jade Matriarch.
-      if (rooms[i] !== 15 && rooms[i] !== 25)
+      if (rooms[i] !== 15 && rooms[i] !== 20 && rooms[i] !== 25)
         expect(stats[i]!.maxHp).toBeGreaterThan(stats[i - 1]!.maxHp);
       expect(stats[i]!.damage).toBeGreaterThan(stats[i - 1]!.damage);
     }
-    // Bloom Sentinel, the other room-15 boss, still follows regular scaling.
-    expect(getEnemyStatsForRoom('boss', 15, 1, 1).maxHp)
+    // Bloom Sentinel, summoned at room 20, still follows regular scaling.
+    expect(getEnemyStatsForRoom('boss', 20, 1, 1).maxHp)
       .toBeGreaterThan(getEnemyStatsForRoom('boss', 10).maxHp);
   });
 

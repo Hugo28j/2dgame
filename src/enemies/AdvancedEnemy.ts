@@ -11,13 +11,14 @@ import { CHARGER_DASH, WORLD1_BEETLE_DASH } from './enemyBalance';
 import { MOSS_DASH, ROOT_BRANCH, SPORE_THROW_INTERVAL_MS } from './worldOneBossBalance';
 import { FROZEN_EARLY } from './frozenEarlyGame';
 import { FROZEN_BALANCE } from './frozenBalance';
+import { sporePatrolVelocity } from './sporeMovement';
 import type { BulletPattern } from './projectilePatterns';
 export type { BulletPattern } from './projectilePatterns';
 
 export type EnemyFire = (enemy: AdvancedEnemy, pattern: BulletPattern, volley?: number, speed?: number) => void;
 export type EnemyExplosion = (enemy: AdvancedEnemy, radius: number) => void;
 export type EnemySummon = (enemy: AdvancedEnemy) => void;
-export type EnemyRoot = (enemy: AdvancedEnemy, attack: 'line' | 'burst', targetX: number, targetY: number, rotated: boolean) => void;
+export type EnemyRoot = (enemy: AdvancedEnemy, attack: 'line' | 'burst', targetX: number, targetY: number, rotation: number | boolean) => void;
 export type EnemyTrail = (enemy: AdvancedEnemy, x: number, y: number) => void;
 export type EnemyBomb = (enemy: AdvancedEnemy, targetX: number, targetY: number,
   count: number, radius: number, windupMs: number) => void;
@@ -29,7 +30,7 @@ export class AdvancedEnemy extends Slime {
   private nextShotAt = 0;
   private nextTrailAt = 0;
   private nextSnowfallAt = 0;
-  private rootStage: 'line' | 'burst1' | 'burst2' | 'rest' = 'line';
+  private rootStage: 'ready' | 'second' | 'third' | 'rest' = 'ready';
   public fasterTwin = false;
   /** Index of the two split Void Sentinels (0 spins clockwise, 1 counterclockwise). */
   public splitTwinIndex: 0 | 1 = 0;
@@ -103,7 +104,7 @@ export class AdvancedEnemy extends Slime {
     return { x: this.x, y: this.y, facingX: this.shieldFacingX, facingY: this.shieldFacingY };
   }
   public get isPoisonAlchemist(): boolean {
-    return this.isBoss && this.worldId === 1 && this.roomNumber === 20;
+    return this.isBoss && this.worldId === 1 && this.roomNumber === 15;
   }
   public get isRootTyrant(): boolean {
     return this.isBoss && this.worldId === 1 && this.roomNumber === 10;
@@ -193,8 +194,8 @@ export class AdvancedEnemy extends Slime {
         break;
       case 'boss': {
         const phase = bossPhase(this.healthRatio);
-        const profile = getBossProfile(this.roomNumber, this.bossSlot);
-        const mode = getBossPlan(this.roomNumber, phase, this.bossVolleys, this.bossSlot);
+        const profile = getBossProfile(this.roomNumber, this.bossSlot, this.worldId);
+        const mode = getBossPlan(this.roomNumber, phase, this.bossVolleys, this.bossSlot, this.worldId);
         const move = rangedVelocity(this.x, this.y, targetX, targetY, speed,
           profile.preferredRange, this.orbitSign);
         if (this.isGlacierWarden) {
@@ -220,20 +221,20 @@ export class AdvancedEnemy extends Slime {
             if (phase === 1) {
               rootAttack?.(this, 'line', targetX, targetY, false);
               this.nextShotAt = now + ROOT_BRANCH.lineRecoveryMs + ROOT_BRANCH.lineWarningMs;
-            } else if (this.rootStage === 'line') {
-              rootAttack?.(this, 'burst', targetX, targetY, false);
-              this.rootStage = 'burst1';
+            } else if (this.rootStage === 'ready') {
+              rootAttack?.(this, 'burst', targetX, targetY, 0);
+              this.rootStage = 'second';
               this.nextShotAt = now + ROOT_BRANCH.burstStaggerMs;
-            } else if (this.rootStage === 'burst1') {
-              rootAttack?.(this, 'burst', targetX, targetY, true);
-              this.rootStage = 'burst2';
-              this.nextShotAt = now + ROOT_BRANCH.pauseAfterBurstMs;
-            } else if (this.rootStage === 'burst2') {
-              rootAttack?.(this, 'line', targetX, targetY, false);
+            } else if (this.rootStage === 'second') {
+              rootAttack?.(this, 'burst', targetX, targetY, 1);
+              this.rootStage = 'third';
+              this.nextShotAt = now + ROOT_BRANCH.burstStaggerMs;
+            } else if (this.rootStage === 'third') {
+              rootAttack?.(this, 'burst', targetX, targetY, 2);
               this.rootStage = 'rest';
-              this.nextShotAt = now + ROOT_BRANCH.lineWarningMs + ROOT_BRANCH.lineRecoveryMs;
+              this.nextShotAt = now + ROOT_BRANCH.pauseAfterBurstMs;
             } else {
-              this.rootStage = 'line';
+              this.rootStage = 'ready';
               this.nextShotAt = now;
             }
           }
@@ -249,7 +250,7 @@ export class AdvancedEnemy extends Slime {
           }
           break;
         }
-        if (this.worldId === 1 && this.roomNumber === 15 && this.fasterTwin) {
+        if (this.worldId === 1 && this.roomNumber === 20 && this.fasterTwin) {
           const sibling = this.scene.children.list.find(child =>
             child instanceof AdvancedEnemy && child !== this && child.active &&
             child.kind === 'boss' && child.fasterTwin && child.bossSlot === this.bossSlot);
@@ -268,16 +269,22 @@ export class AdvancedEnemy extends Slime {
             (body.blocked.left || body.blocked.right || body.touching.left || body.touching.right);
           const blockedY = body instanceof Phaser.Physics.Arcade.Body &&
             (body.blocked.up || body.blocked.down || body.touching.up || body.touching.down);
+          // Spore Alchemist actively patrols the arena instead of holding the
+          // same preferred distance. All other bosses retain their existing AI.
+          const desired = this.isPoisonAlchemist ?
+            sporePatrolVelocity(this, {x: targetX, y: targetY},
+              this.scene.physics.world.bounds, now, speed * 1.7, this.orbitSign) : move;
           const velocity = blockedX || blockedY
             ? getObstacleAvoidanceVelocity(blockedX, targetX - this.x,
-                targetY - this.y, speed, this.orbitSign) : move;
+                targetY - this.y, this.isPoisonAlchemist ? speed * 1.7 : speed, this.orbitSign)
+            : desired;
           this.setVelocity(velocity.x, velocity.y);
         }
         if (now >= this.nextShotAt && this.windupEndsAt === 0 && this.dashEndsAt === 0) {
           if (!this.isPoisonAlchemist) fire(this, mode.pattern, this.bossVolleys, mode.speed);
           if (mode.bombs > 0 && dropBombs && !(this.worldId === 2 && this.roomNumber === 10)) {
             dropBombs(this, targetX, targetY,
-              this.isPoisonAlchemist ? (phase === 1 ? 4 : 8) : mode.bombs,
+              this.isPoisonAlchemist ? (phase === 1 ? 6 : 12) : mode.bombs,
               mode.radius, mode.windupMs);
           }
           this.bossVolleys++;

@@ -30,7 +30,8 @@ describe('five unique playable worlds', () => {
         expect(getRoomDefinition(room).isBossRoom).toBe(true);
         expect(getRoomDefinition(room).enemyCount).toBe(1);
         bossNames.add(getWorldBossName(world.id, room));
-        if (room === 15 && world.id !== 2) bossNames.add(getWorldBossName(world.id, room, 1));
+        if ((room === 20 && world.id === 1) || (room === 15 && world.id >= 3))
+          bossNames.add(getWorldBossName(world.id, room, 1));
       }
     }
     expect(bossNames.size).toBe(34);

@@ -1,4 +1,5 @@
 import type { BulletPattern } from './projectilePatterns';
+import type { WorldId } from '../worlds/worldConfig';
 
 export interface BossMode {
   patterns: readonly BulletPattern[];
@@ -66,17 +67,19 @@ export const BOSS_ENCOUNTER_ARCHETYPES: Readonly<Record<number, readonly number[
 export function getBossTier(roomNumber: number): number {
   return Math.min(6, Math.max(1, Math.floor(roomNumber / 5)));
 }
-export function getBossArchetypeIndex(roomNumber: number, bossSlot = 0): number {
+/** World 1 swaps the actual encounter archetype, not just its label. */
+export function getBossArchetypeIndex(roomNumber: number, bossSlot = 0, worldId: WorldId = 1): number {
   const room = Math.max(5, Math.min(30, Math.floor(roomNumber / 5) * 5));
-  return BOSS_ENCOUNTER_ARCHETYPES[room]?.[bossSlot] ??
-    BOSS_ENCOUNTER_ARCHETYPES[room]![0]!;
+  const encounter = worldId === 1 && room === 15 ? [6] :
+    worldId === 1 && room === 20 ? [4, 3] : BOSS_ENCOUNTER_ARCHETYPES[room];
+  return encounter?.[bossSlot] ?? encounter![0]!;
 }
-export function getBossProfile(roomNumber: number, bossSlot = 0): BossProfile {
-  return BOSSES[getBossArchetypeIndex(roomNumber, bossSlot)]!;
+export function getBossProfile(roomNumber: number, bossSlot = 0, worldId: WorldId = 1): BossProfile {
+  return BOSSES[getBossArchetypeIndex(roomNumber, bossSlot, worldId)]!;
 }
-export function getBossPlan(roomNumber: number, phase: 1 | 2, volley: number, bossSlot = 0):
-  BossMode & { pattern: BulletPattern } {
-  const boss = getBossProfile(roomNumber, bossSlot);
+export function getBossPlan(roomNumber: number, phase: 1 | 2, volley: number, bossSlot = 0,
+  worldId: WorldId = 1): BossMode & { pattern: BulletPattern } {
+  const boss = getBossProfile(roomNumber, bossSlot, worldId);
   const m = phase === 1 ? boss.phaseOne : boss.phaseTwo;
   return { ...m, pattern: m.patterns[Math.abs(Math.floor(volley)) % m.patterns.length]! };
 }

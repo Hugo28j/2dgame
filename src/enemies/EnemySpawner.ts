@@ -43,7 +43,7 @@ export class EnemySpawner {
     });
   }
 
-  /** Second phase of World 1 chamber 15: two separate Sentinel bosses. */
+  /** Second phase of World 1 chamber 20: two separate Bloom Sentinels. */
   public spawnSplitBosses(points: readonly SpawnPoint[], room: number): AdvancedEnemy[] {
     return points.map((point, index) => {
       const boss = new AdvancedEnemy(this.scene, `split-boss-${this.nextEnemyNumber++}`,

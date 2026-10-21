@@ -1,6 +1,6 @@
 import { getWorld, getWorldBossName, type WorldId } from '../worlds/worldConfig';
 import type { EnemyKind } from './enemyConfig';
-import { getBossArchetypeIndex } from './bossProfiles';
+import { BOSS_ENCOUNTER_ARCHETYPES, getBossArchetypeIndex } from './bossProfiles';
 
 export type MinionKind = Exclude<EnemyKind, 'boss'>;
 export interface CharacterLook {
@@ -50,7 +50,7 @@ const minionOrder: readonly MinionKind[] = ['slime', 'archer', 'charger', 'mage'
 export function getWorldCharacter(worldId: WorldId, kind: EnemyKind, roomNumber = 1, bossSlot = 0): CharacterLook {
   const world = getWorld(worldId);
   if (kind === 'boss') {
-    const tier = getBossArchetypeIndex(roomNumber, bossSlot) + 1;
+    const tier = getBossArchetypeIndex(roomNumber, bossSlot, worldId) + 1;
     // Each archetype retains its unique texture when moving to 30-room worlds.
     return {
       name: getWorldBossName(worldId, roomNumber, bossSlot),
@@ -76,4 +76,13 @@ export function getWorldCharacter(worldId: WorldId, kind: EnemyKind, roomNumber 
 
 export function getWorldCharacterRoster(worldId: WorldId): readonly CharacterLook[] {
   return minionOrder.map(kind => getWorldCharacter(worldId, kind));
+}
+
+/** Every generated boss texture must include special multi-stage encounters. */
+export function getWorldBossArtRoster(worldId: WorldId): CharacterLook[] {
+  const original = Object.entries(BOSS_ENCOUNTER_ARCHETYPES).flatMap(([room, indices]) =>
+    indices.map((_, slot) => getWorldCharacter(worldId, 'boss', Number(room), slot)));
+  // Phase 4 moves Bloom Sentinel's second stage from W1/15 to W1/20.
+  return worldId === 1 ?
+    [...original, getWorldCharacter(worldId, 'boss', 20, 1)] : original;
 }

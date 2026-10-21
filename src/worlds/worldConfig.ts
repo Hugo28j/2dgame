@@ -84,7 +84,9 @@ export function isWorldUnlocked(id: WorldId, completedWorlds: number): boolean {
 export function getWorldBossName(id: WorldId, roomNumber: number, bossSlot = 0): string {
   const tier = Math.max(1, Math.min(6, Math.floor(roomNumber / 5)));
   const rosterIndices = [[0], [2], [4, 3], [6], [7], [9]] as const;
-  const index = id === 2 && roomNumber === 15 ? 3 :
+  const index = id === 1 && roomNumber === 15 ? 6 :
+    id === 1 && roomNumber === 20 ? ([4, 3][bossSlot] ?? 4) :
+    id === 2 && roomNumber === 15 ? 3 :
     rosterIndices[tier - 1]?.[bossSlot] ?? rosterIndices[tier - 1]![0];
   return getWorld(id).bossNames[index]!;
 }

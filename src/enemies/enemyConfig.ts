@@ -58,13 +58,13 @@ export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number,
         worldId === 1 && kind === 'bomber' ? WORLD1_SPORECAP_HP_MULTIPLIER : 1) *
       (1 + completed * SLIME_DIFFICULTY.hpPerRoom) *
       (kind === 'boss' ? 1 + (getBossTier(number) - 1) * 0.09 : 1) * world.hpMultiplier *
-      // Only Bramble Gunner (first boss, world 1 room 15); Bloom Sentinel
-      // in the same room and other world's gunner retain full HP.
-      (kind === 'boss' && worldId === 1 && number === 15 && bossSlot === 0
+      // Only world-1 Bramble Gunner at room 20 gets its original HP reduction.
+      // Bloom Sentinel twins keep their full stage-20 boss health.
+      (kind === 'boss' && worldId === 1 && number === 20 && bossSlot === 0
         ? BRAMBLE_GUNNER_HP_MULTIPLIER : 1) *
       (kind === 'boss' && worldId === 2 && number === 5 ? FROZEN_BALANCE.glacierWardenHpMultiplier :
         kind === 'boss' && worldId === 2 && number === 15 ? FROZEN_BALANCE.snowSentinelHpMultiplier : 1) *
-      (kind === 'boss' && worldId === 1 && number === 20 ? 1.5 :
+      (kind === 'boss' && worldId === 1 && number === 15 ? 1.5 * 1.5 :
         kind === 'boss' && worldId === 1 && number === 30 ? 2 : 1)),
     damage: Math.round(base.damage * (worldId === 2 && kind === 'archer' ? 2 * FROZEN_BALANCE.rangerDamageMultiplier :
       worldId === 1 && kind === 'archer' ? WORLD1_BRIAR_DAMAGE_MULTIPLIER : 1) *
