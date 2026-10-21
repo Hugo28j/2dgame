@@ -15,7 +15,7 @@ describe('new end screen HOME button', () => {
     const logical = homeButtonLayout(390);
     expect(homeButtonClientBounds(logical,
       { left: 35, top: 12, width: 195, height: 422 }, 390, 844,
-    )).toEqual({ left: 55, top: 349, width: 155, height: 32 });
+    )).toEqual({ left: 55, top: 358.5, width: 155, height: 32 });
   });
 
   it('follows desktop canvas center, never the page center', () => {
@@ -24,7 +24,7 @@ describe('new end screen HOME button', () => {
       { left: 152, top: 26, width: 608, height: 675.2 }, 760, 844,
     );
     expect(result?.left).toBeCloseTo(332);
-    expect(result?.top).toBeCloseTo(565.2);
+    expect(result?.top).toBeCloseTo(580.4);
     expect(result?.width).toBeCloseTo(248);
     expect(result?.height).toBeCloseTo(51.2);
   });

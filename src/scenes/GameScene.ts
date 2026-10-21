@@ -27,7 +27,7 @@ import { Player } from '../entities/Player';
 import { CoinPickup } from '../entities/CoinPickup';
 import { XpPickup } from '../entities/XpPickup';
 import { ArmorPickup } from '../entities/ArmorPickup';
-import { rollEnemyArmor, armorDefinition, RARITY_CONFIG } from '../progression/armor';
+import { rollEnemyArmor, armorDefinition, RARITY_CONFIG, type ArmorItem } from '../progression/armor';
 import { xpDropsForEnemy } from '../progression/heroXp';
 import { heroXpRequirement } from '../progression/ProgressStore';
 import { MAX_HERO_LEVEL } from '../heroes/heroConfig';
@@ -69,6 +69,7 @@ export class GameScene extends Phaser.Scene {
   private readonly coins = new Set<CoinPickup>();
   private readonly xpCrystals = new Set<XpPickup>();
   private readonly armorDrops = new Set<ArmorPickup>();
+  private collectedRunArmor: ArmorItem[] = [];
   private xpHudText?: Phaser.GameObjects.Text;
   private levelUpGlow?: Phaser.GameObjects.Container;
   private levelUpGlowEndAt = 0;
@@ -134,6 +135,7 @@ export class GameScene extends Phaser.Scene {
 
   public create(): void {
     this.worldId = progressStore.current.selectedWorld;
+    this.collectedRunArmor = [];
     this.roomProgress.reset();
     this.clearCoins();
     this.aliveEnemies = 0;
@@ -1785,6 +1787,8 @@ export class GameScene extends Phaser.Scene {
       const item = drop.item;
       const collected = progressStore.dispatch({ type: 'collectArmor', item });
       if (collected) {
+        // Include only successfully collected drops on the results screen.
+        this.collectedRunArmor.push(item);
         const name = armorDefinition(item).slot.toUpperCase();
         const text = this.add.text(this.player.x, this.player.y - 48,
           name + ' · ' + RARITY_CONFIG[item.rarity].label.toUpperCase(), {
@@ -2154,6 +2158,7 @@ export class GameScene extends Phaser.Scene {
     progressStore.dispatch({ type: 'settleRun', report, heroId: this.player?.heroId });
     this.scene.launch(GAME_OVER_SCENE_KEY, {
       report, chosenUpgrades: this.upgrades.chosen(),
+      collectedArmor: [...this.collectedRunArmor],
     });
     this.scene.sleep();
   }

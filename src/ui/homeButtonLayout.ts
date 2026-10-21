@@ -14,7 +14,7 @@ export interface ClientHomeButtonBounds {
 }
 
 export function homeButtonLayout(gameWidth: number): HomeButtonBounds {
-  return { x: gameWidth / 2, y: 706, width: Math.min(310, gameWidth - 60), height: 64 };
+  return { x: gameWidth / 2, y: 725, width: Math.min(310, gameWidth - 60), height: 64 };
 }
 
 /**
