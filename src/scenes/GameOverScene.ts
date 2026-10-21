@@ -1,10 +1,14 @@
 import Phaser from 'phaser';
-import { GAME_OVER_SCENE_KEY, GAME_SCENE_KEY, GAME_WIDTH, MENU_SCENE_KEY } from '../config/constants';
+import {
+  GAME_HEIGHT, GAME_OVER_SCENE_KEY, GAME_SCENE_KEY, GAME_WIDTH, MENU_SCENE_KEY,
+} from '../config/constants';
 import type { RunReport } from '../progression/RunLedger';
 import { progressStore } from '../progression/ProgressStore';
 import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
 import { getWorld } from '../worlds/worldConfig';
-import { containsScreenPoint, endScreenLayout } from '../ui/endScreenLayout';
+import {
+  clientPointInGame, containsScreenPoint, endScreenLayout,
+} from '../ui/endScreenLayout';
 
 interface GameOverData {
   report: RunReport;
@@ -36,21 +40,25 @@ export class GameOverScene extends Phaser.Scene {
     this.input.enabled = true;
     this.input.setTopOnly(true);
     this.cameras.main.setScroll(0, 0);
-    this.cameras.main.setBackgroundColor('#081525');
-    const panel = this.add.rectangle(centerX, 422, 364, 760, 0x101d30)
-      .setStrokeStyle(3, report.victory ? 0x38bdf8 : 0xef4444);
-    panel.setScale(0.86).setAlpha(0);
-    this.tweens.add({ targets: panel, scaleX: 1, scaleY: 1, alpha: 1,
-      duration: 550, ease: 'Back.easeOut' });
-    this.cameras.main.fadeIn(500, 0, 0, 0);
+    this.cameras.main.setBackgroundColor('#17324b');
+    this.add.rectangle(centerX, 422, GAME_WIDTH, GAME_HEIGHT, 0x17324b)
+      .setScrollFactor(0);
+    this.add.circle(centerX + 130, 95, 220, report.victory ? 0x0e7490 : 0x9f3040, 0.16)
+      .setScrollFactor(0);
+    this.add.circle(centerX - 145, 760, 190, 0x25668a, 0.13).setScrollFactor(0);
+    const panel = this.add.rectangle(centerX, 422, 364, 760, 0x23415f)
+      .setStrokeStyle(3, report.victory ? 0x67e8f9 : 0xfb7185);
+    panel.setScale(0.92).setAlpha(0.72);
+    this.tweens.add({ targets: panel, scaleX: 1, scaleY: 1, alpha: 0.98,
+      duration: 380, ease: 'Back.easeOut' });
     const headline = this.add.text(centerX, 87, report.victory ? 'CHAPTER VOLTOOID!' : 'GAME OVER', {
       fontFamily, fontSize: '28px', fontStyle: 'bold',
-      color: report.victory ? '#67e8f9' : '#fca5a5',
+      color: report.victory ? '#a5f3fc' : '#fecdd3',
     }).setOrigin(0.5).setScale(0.5).setAlpha(0);
     this.tweens.add({ targets: headline, scaleX: 1, scaleY: 1, alpha: 1,
       duration: 600, delay: 120, ease: 'Back.easeOut' });
     this.add.text(centerX, 128, 'JE RUN-RESULTAAT', {
-      fontFamily, fontSize: '14px', color: '#cbd5e1',
+      fontFamily, fontSize: '14px', color: '#e2e8f0',
     }).setOrigin(0.5);
 
     const rows = [
@@ -70,11 +78,11 @@ export class GameOverScene extends Phaser.Scene {
       this.add.text(layout.panelLeft, y, label ?? '', {
         fontFamily, fontSize: index === 6 || index === 7 ? '12px' : '13px',
         fontStyle: index === 6 || index === 7 ? 'bold' : 'normal',
-        color: index === 6 || index === 7 ? '#fde68a' : '#94a3b8',
+        color: index === 6 || index === 7 ? '#fef08a' : '#cbd5e1',
       });
       this.add.text(layout.panelRight, y, value ?? '', {
         fontFamily, fontSize: '13px', fontStyle: 'bold',
-        color: index === 6 || index === 7 ? '#fde68a' : '#f8fafc',
+        color: index === 6 || index === 7 ? '#fef08a' : '#ffffff',
       }).setOrigin(1, 0);
     });
 
@@ -84,7 +92,7 @@ export class GameOverScene extends Phaser.Scene {
       }).setOrigin(0.5);
     }
     this.add.text(centerX, 566, 'ARMOR: VERSLA VIJANDEN EN RAAP LOOT OP', {
-      fontFamily, fontSize: '10px', color: '#94a3b8',
+      fontFamily, fontSize: '10px', color: '#cbd5e1',
     }).setOrigin(0.5);
     const upgrades = data.chosenUpgrades;
     this.add.text(layout.panelLeft, 503, 'TIJDELIJKE UPGRADES', {
@@ -92,30 +100,41 @@ export class GameOverScene extends Phaser.Scene {
     });
     this.add.text(layout.panelLeft, 526,
       upgrades.length ? upgrades.map(u => u.name + (u.stacks > 1 ? ' ×' + u.stacks : '')).join(', ') : 'Geen',
-      { fontFamily, fontSize: '12px', color: '#cbd5e1', wordWrap: { width: 310 } },
+      { fontFamily, fontSize: '12px', color: '#e2e8f0', wordWrap: { width: 310 } },
     );
 
     const button = (bounds: typeof layout.replay, label: string,
       callback: () => void, primary = false): void => {
-      // Full-height hit target above the visible label, with explicit center geometry.
-      const plate = this.add.rectangle(bounds.x, bounds.y, 294, 53,
-        primary ? 0x0e7490 : 0x334155)
-        .setStrokeStyle(2, primary ? 0x67e8f9 : 0x64748b)
-        .setDepth(20).setScrollFactor(0);
+      // The visible graphic itself owns the exact same rectangle used for input.
+      const plate = this.add.graphics()
+        .setPosition(bounds.x - bounds.width / 2, bounds.y - bounds.height / 2)
+        .setDepth(30).setScrollFactor(0);
+      const drawPlate = (pressed: boolean): void => {
+        plate.clear();
+        plate.fillStyle(primary ? (pressed ? 0x0891b2 : 0x0e7490) :
+          (pressed ? 0x475569 : 0x334155), 1);
+        plate.fillRoundedRect(0, 0, bounds.width, bounds.height, 8);
+        plate.lineStyle(3, primary ? 0x67e8f9 : 0x94a3b8, 1);
+        plate.strokeRoundedRect(0, 0, bounds.width, bounds.height, 8);
+      };
+      drawPlate(false);
       const caption = this.add.text(bounds.x, bounds.y, label, {
         fontFamily, fontSize: '17px', fontStyle: 'bold', color: '#fff',
-      }).setOrigin(0.5).setDepth(21).setScrollFactor(0);
-      const hit = this.add.zone(bounds.x, bounds.y, bounds.width, bounds.height).setDepth(30)
-        .setScrollFactor(0).setInteractive({ useHandCursor: true });
+      }).setOrigin(0.5).setDepth(31).setScrollFactor(0);
       let activated = false;
       const activate = (): void => {
-        if (activated || !this.scene.isActive()) return;
+        if (activated) return;
         activated = true;
         callback();
       };
-      hit.on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, activate);
+      plate.setInteractive(new Phaser.Geom.Rectangle(0, 0, bounds.width, bounds.height),
+        Phaser.Geom.Rectangle.Contains);
+      plate.input!.cursor = 'pointer';
+      plate.on('pointerover', () => drawPlate(true));
+      plate.on('pointerout', () => drawPlate(false));
+      plate.on('pointerdown', activate);
       this.tweens.add({ targets: [plate, caption], alpha: { from: 0, to: 1 },
-        duration: 380, delay: 340, ease: 'Sine.easeOut' });
+        duration: 260, delay: 180, ease: 'Sine.easeOut' });
     };
     let navigating = false;
     const navigate = (target: string): void => {
@@ -127,17 +146,21 @@ export class GameOverScene extends Phaser.Scene {
     };
     button(layout.replay, 'OPNIEUW SPELEN', () => navigate(GAME_SCENE_KEY), true);
     button(layout.menu, 'HOOFDMENU', () => navigate(MENU_SCENE_KEY));
-    // Fallback for canvas input/camera hit-zone inconsistencies on touch & desktop.
-    const handleScreenPointer = (pointer: Phaser.Input.Pointer): void => {
-      if (containsScreenPoint(layout.replay, pointer.x, pointer.y)) navigate(GAME_SCENE_KEY);
-      else if (containsScreenPoint(layout.menu, pointer.x, pointer.y)) navigate(MENU_SCENE_KEY);
+    // Native canvas backup: reliable for touch and mouse even if Phaser misses
+    // a pointer during a scene hand-off. It reuses the exact rendered bounds.
+    const handleCanvasPointer = (event: PointerEvent): void => {
+      const point = clientPointInGame(event.clientX, event.clientY,
+        this.game.canvas.getBoundingClientRect(), GAME_WIDTH, GAME_HEIGHT);
+      if (!point) return;
+      if (containsScreenPoint(layout.replay, point.x, point.y)) navigate(GAME_SCENE_KEY);
+      else if (containsScreenPoint(layout.menu, point.x, point.y)) navigate(MENU_SCENE_KEY);
     };
-    this.input.on(Phaser.Input.Events.POINTER_DOWN, handleScreenPointer);
+    this.game.canvas.addEventListener('pointerdown', handleCanvasPointer);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.input.off(Phaser.Input.Events.POINTER_DOWN, handleScreenPointer);
+      this.game.canvas.removeEventListener('pointerdown', handleCanvasPointer);
     });
     this.add.text(centerX, 811, 'Alleen opgeraapt goud telt mee — eenmaal opgeslagen', {
-      fontFamily, fontSize: '10px', color: '#94a3b8',
+      fontFamily, fontSize: '10px', color: '#cbd5e1',
     }).setOrigin(0.5);
   }
 }
