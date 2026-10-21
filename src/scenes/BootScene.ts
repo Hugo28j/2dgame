@@ -99,7 +99,6 @@ export class BootScene extends Phaser.Scene {
       'bolt-projectile': 0xfca5a5,
       'magic-projectile': 0xc084fc,
       'lightning-projectile': 0x67e8f9,
-      'rune-projectile': 0xe9d5ff,
       'ember-projectile': 0xfb923c,
       'fire-projectile': 0xfdba74,
       'void-projectile': 0xa855f7,
@@ -122,6 +121,28 @@ export class BootScene extends Phaser.Scene {
       graphics.generateTexture(key, 24, 24);
       graphics.destroy();
     });
+
+    // Rune Tome uses one enchanted sphere rather than the old plain bullet.
+    // The entire rune sprite rotates independently of its flight direction.
+    const runeKey = 'rune-projectile';
+    if (!this.textures.exists(runeKey)) {
+      const g = this.make.graphics({ x:0, y:0 },false);
+      // Outer mystic aura intentionally extends beyond the actual collision orb.
+      g.fillStyle(0xa78bfa,0.17);g.fillCircle(12,12,12);
+      g.fillStyle(0x6d28d9,0.74);g.fillCircle(12,12,10);
+      g.fillStyle(0xc4b5fd,0.86);g.fillCircle(12,12,8);
+      g.fillStyle(0xf5e8ff,0.62);g.fillCircle(9,8,3);
+      g.lineStyle(1.2,0xffffff,0.91);g.strokeCircle(12,12,8.5);
+      g.lineStyle(1.3,0x6b21a8,0.86);
+      // A compact rune: central diamond and 4 radial glyphs.
+      g.lineBetween(12,6,17,12);g.lineBetween(17,12,12,18);
+      g.lineBetween(12,18,7,12);g.lineBetween(7,12,12,6);
+      g.lineBetween(12,3,12,7);g.lineBetween(12,17,12,21);
+      g.lineBetween(3,12,7,12);g.lineBetween(17,12,21,12);
+      g.fillStyle(0xffffff,0.98);g.fillCircle(12,12,2);
+      g.generateTexture(runeKey,24,24);
+      g.destroy();
+    }
 
     // Fase 7: a translucent, sharpened ice-spike rather than a grey dagger.
     // The long axis is horizontal so Phaser projectile rotation aims the tip.
