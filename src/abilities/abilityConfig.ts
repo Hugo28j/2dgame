@@ -1,4 +1,6 @@
 import type { HeroId } from '../heroes/heroConfig';
+import { SHOTGUN_TRANSFORM, FROST_TIMEWARP, WHITEOUT_WAVE,
+  frostSlowMotionCooldownMs, frostSlowMotionDurationMs } from './phase9Balance';
 
 export type AbilityId =
   | 'guardian-charge' | 'guardian-slam' | 'guardian-aegis'
@@ -12,7 +14,7 @@ export type AbilityKind = 'dash' | 'teleport' | 'shield' | 'area' | 'slow' | 'he
 
 /** Abilities with a directional, hold-and-release aiming gesture. */
 export const isAimedAbility = (kind: AbilityKind): boolean =>
-  kind === 'wind' || kind === 'shotgun' || kind === 'bomb';
+  kind === 'wind' || kind === 'bomb';
 
 export interface AbilityConfig {
   readonly id: AbilityId;
@@ -42,7 +44,7 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityConfig>> = {
     invulnerabilityMs: 0, slowFactor: 1 }),
   'guardian-slam': ability({ id: 'guardian-slam', heroId: 'guardian', slot: 2, unlockLevel: 20,
     kind: 'wind', name: 'Gravitatiegreep', description: 'Trekt vijanden naar je toe en verdooft 1 seconde', symbol: '➠', color: 0xf59e0b,
-    cooldownMs: 10000, radius: 225, damage: 37, heal: 0, durationMs: 320, dashSpeed: 0,
+    cooldownMs: 5000, radius: 225, damage: 37, heal: 0, durationMs: 320, dashSpeed: 0,
     invulnerabilityMs: 0, slowFactor: 1 }),
   'guardian-aegis': ability({ id: 'guardian-aegis', heroId: 'guardian', slot: 3, unlockLevel: 30,
     kind: 'area', name: 'Titanenexplosie', description: 'Grote cirkelgolf: veel schade en krachtige knockback', symbol: '✹', color: 0xfde68a,
@@ -54,8 +56,8 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityConfig>> = {
     cooldownMs: 4300, radius: 0, damage: 0, heal: 0, durationMs: 190, dashSpeed: 780,
     invulnerabilityMs: 125, slowFactor: 1 }),
   'ranger-rain': ability({ id: 'ranger-rain', heroId: 'ranger', slot: 2, unlockLevel: 20,
-    kind: 'shotgun', name: 'Shotgun Volley', description: 'Gerichte salvo van zeven pijlen', symbol: '⋙', color: 0x7dd3fc,
-    cooldownMs: 8500, radius: 270, damage: 24, heal: 0, durationMs: 360, dashSpeed: 0,
+    kind: 'shotgun', name: 'Shotgun Volley', description: '8s tijdelijke shotgun: elke 1,2s zeven pijlen in een waaier', symbol: '⋙', color: 0x7dd3fc,
+    cooldownMs: 35000, radius: 270, damage: 24, heal: 0, durationMs: SHOTGUN_TRANSFORM.durationMs, dashSpeed: 0,
     invulnerabilityMs: 0, slowFactor: 1 }),
   'ranger-volley': ability({ id: 'ranger-volley', heroId: 'ranger', slot: 3, unlockLevel: 30,
     kind: 'companion', name: 'Wolf Ally', description: 'Roep een AI-wolf met eigen HP op', symbol: '🐺', color: 0x22d3ee,
@@ -80,13 +82,13 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityConfig>> = {
     cooldownMs: 4500, radius: 0, damage: 0, heal: 0, durationMs: 190, dashSpeed: 820,
     invulnerabilityMs: 135, slowFactor: 1 }),
   'frost-ring': ability({ id: 'frost-ring', heroId: 'frostblade', slot: 2, unlockLevel: 20,
-    kind: 'slow', name: 'Frozen Ring', description: 'Beschadigt en vertraagt', symbol: '❄', color: 0x67e8f9,
-    cooldownMs: 8500, radius: 120, damage: 48, heal: 0, durationMs: 3200, dashSpeed: 0,
-    invulnerabilityMs: 0, slowFactor: 0.4 }),
+    kind: 'timewarp', name: 'Slow Motion', description: 'Alle vijanden en vijandelijke projectielen 50% trager (5-10 seconden)', symbol: '◴', color: 0x67e8f9,
+    cooldownMs: FROST_TIMEWARP.cooldownAtLevel1Ms, radius: 0, damage: 0, heal: 0, durationMs: FROST_TIMEWARP.durationAtLevel1Ms, dashSpeed: 0,
+    invulnerabilityMs: 0, slowFactor: FROST_TIMEWARP.enemyFactor }),
   'frost-blizzard': ability({ id: 'frost-blizzard', heroId: 'frostblade', slot: 3, unlockLevel: 30,
-    kind: 'slow', name: 'Whiteout', description: 'Verwoestende bevriezende storm', symbol: '✻', color: 0xbae6fd,
-    cooldownMs: 15500, radius: 180, damage: 92, heal: 0, durationMs: 4500, dashSpeed: 0,
-    invulnerabilityMs: 0, slowFactor: 0.22 }),
+    kind: 'area', name: 'Whiteout', description: 'Uitdijende witte ijsstofgolf: 250 bereik, 150 schade, knockback', symbol: '✻', color: 0xbae6fd,
+    cooldownMs: WHITEOUT_WAVE.cooldownMs, radius: WHITEOUT_WAVE.radius, damage: WHITEOUT_WAVE.damage, heal: 0, durationMs: WHITEOUT_WAVE.expansionMs, dashSpeed: 0,
+    invulnerabilityMs: 0, slowFactor: 1 }),
 
   'pyro-dash': ability({ id: 'pyro-dash', heroId: 'pyromancer', slot: 1, unlockLevel: 5,
     kind: 'dash', name: 'Flame Rush', description: 'Dash met brandend spoor', symbol: '➜', color: 0xfb923c,
@@ -153,10 +155,15 @@ export function getAbilityStats(id: AbilityId, level: number): AbilityStats {
     Math.max(0.7, 1 - extra * 0.015);
   return {
     ...base, upgradeLevel: extra + 1,
+    ...(id === 'frost-ring' ? {
+      durationMs: frostSlowMotionDurationMs(extra + 1),
+      cooldownMs: frostSlowMotionCooldownMs(extra + 1),
+    } : {}),
     damage: Math.round(base.damage * (1 + extra * 0.12)),
     heal: Math.round(base.heal * (1 + extra * 0.1)),
     radius: Math.round(base.radius * (1 + extra * 0.012)),
-    cooldownMs: Math.round(base.cooldownMs * cooldownScale),
+    cooldownMs: id === 'frost-ring' ? frostSlowMotionCooldownMs(extra + 1) :
+      Math.round(base.cooldownMs * cooldownScale),
     dashSpeed: Math.round(base.dashSpeed * (1 + extra * 0.012)),
   };
 }
