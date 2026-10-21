@@ -162,6 +162,10 @@ function drawEmberMinion(g: Phaser.GameObjects.Graphics, look: CharacterLook): v
 }
 
 function drawBoss(g: Phaser.GameObjects.Graphics, look: CharacterLook, tier: number): void {
+  if (look.worldId === 3) {
+    drawEmberBoss(g, tier);
+    return;
+  }
   // Distinct silhouettes for the six encounters, including both room-15 bosses.
   g.fillStyle(0x020617, 0.7); g.fillEllipse(24, 44, 40, 7);
   g.fillStyle(look.secondary); g.fillRoundedRect(6, 16, 36, 28, 8);
@@ -188,6 +192,65 @@ function drawBoss(g: Phaser.GameObjects.Graphics, look: CharacterLook, tier: num
     g.lineBetween(44, 32, 36, 40);
   }
   worldMark(g, look.worldId, 0xf8fafc, 24, 38);
+}
+
+/** Unique World-3 boss silhouettes keyed by their retained archetype texture index. */
+function drawEmberBoss(g: Phaser.GameObjects.Graphics, tier: number): void {
+  g.fillStyle(0x130707, 0.82); g.fillEllipse(24, 44, 44, 7);
+  if (tier === 1) { // Helios Spinner
+    g.fillStyle(0x7c2d12); g.fillCircle(24, 25, 17);
+    g.lineStyle(5, 0xf97316); g.strokeCircle(24, 25, 13);
+    g.lineStyle(4, 0xfbbf24);
+    g.lineBetween(2, 25, 46, 25); g.lineBetween(24, 3, 24, 47);
+    g.fillStyle(0xfef08a); g.fillCircle(24, 25, 6);
+  } else if (tier === 3) { // Cinder Mortar
+    g.fillStyle(0x292524); g.fillRoundedRect(7, 16, 35, 28, 8);
+    g.fillStyle(0x9a3412); g.fillCircle(24, 20, 14);
+    g.fillStyle(0x451a03); g.fillRoundedRect(18, 1, 12, 25, 5);
+    g.fillStyle(0xf97316); g.fillCircle(24, 7, 5);
+    g.fillStyle(0xfef3c7); g.fillRect(14, 27, 7, 3); g.fillRect(28, 27, 7, 3);
+  } else if (tier === 5) { // Furnace Artillerist
+    g.fillStyle(0x44403c); g.fillRoundedRect(7, 15, 34, 29, 6);
+    g.fillStyle(0x7c2d12); g.fillCircle(24, 24, 12);
+    g.fillStyle(0x1c1917); g.fillRect(0, 16, 17, 8); g.fillRect(32, 16, 16, 8);
+    g.fillStyle(0xfbbf24); g.fillCircle(8, 20, 4); g.fillCircle(40, 20, 4);
+    g.fillStyle(0xffedd5); g.fillRect(18, 26, 5, 3); g.fillRect(27, 26, 5, 3);
+  } else if (tier === 4) { // Pentaflare Sentinel
+    g.fillStyle(0x450a0a); g.fillTriangle(24, 2, 3, 43, 45, 43);
+    g.fillStyle(0x991b1b); g.fillCircle(24, 23, 14);
+    for (let i = 0; i < 5; i++) {
+      const a = -Math.PI / 2 + i * Math.PI * 2 / 5;
+      g.fillStyle(i % 2 ? 0xf97316 : 0xfbbf24);
+      g.fillCircle(24 + Math.cos(a) * 18, 23 + Math.sin(a) * 18, 4);
+    }
+    g.fillStyle(0xfef08a); g.fillCircle(24, 23, 5);
+  } else if (tier === 7) { // Lava Broodmother
+    g.fillStyle(0x431407); g.fillEllipse(24, 28, 39, 29);
+    g.fillStyle(0xb91c1c); g.fillEllipse(24, 25, 28, 22);
+    g.lineStyle(4, 0x7f1d1d);
+    for (const y of [25, 35]) { g.lineBetween(9, y, 1, y + 7); g.lineBetween(39, y, 47, y + 7); }
+    g.fillStyle(0xfde047); g.fillCircle(17, 24, 3); g.fillCircle(31, 24, 3);
+    g.fillStyle(0xf97316); g.fillCircle(24, 35, 7);
+  } else if (tier === 8) { // Caldera Queen
+    g.fillStyle(0x3f3f46); g.fillTriangle(24, 4, 4, 44, 44, 44);
+    g.fillStyle(0x9a3412); g.fillCircle(24, 23, 14);
+    g.fillStyle(0xf97316); g.fillTriangle(7, 16, 12, 1, 18, 17);
+    g.fillTriangle(18, 15, 24, -1, 30, 15); g.fillTriangle(30, 17, 37, 1, 42, 18);
+    g.lineStyle(3, 0xfbbf24); g.lineBetween(14, 31, 24, 22); g.lineBetween(24, 22, 34, 34);
+    g.fillStyle(0xfffbeb); g.fillCircle(19, 22, 2); g.fillCircle(29, 22, 2);
+  } else { // Heart of Inferno
+    g.fillStyle(0x1c1917); g.fillRoundedRect(4, 11, 40, 34, 8);
+    g.fillStyle(0x7f1d1d); g.fillCircle(24, 27, 17);
+    g.lineStyle(4, 0xf97316); g.strokeCircle(24, 27, 13);
+    g.fillStyle(0xfde047); g.fillCircle(24, 27, 7);
+    for (let i = 0; i < 6; i++) {
+      const a = i * Math.PI / 3;
+      g.fillStyle(i % 2 ? 0xdc2626 : 0xf97316);
+      g.fillTriangle(24 + Math.cos(a) * 15, 27 + Math.sin(a) * 15,
+        24 + Math.cos(a - .16) * 28, 27 + Math.sin(a - .16) * 28,
+        24 + Math.cos(a + .16) * 28, 27 + Math.sin(a + .16) * 28);
+    }
+  }
 }
 
 /** One pre-rendered texture per minion and encountered boss. */

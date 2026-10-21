@@ -78,6 +78,17 @@ export class EnemySpawner {
     });
   }
 
+  /** Living lava monsters summoned by the World-3 Broodmother. */
+  public summonLavaMonsters(points: readonly SpawnPoint[], room: number): readonly AdvancedEnemy[] {
+    return points.map(point => {
+      const enemy = new AdvancedEnemy(this.scene, 'lava-summon-' + this.nextEnemyNumber++,
+        point.x, point.y, 'tank', room, 3);
+      enemy.setTint(0xff6b00);
+      addBoundedEnemy(enemy, () => this.enemyGroup.add(enemy));
+      return enemy;
+    });
+  }
+
   public spawnSlimes(
     spawnPoints: readonly SpawnPoint[],
     stats: Readonly<SlimeRuntimeStats>,

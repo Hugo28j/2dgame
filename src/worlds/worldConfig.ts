@@ -44,9 +44,9 @@ export const WORLDS: readonly WorldTheme[] = [
     accent: 0xfb923c, floor: 0x331b1c, grid: 0x7a3b2b, wall: 0x3e2222,
     obstacle: 0x67352c, obstacleBorder: 0xfdba74, bossColor: 0xf97316,
     hpMultiplier: 1.75, damageMultiplier: 1.43, speedMultiplier: 1.08, attackSpeedMultiplier: 1.1,
-    bossNames: ['Ash Warden', 'Molten Colossus', 'Inferno Tyrant', 'Cinder Sentinel',
-      'Coal Gunner', 'Flame Weaver', 'Magma Alchemist', 'Ruby Matriarch',
-      'Scorch Stalker', 'Lord of the Furnace'],
+    bossNames: ['Helios Spinner', 'Molten Colossus', 'Cinder Mortar', 'Pentaflare Sentinel',
+      'Furnace Artillerist', 'Flame Weaver', 'Lava Broodmother', 'Caldera Queen',
+      'Scorch Stalker', 'Heart of Inferno'],
   },
   {
     id: 4, name: 'Storm Citadel', subtitle: 'Bliksem, metaal en wolken',
