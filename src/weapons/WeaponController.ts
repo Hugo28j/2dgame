@@ -10,9 +10,12 @@ import { isInsideMeleeSwing } from './meleeCombat';
 import { inForwardRectangle, normalizedDirection } from '../abilities/directedGeometry';
 import { GLACIAL_COMBO, glacialStrikeDelayMs, glacialStrikeHits,
   glacialStrikeShape, nextGlacialStrike, type GlacialStrike } from './glacialCombo';
+import { SHOTGUN_TRANSFORM, shotgunVolleyAngles } from '../abilities/phase9Balance';
 
 export class WeaponController {
   private nextShotAt = 0;
+  private shotgunUntil = 0;
+  private shotgunDamage = 0;
   private glacialStrike: GlacialStrike = 0;
   private lastGlacialStrikeAt = -Infinity;
   private readonly groundEffects = new Set<Phaser.GameObjects.Graphics>();
@@ -34,7 +37,35 @@ export class WeaponController {
   ) {}
   public get attackMode(): 'melee' | 'projectile' { return this.config.attackMode; }
   public get config() { return getWeaponStats(this.weaponId, this.upgradeLevel); }
+  /** Transient override: never alters weaponId, weapon level, save data or inventory. */
+  public activateShotgunBuff(now: number, damage: number, durationMs: number = SHOTGUN_TRANSFORM.durationMs): boolean {
+    if (this.owner.heroId !== 'ranger' || !(durationMs > 0) || !(damage > 0) ||
+        !Number.isFinite(now) || now < 0 || now < this.shotgunUntil) return false;
+    this.shotgunUntil = now + durationMs;
+    this.shotgunDamage = damage;
+    this.nextShotAt = now; // The first temporary salvo fires immediately.
+    return true;
+  }
+
+  public shotgunRemainingMs(now: number): number {
+    return Math.max(0, this.shotgunUntil - now);
+  }
+
   public update(time: number, firing: boolean, direction: Readonly<Vector2Value>): void {
+    if (this.shotgunUntil > 0 && time >= this.shotgunUntil) {
+      this.shotgunUntil = 0;
+      this.shotgunDamage = 0;
+      this.nextShotAt = time; // Restore the original selected weapon immediately.
+    }
+    if (time < this.shotgunUntil) {
+      // This short transformation automatically fires while the hero is free
+      // to move and steer the aim. No normal shots can fire alongside it.
+      if (time >= this.nextShotAt) {
+        this.fireShotgunVolley(direction);
+        this.nextShotAt = time + SHOTGUN_TRANSFORM.cadenceMs;
+      }
+      return;
+    }
     if (!firing) {
       // Releasing the trigger for a while resets the *next* sequence, but does
       // not bypass the third strike's mandatory recovery.
@@ -76,6 +107,32 @@ export class WeaponController {
       );
       addAndLaunch(projectile, () => this.projectiles.add(projectile), vector, config.projectileSpeed);
     }
+  }
+
+  /** Actual seven directed, physical arrows per salvo; no instant laser
+   * damage and no mutation of the original weapon or projectile upgrades. */
+  private fireShotgunVolley(direction: Readonly<Vector2Value>): void {
+    const heading = Math.atan2(direction.y, direction.x);
+    const attack = this.createAttack();
+    // Ability upgrades scale the new shots without replacing the equipped bow
+    // or crossbow and without permanently changing their combat stats.
+    attack.damage = this.shotgunDamage * this.owner.abilityDamageMultiplier +
+      this.owner.damage * 0.35;
+    const flash = this.scene.add.graphics().setDepth(26);
+    this.groundEffects.add(flash);
+    for (const angle of shotgunVolleyAngles(heading)) {
+      const vector = {x:Math.cos(angle),y:Math.sin(angle)};
+      const arrow = new Projectile(this.scene,
+        this.owner.x + vector.x * 31, this.owner.y + vector.y * 31,
+        vector, SHOTGUN_TRANSFORM.projectileSpeed, attack, 0,
+        {textureKey:'arrow-placeholder',range:SHOTGUN_TRANSFORM.projectileRange,effect:'none'});
+      addAndLaunch(arrow,()=>this.projectiles.add(arrow),vector,SHOTGUN_TRANSFORM.projectileSpeed);
+      flash.lineStyle(3,0xbae6fd,0.86);
+      flash.lineBetween(this.owner.x+vector.x*15,this.owner.y+vector.y*15,
+        this.owner.x+vector.x*59,this.owner.y+vector.y*59);
+    }
+    this.scene.tweens.add({targets:flash,alpha:0,duration:150,
+      onComplete:()=>{this.groundEffects.delete(flash);flash.destroy();}});
   }
 
   private swing(direction: Readonly<Vector2Value>): void {
@@ -371,6 +428,8 @@ export class WeaponController {
       effect.destroy();
     }
     this.groundEffects.clear();
+    this.shotgunUntil = 0;
+    this.shotgunDamage = 0;
     this.glacialStrike = 0;
     this.lastGlacialStrikeAt = -Infinity;
   }

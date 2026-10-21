@@ -14,7 +14,8 @@ import {
 } from './abilityConfig';
 import { targetsInRadius } from './areaTargets';
 import { DashState } from './DashState';
-import { inForwardRectangle, normalizedDirection, rayHitsCircle } from './directedGeometry';
+import { inForwardRectangle, normalizedDirection } from './directedGeometry';
+import { FROST_TIMEWARP, WHITEOUT_WAVE, whiteoutWaveRadius, whiteoutReaches } from './phase9Balance';
 import { findTeleportDestination, safeBombBlastDistance } from './teleportDestination';
 import type { RoomLayout } from '../rooms/roomConfig';
 import { displayedHp } from '../ui/displayValues';
@@ -79,6 +80,11 @@ export class AbilityController {
   private trailUntil = 0;
   private nextTrailAt = 0;
   private timeWarpUntil = 0;
+  private frostSlowUntil = 0;
+  private shotgunBuffUntil = 0;
+  private readonly phase9Hud: Phaser.GameObjects.Text;
+  private readonly shotgunAura: Phaser.GameObjects.Graphics;
+  private readonly whiteoutEffects = new Set<Phaser.GameObjects.Graphics>();
 
   public constructor(
     scene: Phaser.Scene,
@@ -94,11 +100,17 @@ export class AbilityController {
     private readonly enemyProjectiles?: Phaser.Physics.Arcade.Group,
     private readonly arenaLayout?: () => Pick<RoomLayout, 'bounds' | 'obstacles'> | undefined,
     private readonly protectingShield?: (origin: Readonly<ShieldPoint>, target: Slime) => Slime | undefined,
+    private readonly activateShotgun?: (now: number, damage: number, durationMs: number) => boolean,
   ) {
     this.scene = scene;
     this.slots = HERO_ABILITIES[player.heroId];
     this.aimPreview = scene.add.graphics().setScrollFactor(0).setDepth(126);
     this.shieldVisual = scene.add.graphics().setDepth(22);
+    this.shotgunAura = scene.add.graphics().setDepth(21);
+    this.phase9Hud = scene.add.text(150, 75, '', {
+      fontFamily:'system-ui, sans-serif',fontSize:'11px',fontStyle:'bold',
+      color:'#dbeafe',stroke:'#0b1121',strokeThickness:3,
+    }).setScrollFactor(0).setDepth(122);
     this.shieldHud = scene.add.text(150, 53, '', {
       fontFamily: 'system-ui, sans-serif', fontSize: '10px', fontStyle: 'bold',
       color: '#fde68a', stroke: '#020617', strokeThickness: 2,
@@ -159,9 +171,35 @@ export class AbilityController {
     this.updateBombs();
     this.updateCompanion(now, delta);
     this.drawShield();
-    if (now < this.timeWarpUntil && !this.blocked()) {
-      for (const enemy of this.liveEnemies()) enemy.applySlow(now, 180, 0.33);
+    if (!this.blocked()) {
+      if (now < this.timeWarpUntil) {
+        const remaining = this.timeWarpUntil - now;
+        for (const enemy of this.liveEnemies())
+          enemy.applySlow(now, Math.min(180,remaining), 0.33);
+      }
+      if (now < this.frostSlowUntil) {
+        const remaining = this.frostSlowUntil - now;
+        for (const enemy of this.liveEnemies())
+          enemy.applySlow(now, Math.min(60,remaining), FROST_TIMEWARP.enemyFactor);
+      }
     }
+    this.shotgunAura.clear();
+    if (!this.blocked() && now < this.shotgunBuffUntil) {
+      const x=this.player.x,y=this.player.y;
+      this.shotgunAura.lineStyle(3,0x7dd3fc,0.68);
+      this.shotgunAura.strokeCircle(x,y,31+Math.sin(now/120)*3);
+      const aim=this.inputs.getAim(x,y),angle=Math.atan2(aim.y,aim.x);
+      for(let i=-3;i<=3;i++) {
+        const a=angle+i*0.13;
+        this.shotgunAura.fillStyle(0xe0f2fe,0.84);
+        this.shotgunAura.fillTriangle(x+Math.cos(a)*37,y+Math.sin(a)*37,
+          x+Math.cos(a+.06)*44,y+Math.sin(a+.06)*44,
+          x+Math.cos(a-.06)*44,y+Math.sin(a-.06)*44);
+      }
+      this.phase9Hud.setText('SHOTGUN ×7  '+((this.shotgunBuffUntil-now)/1000).toFixed(1)+'s');
+    } else if (!this.blocked() && now < this.frostSlowUntil) {
+      this.phase9Hud.setText('❄ SLOW MOTION  '+((this.frostSlowUntil-now)/1000).toFixed(1)+'s');
+    } else this.phase9Hud.setText('');
     this.refresh(now);
   }
 
@@ -199,7 +237,9 @@ export class AbilityController {
 
   /** Enemy projectiles are slowed too; friendly shots remain unaffected. */
   public enemyProjectileFactor(now: number): number {
-    return !this.blocked() && now < this.timeWarpUntil ? 0.36 : 1;
+    return this.blocked() ? 1 : Math.min(
+      now < this.timeWarpUntil ? 0.36 : 1,
+      now < this.frostSlowUntil ? FROST_TIMEWARP.projectileFactor : 1);
   }
 
   /** Hide / deactivate every ability input element; no invisible tappable zones. */
@@ -207,6 +247,8 @@ export class AbilityController {
     this.aimHold = undefined;
     this.aimPreview.clear().setVisible(visible);
     this.shieldHud.setVisible(visible);
+    this.phase9Hud.setVisible(visible);
+    this.shotgunAura.setVisible(visible);
     this.buttons.forEach(button => {
       button.background.setVisible(visible);
       if (visible) button.background.setInteractive();
@@ -222,6 +264,15 @@ export class AbilityController {
     this.dash.cancel();
     this.dashTrailKind = undefined;
     this.timeWarpUntil = 0;
+    this.frostSlowUntil = 0;
+    this.shotgunBuffUntil = 0;
+    this.phase9Hud.setText('');
+    this.shotgunAura.clear();
+    for (const effect of this.whiteoutEffects) {
+      this.scene.tweens.killTweensOf(effect);
+      effect.destroy();
+    }
+    this.whiteoutEffects.clear();
     this.aimHold = undefined;
     this.aimPreview.clear();
     for (const patch of this.trails) patch.visual.destroy();
@@ -239,6 +290,8 @@ export class AbilityController {
     this.aimPreview.destroy();
     this.shieldVisual.destroy();
     this.shieldHud.destroy();
+    this.phase9Hud.destroy();
+    this.shotgunAura.destroy();
     for (const button of this.buttons) {
       button.background.removeAllListeners();
       button.background.destroy(); button.icon.destroy();
@@ -320,6 +373,8 @@ export class AbilityController {
       if (!this.dash.begin(now, stats.durationMs, direction)) return false;
       this.activeDashSpeed = stats.dashSpeed;
     }
+    if (stats.kind === 'shotgun' && !this.activateShotgun?.(now,stats.damage,stats.durationMs))
+      return false;
     if (!this.cooldowns.activate(id, now, stats.cooldownMs, this.cooldownModifier(id))) {
       if (stats.kind === 'dash') this.dash.cancel();
       return false;
@@ -357,8 +412,10 @@ export class AbilityController {
         this.pulse(this.player.x, this.player.y, 60, stats.color, 360);
         break;
       case 'timewarp':
-        this.timeWarpUntil = now + stats.durationMs;
-        this.pulse(this.player.x, this.player.y, 230, stats.color, 650);
+        if (id === 'frost-ring') this.frostSlowUntil = now + stats.durationMs;
+        else this.timeWarpUntil = now + stats.durationMs;
+        this.pulse(this.player.x, this.player.y, id === 'frost-ring' ? 270 : 230,
+          stats.color, 650);
         break;
       case 'companion':
         this.spawnCompanion(stats, now);
@@ -368,13 +425,17 @@ export class AbilityController {
         else this.castWind(stats, now, direction);
         break;
       case 'shotgun':
-        this.castShotgun(stats, direction);
+        // The temporary physical-arrow weapon mode is activated above,
+        // before consuming cooldown; it starts shooting in WeaponController.
+        this.shotgunBuffUntil = now + stats.durationMs;
+        this.pulse(this.player.x, this.player.y, 56, stats.color, 380);
         break;
       case 'bomb':
         this.throwBomb(stats, direction);
         break;
       default:
         if (id === 'guardian-aegis') this.castGuardianShockwave(stats, now);
+        else if (id === 'frost-blizzard') this.castWhiteout(stats);
         else this.areaEffect(stats, now);
     }
 
@@ -521,27 +582,57 @@ export class AbilityController {
       onComplete: () => flash.destroy() });
   }
 
-  private castShotgun(stats: Readonly<AbilityStats>,
-    direction: Readonly<Vector2Value>): void {
-    const x = this.player.x, y = this.player.y;
-    const angle = Math.atan2(direction.y, direction.x);
-    const streaks = this.scene.add.graphics().setDepth(26);
-    streaks.lineStyle(3, stats.color, 0.9);
-    const pellets: Vector2Value[] = [];
-    for (let i = -3; i <= 3; i++) {
-      const a = angle + i * 0.11;
-      const vector = { x: Math.cos(a), y: Math.sin(a) };
-      pellets.push(vector);
-      streaks.lineBetween(x + vector.x * 24, y + vector.y * 24,
-        x + vector.x * stats.radius, y + vector.y * stats.radius);
-    }
-    for (const enemy of this.liveEnemies()) {
-      const hitCount = pellets.filter(ray =>
-        rayHitsCircle(x, y, ray, enemy.x, enemy.y, 20, stats.radius)).length;
-      if (hitCount > 0) this.hitEnemy(enemy, stats, hitCount * 0.72);
-    }
-    this.scene.tweens.add({ targets: streaks, alpha: 0, duration: 185,
-      onComplete: () => streaks.destroy() });
+  /** Whiteout is not a static slow circle: white dust visibly expands
+   * from the hero. Each enemy is hit once as the moving wave reaches it. */
+  private castWhiteout(stats: Readonly<AbilityStats>): void {
+    const origin = {x:this.player.x,y:this.player.y};
+    const range = stats.radius;
+    const dust = this.scene.add.graphics().setDepth(30);
+    this.whiteoutEffects.add(dust);
+    const struck = new Set<string>();
+    this.scene.tweens.addCounter({
+      from:0,to:1,duration:WHITEOUT_WAVE.expansionMs,ease:'Cubic.easeOut',
+      onUpdate:tween=>{
+        if (!dust.active || this.blocked()) return;
+        const t=tween.getValue()??0;
+        const radius=whiteoutWaveRadius(t,range);
+        const fade=1-t*0.38;
+        dust.clear();
+        // Several soft concentric fringes and irregular icy flecks, no flat
+        // opaque disk. All artwork stays aligned to the radial hit geometry.
+        dust.lineStyle(25,0xe0faff,0.12*fade);
+        dust.strokeCircle(origin.x,origin.y,radius);
+        dust.lineStyle(10,0xffffff,0.42*fade);
+        dust.strokeCircle(origin.x,origin.y,radius);
+        dust.lineStyle(3,0x9fdff6,0.8*fade);
+        dust.strokeCircle(origin.x,origin.y,radius+3);
+        for(let i=0;i<40;i++){
+          const a=i*Math.PI*2/40;
+          const jitter=7*Math.sin(i*7.1+t*11);
+          const r=Math.max(0,radius+jitter);
+          const x=origin.x+Math.cos(a)*r,y=origin.y+Math.sin(a)*r;
+          dust.fillStyle(i%3 ? 0xf8fafc : 0xa5f3fc, (0.36+0.45*(i%4)/4)*fade);
+          dust.fillCircle(x,y,2+4*((i*7)%5)/5);
+        }
+        for(const enemy of this.liveEnemies()){
+          if(struck.has(enemy.enemyId) ||
+             !whiteoutReaches(origin,enemy,radius)) continue;
+          struck.add(enemy.enemyId);
+          const receiver=this.hitEnemy(enemy,stats,1,origin);
+          if(!receiver || receiver.aiState==='defeated')continue;
+          const dx=receiver.x-origin.x,dy=receiver.y-origin.y;
+          const norm=Math.hypot(dx,dy);
+          if(norm>0.1)receiver.applyKnockback(this.scene.time.now,
+            WHITEOUT_WAVE.knockbackMs,dx/norm,dy/norm,WHITEOUT_WAVE.knockbackSpeed);
+        }
+      },
+      onComplete:()=>{
+        if(!dust.active)return;
+        this.scene.tweens.add({targets:dust,alpha:0,
+          duration:WHITEOUT_WAVE.fadeMs,ease:'Sine.easeOut',
+          onComplete:()=>{this.whiteoutEffects.delete(dust);dust.destroy();}});
+      },
+    });
   }
 
   private throwBomb(stats: Readonly<AbilityStats>,

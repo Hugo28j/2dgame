@@ -17,9 +17,9 @@ describe('directed hero abilities and combat balance', () => {
     expect(rayHitsCircle(0, 0, { x: 1, y: 0 }, -5, 0, 15, 250)).toBe(false);
     expect(normalizedDirection({ x: 0, y: 0 })).toEqual({ x: 1, y: 0 });
   });
-  it('makes the offensive skills aimable, and gives powerful buffs long cooldowns', () => {
+  it('makes directed attacks aimable while the temporary shotgun is a one-tap buff', () => {
     expect(isAimedAbility(ABILITIES['guardian-slam'].kind)).toBe(true);
-    expect(isAimedAbility(ABILITIES['ranger-rain'].kind)).toBe(true);
+    expect(isAimedAbility(ABILITIES['ranger-rain'].kind)).toBe(false);
     expect(isAimedAbility(ABILITIES['mage-burst'].kind)).toBe(true);
     expect(isAimedAbility(ABILITIES['frost-ring'].kind)).toBe(false);
     expect(ABILITIES['ranger-volley'].cooldownMs).toBeGreaterThanOrEqual(45000);
