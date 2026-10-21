@@ -5,7 +5,7 @@ import { getEnemyStatsForRoom, type EnemyKind, type SlimeRuntimeStats } from './
 import { bossPhase, rangedVelocity } from './enemyMovement';
 import { Slime } from './Slime';
 import { getChaseVelocity, getObstacleAvoidanceVelocity } from './slimeMovement';
-import { coverIsClose, rangedCoverSpot, shieldEndpoints, type ShieldSurface } from './treantShield';
+import { coverIsClose, rangedCoverSpot, shieldEndpoints, shouldBreakTreantShield, type ShieldSurface } from './treantShield';
 import { getBossPlan, getBossProfile } from './bossProfiles';
 import { CHARGER_DASH, WORLD1_BEETLE_DASH } from './enemyBalance';
 import { MOSS_DASH, ROOT_BRANCH, SPORE_THROW_INTERVAL_MS } from './worldOneBossBalance';
@@ -47,6 +47,7 @@ export class AdvancedEnemy extends Slime {
   private readonly orbitSign: -1 | 1;
   private readonly bossTint: number;
   private shieldGraphic?: Phaser.GameObjects.Graphics;
+  private treantShieldBroken = false;
   private shieldFacingX = 0;
   private shieldFacingY = 1;
 
@@ -94,7 +95,10 @@ export class AdvancedEnemy extends Slime {
   public get isFrostWitch(): boolean {
     return this.worldId === 2 && this.kind === 'mage';
   }
-  public get isTreantShield(): boolean { return this.kind === 'tank' && this.worldId === 1; }
+  public get isAncientTreant(): boolean { return this.kind === 'tank' && this.worldId === 1; }
+  public get isTreantShield(): boolean {
+    return this.isAncientTreant && !this.treantShieldBroken;
+  }
   public get shieldSurface(): ShieldSurface {
     return { x: this.x, y: this.y, facingX: this.shieldFacingX, facingY: this.shieldFacingY };
   }
@@ -329,9 +333,62 @@ export class AdvancedEnemy extends Slime {
   /** The drawn plate is the same actual line segment used in damage interception.
    * The green bar above the enemy already represents its entire shield + body HP.
    */
+  /** Damage from any source (arrows, explosions or abilities) can shatter the
+   * shield. The flag changes immediately, so projectiles no longer intercept. */
+  public override receiveDamage(amount: number): boolean {
+    const defeated = super.receiveDamage(amount);
+    if (this.isTreantShield && shouldBreakTreantShield(this.healthRatio, this.treantShieldBroken))
+      this.breakTreantShield();
+    return defeated;
+  }
+
+  private breakTreantShield(): void {
+    if (!this.isTreantShield) return;
+    this.treantShieldBroken = true;
+    const [a, b] = shieldEndpoints(this.shieldSurface);
+    const x = (a.x + b.x) / 2;
+    const y = (a.y + b.y) / 2;
+    this.shieldGraphic?.clear();
+    this.shieldGraphic?.destroy();
+    this.shieldGraphic = undefined;
+    // Splinter burst follows the real shield's angle; temporary objects are
+    // cleaned automatically on room/scene shutdown.
+    const cracks = this.scene.add.graphics().setDepth(28);
+    cracks.lineStyle(3, 0xfef3c7, 1);
+    cracks.lineBetween(a.x, a.y, x, y);
+    cracks.lineBetween(x, y, b.x, b.y);
+    cracks.lineStyle(2, 0x4b321e, 1);
+    cracks.lineBetween(x - 11, y - 15, x + 2, y + 4);
+    cracks.lineBetween(x + 2, y + 4, x + 14, y + 18);
+    this.scene.tweens.add({
+      targets: cracks, alpha: 0, duration: 360, ease: 'Cubic.easeIn',
+      onComplete: () => cracks.destroy(),
+    });
+    const angle = Math.atan2(b.y - a.y, b.x - a.x);
+    for (let i = 0; i < 8; i++) {
+      const along = (i - 3.5) / 4;
+      const originX = x + Math.cos(angle) * along * 33;
+      const originY = y + Math.sin(angle) * along * 33;
+      const direction = angle + ((i % 2) ? 1 : -1) * (0.5 + i * 0.17);
+      const length = 18 + i % 4 * 8;
+      const shard = this.scene.add.triangle(originX, originY, 0, -8, -5, 6, 5, 6,
+        i % 2 === 0 ? 0xb88953 : 0xe3bf87).setDepth(29);
+      this.scene.tweens.add({
+        targets: shard,
+        x: originX + Math.cos(direction) * length,
+        y: originY + Math.sin(direction) * length,
+        angle: (i % 2 ? 120 : -120),
+        alpha: 0,
+        duration: 420,
+        ease: 'Quad.easeOut',
+        onComplete: () => shard.destroy(),
+      });
+    }
+  }
+
   private drawTreantShield(): void {
     const graphic = this.shieldGraphic;
-    if (!graphic || !graphic.active) return;
+    if (!graphic || !graphic.active || !this.isTreantShield) return;
     const [a, b] = shieldEndpoints(this.shieldSurface);
     const centerX = (a.x + b.x) / 2;
     const centerY = (a.y + b.y) / 2;

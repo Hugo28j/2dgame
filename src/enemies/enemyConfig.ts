@@ -47,6 +47,8 @@ export const getEnemyStatsForRoom = (kind: EnemyKind, roomNumber: number,
   const world = getWorld(worldId);
   return {
     ...base, roomNumber: number,
+    // Phase 3: current base defense is doubled only in worlds 1 and 2.
+    defense: base.defense * (worldId === 1 || worldId === 2 ? 2 : 1),
     maxHp: Math.round(base.maxHp *
       (worldId === 2 && kind === 'mage' ? 3 :
         worldId === 2 && kind === 'archer' ? 1.5 * FROZEN_BALANCE.rangerHpMultiplier :
@@ -84,8 +86,11 @@ export { WORLD2_UNLOCK_ROOMS } from './frozenBalance';
 /** First rooms contain only slimes. New enemies unlock gradually, then become
  * more frequent as the dungeon gets deeper. Deterministic for reproducible runs. */
 export const ENEMY_UNLOCK_ROOMS = {
-  slime: 1, archer: 7, charger: 11, tank: 16, mage: 21, bomber: 26,
+  slime: 1, archer: 4, charger: 11, tank: 16, mage: 21, bomber: 26,
 } as const;
+// The Briar Hunter's earlier unlock is exclusive to Verdant Ruins.
+// Worlds 3–5 retain their original archer progression at room 7.
+const OTHER_WORLD_UNLOCK_ROOMS = { ...ENEMY_UNLOCK_ROOMS, archer: 7 } as const;
 
 export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number,
   worldId: WorldId = 1): EnemyKind => {
@@ -100,7 +105,8 @@ export const getEnemyKindForRoom = (roomNumber: number, spawnIndex: number,
   if (worldId === FROZEN_EARLY.world && room <= FROZEN_EARLY.lastRoom) {
     return earlyFrozenEnemy(room, index);
   }
-  const entries = Object.entries(worldId === 2 ? WORLD2_UNLOCK_ROOMS : ENEMY_UNLOCK_ROOMS) as Array<
+  const entries = Object.entries(worldId === 2 ? WORLD2_UNLOCK_ROOMS :
+    worldId === 1 ? ENEMY_UNLOCK_ROOMS : OTHER_WORLD_UNLOCK_ROOMS) as Array<
     [Exclude<EnemyKind, 'boss'>, number]>;
   // A new enemy always appears when its type is first introduced.
   const newKind = entries.find(([, unlock]) => unlock === room);

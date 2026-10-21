@@ -27,7 +27,8 @@ describe('Frozen Hollow rooms 1-10', () => {
     for (const world of [1, 3, 4, 5] as const) {
       expect(getEnemyKindForRoom(1, 0, world)).toBe('slime');
       expect(getEnemyKindForRoom(3, 0, world)).toBe('slime');
-      expect(getEnemyKindForRoom(7, 0, world)).toBe('archer');
+      if (world === 1) expect(getEnemyKindForRoom(4, 0, world)).toBe('archer');
+      else expect(getEnemyKindForRoom(7, 0, world)).toBe('archer');
     }
     expect(getEnemyKindForRoom(12, 0, 2)).toBe('slime');
   });

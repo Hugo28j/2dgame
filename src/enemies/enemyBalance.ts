@@ -1,6 +1,7 @@
 /** Enemy balance tuning isolated from generic movement and boss logic. */
 export const WORLD1_MOSSLING_SPEED_MULTIPLIER = 1.25 * 1.25;
-export const WORLD1_BRIAR_DAMAGE_MULTIPLIER = 1.5;
+export const WORLD1_BRIAR_DAMAGE_MULTIPLIER = 1.5 * 2;
+export const WORLD1_BRIAR_ARROW_SPEED_MULTIPLIER = 1.5;
 export const WORLD1_WISP_HP_MULTIPLIER = 2 * 3;
 export const WORLD1_WISP_FIRE_RATE_MULTIPLIER = 1.2;
 export const WORLD1_SPORECAP_SPEED_MULTIPLIER = 3;
