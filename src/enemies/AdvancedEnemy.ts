@@ -16,6 +16,8 @@ import { BRAMBLE_CINEMATIC } from './brambleCinematic';
 import { JADE_BRANCH } from './groveAttacks';
 import { sporePatrolVelocity } from './sporeMovement';
 import { EMBER_ATTACKS } from './emberWastes';
+import { EMBER_BOSS_ATTACKS, getEmberBossAttack,
+  type EmberBossAttack } from './emberBosses';
 import type { BulletPattern } from './projectilePatterns';
 export type { BulletPattern } from './projectilePatterns';
 
@@ -27,6 +29,8 @@ export type EnemyTrail = (enemy: AdvancedEnemy, x: number, y: number) => void;
 export type EnemyJadeBranches = (enemy: AdvancedEnemy) => void;
 export type EnemyBomb = (enemy: AdvancedEnemy, targetX: number, targetY: number,
   count: number, radius: number, windupMs: number) => void;
+export type EnemyEmberBoss = (enemy: AdvancedEnemy, attack: Exclude<EmberBossAttack, 'pentaflare'>,
+  phase: 1 | 2, cycle: number) => void;
 
 /** Reuses the phase-3 shared HP, damage, slow and death events for all enemy types. */
 export class AdvancedEnemy extends Slime {
@@ -74,12 +78,18 @@ export class AdvancedEnemy extends Slime {
     this.orbitSign = id.length % 2 === 0 ? 1 : -1;
     this.setTexture(getWorldCharacter(worldId, kind, roomNumber, bossSlot).textureKey);
     if (worldId === 3 && kind !== 'boss') {
-      scene.tweens.add({ targets: this, scaleX: 1.06, scaleY: 0.94,
+      const summonedScale = id.startsWith('lava-summon-') ? 1.22 : 1;
+      this.setScale(summonedScale);
+      scene.tweens.add({ targets: this, scaleX: 1.06 * summonedScale, scaleY: 0.94 * summonedScale,
         duration: 330 + (id.length % 4) * 45, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
     }
     if (kind === 'boss') {
       this.setScale(1.75);
       this.setTint(this.bossTint);
+      if (worldId === 3) {
+        scene.tweens.add({ targets: this, scaleX: 1.86, scaleY: 1.64,
+          duration: 460 + bossSlot * 80, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
+      }
       const body = this.body;
       if (body instanceof Phaser.Physics.Arcade.Body) body.setCircle(21, 3, 3);
     }
@@ -142,7 +152,7 @@ export class AdvancedEnemy extends Slime {
     coverTank?: Readonly<ShieldSurface>, summon?: EnemySummon,
     rootAttack?: EnemyRoot, trailBomb?: EnemyTrail,
     frozenSpecial?: (enemy: AdvancedEnemy, effect: 'boulder' | 'snow' | 'golems', count: number) => void,
-    jadeBranches?: EnemyJadeBranches): void {
+    jadeBranches?: EnemyJadeBranches, emberBoss?: EnemyEmberBoss): void {
     if (this.aiState === 'defeated') return;
     // Living summoners call their first wave ~350 ms after appearing. Do this
     // before stun / knockback returns, otherwise a newly spawned summoner can
@@ -228,6 +238,10 @@ export class AdvancedEnemy extends Slime {
         const mode = getBossPlan(this.roomNumber, phase, this.bossVolleys, this.bossSlot, this.worldId);
         const move = rangedVelocity(this.x, this.y, targetX, targetY, speed,
           profile.preferredRange, this.orbitSign);
+        if (this.worldId === 3) {
+          this.updateEmberBoss(now, phase, move, fire, emberBoss);
+          break;
+        }
         if (this.isGlacierWarden) {
           this.setVelocity(move.x * 0.65, move.y * 0.65);
           if (now >= this.nextShotAt) {
@@ -438,6 +452,38 @@ export class AdvancedEnemy extends Slime {
         this.nextShotAt = now + this.stats.attackIntervalMs;
       }
     }
+  }
+
+  private updateEmberBoss(now: number, phase: 1 | 2,
+    move: { x: number; y: number }, fire: EnemyFire, emberBoss?: EnemyEmberBoss): void {
+    this.setVelocity(move.x * 0.72, move.y * 0.72);
+    const attack = getEmberBossAttack(this.roomNumber, this.bossSlot);
+    if (attack === 'pentaflare') {
+      if (now >= this.nextShotAt) {
+        fire(this, 'wide', this.bossVolleys, phase === 2 ? 1.18 : 1);
+        this.bossVolleys++;
+        this.nextShotAt = now + (phase === 2 ? 350 : EMBER_BOSS_ATTACKS.pentaflareIntervalMs);
+      }
+      return;
+    }
+
+    // The Broodmother keeps pressure between summons; all other bosses let
+    // their signature attack fully own the encounter rhythm.
+    if (attack === 'lava-summon' && now >= this.nextShotAt) {
+      fire(this, phase === 2 ? 'fan' : 'double', this.bossVolleys, 0.9);
+      this.bossVolleys++;
+      this.nextShotAt = now + (phase === 2 ? 1050 : 1450);
+    }
+    if (now < this.nextSpecialAt || !emberBoss) return;
+    emberBoss(this, attack, phase, this.bossVolleys);
+    this.bossVolleys++;
+    this.nextSpecialAt = now + (
+      attack === 'spinning-lasers' ? EMBER_BOSS_ATTACKS.laserDurationMs + 1800 :
+      attack === 'ground-fireball' ? (phase === 2 ? 1900 : 2700) :
+      attack === 'edge-cannons' ? (phase === 2 ? 1900 : 2800) :
+      attack === 'lava-summon' ? EMBER_BOSS_ATTACKS.lavaSummonIntervalMs :
+      attack === 'lava-geysers' ? (phase === 2 ? 1800 : 2600) :
+      phase === 2 ? 1550 : 2200);
   }
 
   /** The drawn plate is the same actual line segment used in damage interception.

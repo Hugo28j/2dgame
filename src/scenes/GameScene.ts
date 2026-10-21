@@ -14,7 +14,7 @@ import { rootWavePoint, rootTipHits } from '../enemies/rootGrowth';
 import { JADE_BRANCH, HEART_TREE, jadeBranchLanes, groveBranchTip,
   groveBranchHits, groveTreeHits, type GroveBranchLane } from '../enemies/groveAttacks';
 import { AdvancedEnemy, type BulletPattern } from '../enemies/AdvancedEnemy';
-import { EnemyProjectile } from '../enemies/EnemyProjectile';
+import { EnemyProjectile, type EnemyProjectileEffect } from '../enemies/EnemyProjectile';
 import { ricochetAxis } from '../enemies/enemyRicochet';
 import { WORLD1_BRIAR_ARROW_SPEED_MULTIPLIER } from '../enemies/enemyBalance';
 import { HomingEnemyProjectile } from '../enemies/HomingEnemyProjectile';
@@ -66,6 +66,8 @@ import { runeBounceTarget } from '../weapons/runeTome';
 import { upgradeCardBounds } from '../ui/upgradeLayout';
 import { displayedHp } from '../ui/displayValues';
 import { EMBER_ATTACKS } from '../enemies/emberWastes';
+import { EMBER_BOSS_ATTACKS, laserDirection, pointToLaserDistance,
+  type EmberBossAttack } from '../enemies/emberBosses';
 
 type ArcadeCollisionObject =
   | Phaser.Types.Physics.Arcade.GameObjectWithBody
@@ -286,7 +288,7 @@ export class GameScene extends Phaser.Scene {
           this.fireEnemyProjectiles, this.explodeEnemy, this.dropBossBombs,
           nearestCover?.shieldSurface, this.summonFrostMinions,
           this.performRootAttack, this.dropDashTrailBomb, this.frozenBossSpecial,
-          this.performJadeBranches);
+          this.performJadeBranches, this.emberBossSpecial);
       } else {
         child.chase(this.player.x, this.player.y);
       }
@@ -1070,6 +1072,7 @@ export class GameScene extends Phaser.Scene {
     const briarHunter = this.worldId === 1 && enemy.kind === 'archer';
     const emberFlame = this.worldId === 3 && enemy.kind === 'archer';
     const emberFireball = this.worldId === 3 && enemy.kind === 'mage';
+    const emberBossProjectile = this.worldId === 3 && enemy.isBoss;
     const speed = (emberFlame ? EMBER_ATTACKS.flameProjectileSpeed :
       emberFireball ? EMBER_ATTACKS.fireballProjectileSpeed :
       enemy.kind === 'boss' ? (220 + getBossTier(enemy.stats.roomNumber) * 8) *
@@ -1078,15 +1081,17 @@ export class GameScene extends Phaser.Scene {
       (briarHunter ? WORLD1_BRIAR_ARROW_SPEED_MULTIPLIER : 1);
     const frostArcher = this.worldId === 2 && enemy.kind === 'archer';
     const frostWitch = enemy.isFrostWitch;
-    const effect = emberFlame ? 'ember-flame' : emberFireball ? 'ember-fireball' :
+    const effect = emberFlame ? 'ember-flame' :
+      emberFireball || emberBossProjectile ? 'ember-fireball' :
       frostWitch ? 'frost-burst' : frostArcher ? 'frost-chill' :
       briarHunter ? 'briar-ricochet' : 'none';
     const color = frostWitch ? 0x93c5fd : frostArcher ? 0x38bdf8 :
       briarHunter ? 0xa3e635 :
       enemy.isBoss ? getBossProfile(enemy.stats.roomNumber, enemy.bossSlot, this.worldId).color :
-      emberFlame ? 0xfbbf24 : emberFireball ? 0xf97316 :
+      emberFlame ? 0xfbbf24 : emberFireball || emberBossProjectile ? 0xf97316 :
       enemy.kind === 'mage' ? 0xa78bfa : 0xfb7185;
-    if (emberFlame || emberFireball) this.showEmberMuzzle(enemy, angle, emberFireball);
+    if (emberFlame || emberFireball || emberBossProjectile)
+      this.showEmberMuzzle(enemy, angle, emberFireball || emberBossProjectile);
     for (const direction of angles) {
       const bullet = new EnemyProjectile(
         this, enemy.x + Math.cos(direction) * 30,
@@ -1118,6 +1123,210 @@ export class GameScene extends Phaser.Scene {
     flare.setRotation(angle);
     this.tweens.add({ targets: flare, scale: 1.65, alpha: 0,
       duration: fireball ? 220 : 130, onComplete: () => flare.destroy() });
+  }
+
+  private readonly emberBossSpecial = (enemy: AdvancedEnemy, attack: EmberBossAttack,
+    phase: 1 | 2, cycle: number): void => {
+    if (this.worldId !== 3 || !this.player || !this.currentRoom ||
+        this.gameOver || this.transitioning || this.roomProgress.doorOpen ||
+        !enemy.active || enemy.aiState === 'defeated') return;
+    if (attack === 'spinning-lasers') this.launchEmberLasers(enemy, phase, cycle);
+    else if (attack === 'ground-fireball') this.launchGroundBurst(enemy, phase);
+    else if (attack === 'edge-cannons') this.fireEdgeCannons(enemy, phase);
+    else if (attack === 'lava-summon') this.summonLavaMonsters(enemy, phase);
+    else if (attack === 'lava-geysers') this.launchLavaGeysers(enemy, phase);
+    else if (attack === 'furnace-wave') this.launchFurnaceWave(enemy, phase, cycle);
+  };
+
+  private launchEmberLasers(enemy: AdvancedEnemy, phase: 1 | 2, cycle: number): void {
+    const beam = this.add.graphics().setDepth(27);
+    this.rootEffects.add(beam);
+    const startAt = this.time.now;
+    const direction = laserDirection(cycle);
+    const duration = EMBER_BOSS_ATTACKS.laserDurationMs;
+    const reach = Math.max(this.currentRoom?.layout.bounds.width ?? 700,
+      this.currentRoom?.layout.bounds.height ?? 900);
+    let nextDamageAt = startAt + EMBER_BOSS_ATTACKS.laserWarningMs;
+    const totalTicks = Math.ceil(duration / 32);
+    let ticks = 0;
+    let timer: Phaser.Time.TimerEvent;
+    const finish = (): void => {
+      this.bombTimers.delete(timer);
+      this.rootEffects.delete(beam);
+      if (beam.active) beam.destroy();
+    };
+    timer = this.time.addEvent({ delay: 32, repeat: totalTicks - 1, callback: () => {
+      ticks++;
+      if (!beam.active || !enemy.active || enemy.aiState === 'defeated' ||
+          this.roomProgress.doorOpen || this.gameOver || this.transitioning) {
+        timer.remove(false); finish(); return;
+      }
+      const elapsed = this.time.now - startAt;
+      const armed = elapsed >= EMBER_BOSS_ATTACKS.laserWarningMs;
+      const angle = direction * elapsed * EMBER_BOSS_ATTACKS.laserAngularSpeed *
+        (phase === 2 ? 1.3 : 1);
+      beam.clear();
+      for (const offset of [0, Math.PI / 2]) {
+        const a = angle + offset;
+        const ax = enemy.x - Math.cos(a) * reach, ay = enemy.y - Math.sin(a) * reach;
+        const bx = enemy.x + Math.cos(a) * reach, by = enemy.y + Math.sin(a) * reach;
+        beam.lineStyle(armed ? EMBER_BOSS_ATTACKS.laserWidth : 5,
+          armed ? 0xf97316 : 0xfde047, armed ? 0.92 : 0.38);
+        beam.lineBetween(ax, ay, bx, by);
+        beam.lineStyle(armed ? 3 : 1, 0xfffbeb, armed ? 0.9 : 0.55);
+        beam.lineBetween(ax, ay, bx, by);
+        if (armed && this.player && this.time.now >= nextDamageAt &&
+            pointToLaserDistance(this.player.x, this.player.y, ax, ay, bx, by) <=
+              EMBER_BOSS_ATTACKS.laserWidth + 12) {
+          nextDamageAt = this.time.now + 520;
+          this.damagePlayer({ damage: enemy.stats.damage * 0.48,
+            criticalChance: 0, criticalMultiplier: 1 }, 480);
+        }
+      }
+      if (ticks >= totalTicks) finish();
+    } });
+    this.bombTimers.add(timer);
+  }
+
+  private launchGroundBurst(enemy: AdvancedEnemy, phase: 1 | 2): void {
+    if (!this.player || !this.currentRoom) return;
+    const bounds = this.currentRoom.layout.bounds;
+    const targetX = Phaser.Math.Clamp(this.player.x, bounds.x + 45, bounds.x + bounds.width - 45);
+    const targetY = Phaser.Math.Clamp(this.player.y, bounds.y + 45, bounds.y + bounds.height - 45);
+    const warning = this.add.circle(targetX, targetY, 42, 0xef4444, 0.14)
+      .setStrokeStyle(3, 0xfbbf24, 0.9).setDepth(24);
+    const orb = this.add.circle(enemy.x, enemy.y - 18, phase === 2 ? 15 : 12, 0xf97316, 0.96)
+      .setStrokeStyle(3, 0xfef08a).setDepth(31);
+    this.bombWarnings.add(warning); this.bombWarnings.add(orb);
+    const fromX = enemy.x, fromY = enemy.y - 18;
+    this.tweens.addCounter({ from: 0, to: 1,
+      duration: EMBER_BOSS_ATTACKS.groundFireballFlightMs, onUpdate: tween => {
+        if (!orb.active) return;
+        const t = tween.getValue() ?? 0;
+        orb.setPosition(Phaser.Math.Linear(fromX, targetX, t),
+          Phaser.Math.Linear(fromY, targetY, t) - 95 * Math.sin(Math.PI * t));
+        orb.setScale(1 + 0.35 * Math.sin(Math.PI * t));
+      }, onComplete: () => {
+        this.bombWarnings.delete(warning); this.bombWarnings.delete(orb);
+        warning.destroy(); orb.destroy();
+        if (!enemy.active || enemy.aiState === 'defeated' || this.roomProgress.doorOpen) return;
+        const blast = this.add.circle(targetX, targetY, 48, 0xf97316, 0.58)
+          .setStrokeStyle(4, 0xffedd5).setDepth(30);
+        this.tweens.add({ targets: blast, scale: 1.45, alpha: 0, duration: 330,
+          onComplete: () => blast.destroy() });
+        if (this.player && withinRadius(targetX, targetY, this.player.x, this.player.y, 48))
+          this.damagePlayer({ damage: enemy.stats.damage * 0.62,
+            criticalChance: 0, criticalMultiplier: 1 });
+        const count = EMBER_BOSS_ATTACKS.groundBurstCount;
+        for (let i = 0; i < count; i++) {
+          const angle = i * Math.PI * 2 / count;
+          this.launchEmberProjectile(targetX, targetY, Math.cos(angle), Math.sin(angle),
+            EMBER_BOSS_ATTACKS.groundBurstSpeed, enemy.stats.damage * 0.34);
+        }
+      } });
+  }
+
+  private fireEdgeCannons(enemy: AdvancedEnemy, phase: 1 | 2): void {
+    if (!this.currentRoom) return;
+    const b = this.currentRoom.layout.bounds;
+    const positions = phase === 1 ? [
+      {x: b.x + 18, y: b.y + b.height * .35},
+      {x: b.x + b.width - 18, y: b.y + b.height * .65},
+    ] : [
+      {x: b.x + 18, y: b.y + b.height * .3}, {x: b.x + b.width - 18, y: b.y + b.height * .7},
+      {x: b.x + b.width * .3, y: b.y + 18}, {x: b.x + b.width * .7, y: b.y + b.height - 18},
+    ];
+    for (const [index, site] of positions.entries()) {
+      const cannon = this.add.circle(site.x, site.y, 15, 0x292524, 1)
+        .setStrokeStyle(4, 0xf97316).setDepth(29);
+      const warning = this.add.graphics().setDepth(25);
+      warning.lineStyle(3, 0xfbbf24, .5);
+      warning.lineBetween(site.x, site.y,
+        this.player?.x ?? site.x, this.player?.y ?? site.y);
+      this.bombWarnings.add(cannon); this.rootEffects.add(warning);
+      let timer: Phaser.Time.TimerEvent;
+      timer = this.time.delayedCall(EMBER_BOSS_ATTACKS.cannonWarningMs + index * 90, () => {
+        this.bombTimers.delete(timer); this.bombWarnings.delete(cannon);
+        this.rootEffects.delete(warning); cannon.destroy(); warning.destroy();
+        if (!this.player || !enemy.active || enemy.aiState === 'defeated' ||
+            this.roomProgress.doorOpen || this.gameOver) return;
+        const dx = this.player.x - site.x, dy = this.player.y - site.y;
+        const length = Math.hypot(dx, dy) || 1;
+        this.launchEmberProjectile(site.x, site.y, dx / length, dy / length,
+          phase === 2 ? 365 : 320, enemy.stats.damage * 0.52);
+      });
+      this.bombTimers.add(timer);
+    }
+  }
+
+  private summonLavaMonsters(enemy: AdvancedEnemy, phase: 1 | 2): void {
+    if (!this.enemies || !this.enemySpawner || !this.currentRoom) return;
+    const live = this.enemies.getChildren().filter(child => child instanceof Slime &&
+      child.active && child.aiState !== 'defeated' && child.enemyId.startsWith('lava-summon-')).length;
+    const available = Math.max(0, EMBER_BOSS_ATTACKS.lavaSummonCap - live);
+    const count = Math.min(available, phase === 2 ? 2 : 1);
+    if (count <= 0) return;
+    const b = this.currentRoom.layout.bounds;
+    const positions = Array.from({ length: count }, (_, i) => ({
+      x: Phaser.Math.Clamp(enemy.x + (i === 0 ? -72 : 72), b.x + 40, b.x + b.width - 40),
+      y: Phaser.Math.Clamp(enemy.y + 66, b.y + 40, b.y + b.height - 40),
+    }));
+    const portal = this.add.circle(enemy.x, enemy.y + 62, 28 + count * 5, 0xf97316, .4)
+      .setStrokeStyle(4, 0xfde047).setDepth(24);
+    this.tweens.add({ targets: portal, scale: 1.5, alpha: 0, duration: 520,
+      onComplete: () => portal.destroy() });
+    this.roomProgress.addEnemies(count);
+    this.enemySpawner.summonLavaMonsters(positions, this.currentRoom.number);
+  }
+
+  private launchLavaGeysers(enemy: AdvancedEnemy, phase: 1 | 2): void {
+    if (!this.player || !this.currentRoom) return;
+    const b = this.currentRoom.layout.bounds;
+    const count = phase === 2 ? 5 : 3;
+    for (let i = 0; i < count; i++) {
+      const angle = i * Math.PI * 2 / count + this.time.now / 900;
+      const distance = i === 0 ? 0 : 78;
+      const x = Phaser.Math.Clamp(this.player.x + Math.cos(angle) * distance, b.x + 50, b.x + b.width - 50);
+      const y = Phaser.Math.Clamp(this.player.y + Math.sin(angle) * distance, b.y + 50, b.y + b.height - 50);
+      const warning = this.add.circle(x, y, EMBER_BOSS_ATTACKS.geyserRadius, 0xef4444, .13)
+        .setStrokeStyle(3, 0xfbbf24).setDepth(23);
+      this.bombWarnings.add(warning);
+      let timer: Phaser.Time.TimerEvent;
+      timer = this.time.delayedCall(EMBER_BOSS_ATTACKS.geyserWarningMs + i * 70, () => {
+        this.bombTimers.delete(timer); this.bombWarnings.delete(warning); warning.destroy();
+        if (!enemy.active || enemy.aiState === 'defeated' || this.roomProgress.doorOpen) return;
+        const column = this.add.rectangle(x, y - 50, 34, 120, 0xf97316, .78)
+          .setStrokeStyle(3, 0xfef08a).setDepth(30).setOrigin(.5, 1);
+        this.tweens.add({ targets: column, scaleY: {from: .15, to: 1.2}, alpha: 0,
+          duration: 470, onComplete: () => column.destroy() });
+        if (this.player && withinRadius(x, y, this.player.x, this.player.y,
+          EMBER_BOSS_ATTACKS.geyserRadius))
+          this.damagePlayer({ damage: enemy.stats.damage * .55,
+            criticalChance: 0, criticalMultiplier: 1 });
+      });
+      this.bombTimers.add(timer);
+    }
+  }
+
+  private launchFurnaceWave(enemy: AdvancedEnemy, phase: 1 | 2, cycle: number): void {
+    const count = EMBER_BOSS_ATTACKS.furnaceWaveCount + (phase === 2 ? 4 : 0);
+    const offset = cycle % 2 * Math.PI / count;
+    const ring = this.add.circle(enemy.x, enemy.y, 24, 0xf97316, .35)
+      .setStrokeStyle(5, 0xfde047).setDepth(29);
+    this.tweens.add({ targets: ring, scale: 3.2, alpha: 0, duration: 420,
+      onComplete: () => ring.destroy() });
+    for (let i = 0; i < count; i++) {
+      const angle = i * Math.PI * 2 / count + offset;
+      this.launchEmberProjectile(enemy.x, enemy.y, Math.cos(angle), Math.sin(angle),
+        phase === 2 ? 285 : 245, enemy.stats.damage * .38);
+    }
+  }
+
+  private launchEmberProjectile(x: number, y: number, dx: number, dy: number,
+    speed: number, damage: number, effect: EnemyProjectileEffect = 'ember-fireball'): void {
+    if (!this.enemyProjectiles) return;
+    const bullet = new EnemyProjectile(this, x, y, dx, dy, speed, damage, 0xf97316, effect);
+    addAndLaunch(bullet, () => this.enemyProjectiles!.add(bullet), {x: dx, y: dy}, speed);
   }
 
   /** Exclusive World-2 bosses: growing rolling ice boulders, falling snow,

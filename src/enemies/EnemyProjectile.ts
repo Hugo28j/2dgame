@@ -100,4 +100,9 @@ export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
     return this.x < bounds.x || this.x > bounds.right ||
       this.y < bounds.y || this.y > bounds.bottom;
   }
+
+  public override destroy(fromScene?: boolean): void {
+    this.scene?.tweens.killTweensOf(this);
+    super.destroy(fromScene);
+  }
 }
