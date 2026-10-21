@@ -21,6 +21,7 @@ import { HomingEnemyProjectile } from '../enemies/HomingEnemyProjectile';
 import { coverIsClose, firstShieldOnPath, type ShieldPoint } from '../enemies/treantShield';
 import { ICE_WALL, HOMING_ORB, wallGapCenter, wallHitsCircle, wallXAt } from '../enemies/frozenBossAttacks';
 import { FROZEN_EARLY, canSummonFrostMinions } from '../enemies/frozenEarlyGame';
+import { PLAYER_HIT_INVULNERABILITY_MS, playerHitProtectionMs } from '../combat/playerHitProtection';
 import { FROZEN_BALANCE } from '../enemies/frozenBalance';
 import { shouldSplitFrozenGiant } from '../enemies/frozenSplit';
 import { withinRadius } from '../enemies/enemyMovement';
@@ -2223,7 +2224,7 @@ export class GameScene extends Phaser.Scene {
   };
 
   /** The Frost Witch's orb bursts both on the hero and arena obstacles.
-   * AoE collision is resolved once and immobilizes only a vulnerable hero.
+   * AoE damage is resolved once; vulnerable heroes are slowed, never frozen.
    */
   private explodeFrostBolt(x: number, y: number, attack: Readonly<Projectile['attack']>): void {
     const radius = FROZEN_EARLY.witchOrbRadius;
@@ -2237,7 +2238,7 @@ export class GameScene extends Phaser.Scene {
       !withinRadius(x, y, this.player.x, this.player.y, radius)) return;
     const vulnerable = this.player.canReceiveContactDamage(this.time.now);
     this.damagePlayer(attack);
-    if (vulnerable && !this.gameOver) this.player.freeze(this.time.now);
+    if (vulnerable && !this.gameOver) this.player.slowFromWitch(this.time.now);
   }
 
   private readonly handleEnemyBulletHit = (
@@ -2320,21 +2321,24 @@ export class GameScene extends Phaser.Scene {
     this.damagePlayer(enemyObject.contactAttack, enemyObject.attackIntervalMs);
   };
 
-  private damagePlayer(attack: Readonly<Projectile['attack']>, iframeMs = 650): void {
+  private damagePlayer(attack: Readonly<Projectile['attack']>,
+    iframeMs = PLAYER_HIT_INVULNERABILITY_MS): void {
     if (!this.player || this.gameOver || !brambleDamageAllowed(this.brambleStage) ||
         !this.player.canReceiveContactDamage(this.time.now)) return;
+    // Fast enemy attack timers cannot shorten the hero's global hit protection.
+    // A second contact, bullet or boss explosion in the same window is ignored.
+    const protectedFor = playerHitProtectionMs(iframeMs);
     if (shouldParryHit(this.player.heroId, Math.random())) {
-      // A parried hit deals zero damage and consumes the same i-frame window
-      // as a normal hit: overlapping melee enemies cannot repeatedly reroll.
-      this.player.beginInvulnerability(this.time.now, iframeMs);
+      // A parried hit deals zero damage but still grants the same protection.
+      this.player.beginInvulnerability(this.time.now, protectedFor);
       this.showPlayerParry();
       return;
     }
     const result = this.damageSystem.apply(this.player, attack);
-    this.player.beginInvulnerability(this.time.now, iframeMs);
+    this.player.beginInvulnerability(this.time.now, protectedFor);
     this.drawPlayerHealth();
     if (result.defeated) this.endRun();
-    else this.showPlayerHit();
+    else this.showPlayerHit(protectedFor);
   }
 
   private updateBossHud(): void {
@@ -3008,18 +3012,20 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private showPlayerHit(): void {
+  private showPlayerHit(protectedFor: number): void {
     if (!this.player) {
       return;
     }
 
     this.player.setTint(0xef4444).setTintMode(Phaser.TintModes.FILL);
+    // Flash throughout the real protection window, so immunity is visible.
+    this.tweens.killTweensOf(this.player);
     this.tweens.add({
       targets: this.player,
       alpha: 0.35,
-      duration: 80,
+      duration: 100,
       yoyo: true,
-      repeat: 3,
+      repeat: Math.max(0, Math.ceil(protectedFor / 200) - 1),
       onComplete: () => this.player?.setAlpha(1),
     });
     this.time.delayedCall(100, () => {
