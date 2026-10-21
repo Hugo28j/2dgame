@@ -60,8 +60,8 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityConfig>> = {
     cooldownMs: 35000, radius: 270, damage: 24, heal: 0, durationMs: SHOTGUN_TRANSFORM.durationMs, dashSpeed: 0,
     invulnerabilityMs: 0, slowFactor: 1 }),
   'ranger-volley': ability({ id: 'ranger-volley', heroId: 'ranger', slot: 3, unlockLevel: 30,
-    kind: 'companion', name: 'Wolf Ally', description: 'Roep een AI-wolf met eigen HP op', symbol: '🐺', color: 0x22d3ee,
-    cooldownMs: 54000, radius: 300, damage: 25, heal: 0, durationMs: 11000, dashSpeed: 0,
+    kind: 'rapidFire', name: 'Ranger Overdrive', description: '7-15s aanvalssnelheid ×1.2 tot ×2.5; 25s cooldown', symbol: '⚡', color: 0x22d3ee,
+    cooldownMs: 25000, radius: 0, damage: 0, heal: 0, durationMs: 7000, dashSpeed: 0,
     invulnerabilityMs: 0, slowFactor: 1 }),
 
   'mage-blink': ability({ id: 'mage-blink', heroId: 'mage', slot: 1, unlockLevel: 5,
@@ -144,7 +144,11 @@ export const HERO_ABILITIES: Readonly<Record<HeroId, readonly [AbilityId, Abilit
 export const ABILITY_SLOTS = HERO_ABILITIES.guardian;
 export const MAX_ABILITY_LEVEL = 20;
 
-export interface AbilityStats extends AbilityConfig { readonly upgradeLevel: number }
+export interface AbilityStats extends AbilityConfig {
+  readonly upgradeLevel: number;
+  /** Actual firing-rate multiplier while the rapid-fire buff is active. */
+  readonly attackSpeedMultiplier: number;
+}
 export function abilityUpgradeCost(level: number): number {
   return 40 + Math.max(0, level - 1) * 35;
 }
@@ -159,10 +163,19 @@ export function getAbilityStats(id: AbilityId, level: number): AbilityStats {
       durationMs: frostSlowMotionDurationMs(extra + 1),
       cooldownMs: frostSlowMotionCooldownMs(extra + 1),
     } : {}),
+    // Ranger slot 3 keeps a fixed base cooldown and gets longer/stronger
+    // with upgrades. The ability ID is unchanged to preserve saved levels.
+    ...(id === 'ranger-volley' ? {
+      durationMs: Math.round(7000 + 8000 * extra / (MAX_ABILITY_LEVEL - 1)),
+    } : {}),
+    attackSpeedMultiplier: id === 'ranger-volley'
+      ? Math.round((1.2 + 1.3 * extra / (MAX_ABILITY_LEVEL - 1)) * 100) / 100
+      : 2.15,
     damage: Math.round(base.damage * (1 + extra * 0.12)),
     heal: Math.round(base.heal * (1 + extra * 0.1)),
     radius: Math.round(base.radius * (1 + extra * 0.012)),
     cooldownMs: id === 'frost-ring' ? frostSlowMotionCooldownMs(extra + 1) :
+      id === 'ranger-volley' ? 25000 :
       Math.round(base.cooldownMs * cooldownScale),
     dashSpeed: Math.round(base.dashSpeed * (1 + extra * 0.012)),
   };
