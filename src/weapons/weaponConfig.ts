@@ -149,9 +149,12 @@ export function getWeaponStats(id: WeaponId, level: number): WeaponConfig {
     ? base.fireRate + (maxHammerFireRate - base.fireRate) *
         (extra / (MAX_WEAPON_LEVEL - 1))
     : Math.round(base.fireRate * (1 + 0.02 * extra) * 100) / 100;
-  const guardianDamage = base.heroId === 'guardian'
-    ? GUARDIAN_WEAPON_DAMAGE_MULTIPLIER : 1;
-  return { ...base, upgradeLevel: extra + 1,
-    damage: Math.round(base.damage * (1 + 0.12 * extra) * guardianDamage * 10) / 10,
-    fireRate };
+  // First apply the EXISTING level scaling/rounding, then boost that
+  // level's original damage by 50%. This preserves precisely the same
+  // level-to-level growth and avoids compounding a bonus per upgrade.
+  const previousDamage = Math.round(base.damage * (1 + 0.12 * extra) * 10) / 10;
+  const damage = base.heroId === 'guardian'
+    ? Math.round(previousDamage * GUARDIAN_WEAPON_DAMAGE_MULTIPLIER * 10) / 10
+    : previousDamage;
+  return { ...base, upgradeLevel: extra + 1, damage, fireRate };
 }
