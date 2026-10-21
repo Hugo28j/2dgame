@@ -23,12 +23,15 @@ describe('Phase 7 Glacial Blade three-stage combo', () => {
     const first=glacialStrikeShape(0,72);
     const second=glacialStrikeShape(1,72);
     const third=glacialStrikeShape(2,72);
-    expect(first.reach).toBeLessThan(72);
-    expect(second.reach).toBeLessThan(72);
-    expect(third.reach).toBeGreaterThan(second.reach * 2);
+    expect(first.reach).toBeGreaterThan(72);
+    expect(second.reach).toBeGreaterThan(72);
+    expect(third.reach).toBeGreaterThan(second.reach * 1.8);
     expect(third.halfWidth).toBeLessThan(20);
     const owner={x:0,y:0},aim={x:1,y:0};
     expect(glacialStrikeHits(0,owner,aim,{x:50,y:0},72,0)).toBe(true);
+    expect(glacialStrikeHits(0,owner,aim,{x:82,y:0},72,0)).toBe(true);
+    expect(glacialStrikeHits(1,owner,aim,{x:91,y:0},72,0)).toBe(true);
+    expect(glacialStrikeHits(2,owner,aim,{x:165,y:0},72,0)).toBe(true);
     expect(glacialStrikeHits(1,owner,aim,{x:50,y:0},72,0)).toBe(true);
     expect(glacialStrikeHits(0,owner,aim,{x:112,y:0},72,0)).toBe(false);
     expect(glacialStrikeHits(1,owner,aim,{x:112,y:0},72,0)).toBe(false);
@@ -50,6 +53,8 @@ describe('Phase 7 Glacial Blade three-stage combo', () => {
     expect(WEAPONS.daggers.fireRate).toBe(5.1);
     expect(WEAPONS.daggers.projectileSpeed).toBe(550);
     expect(WEAPONS.daggers.projectileCount).toBe(2);
+    expect(WEAPONS.daggers.projectileRange).toBe(365);
+    expect(WEAPONS.iceblade.meleeRange).toBe(72);
     expect(WEAPONS.sunblade.fireRate).toBe(1.75);
   });
 });

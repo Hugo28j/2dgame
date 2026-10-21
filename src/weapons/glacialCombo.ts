@@ -6,9 +6,9 @@ export type GlacialStrike = 0 | 1 | 2;
 
 /** A separate 3-hit cycle; never also uses the generic melee swing. */
 export const GLACIAL_COMBO = Object.freeze({
-  shortReach: [0.86, 0.92] as readonly [number, number],
+  shortReach: [1.2, 1.3] as readonly [number, number],
   shortArc: [1.22, 1.08] as readonly [number, number],
-  thrustReach: 1.95,
+  thrustReach: 2.45,
   thrustHalfWidth: 17,
   shortTempoMultiplier: 0.77,
   recoveryTempoMultiplier: 2.18,
@@ -17,7 +17,7 @@ export const GLACIAL_COMBO = Object.freeze({
   recoveryAnimationMs: 240,
 });
 
-/** Two compact, opposite-direction cuts followed by a long, narrow thrust. */
+/** Two visibly longer, opposite-direction cuts followed by an extended narrow thrust. */
 export function glacialStrikeShape(strike: GlacialStrike, baseRange: number):
   { kind: 'slash' | 'thrust'; reach: number; arc: number; halfWidth: number } {
   return strike === 2

@@ -56,6 +56,9 @@ describe('phase 5: one-time Bramble Gunner cinematic and twin handoff', () => {
   it('doubles current twin firing rate and angle without changing opposite rotation', () => {
     expect(BRAMBLE_CINEMATIC.sentinelAttackRateMultiplier).toBe(3);
     expect(BRAMBLE_CINEMATIC.sentinelSpinMultiplier).toBe(2);
+    expect(BRAMBLE_CINEMATIC.handoffMs).toBeGreaterThanOrEqual(1000);
+    expect(BRAMBLE_CINEMATIC.splitDistance).toBe(90);
+    expect(BRAMBLE_CINEMATIC.splitHalfWidth * 2).toBe(48);
     const a0=splitTwinShotAngle(amplifiedTwinVolleyIndex(0),0);
     const a1=splitTwinShotAngle(amplifiedTwinVolleyIndex(1),0);
     const b0=splitTwinShotAngle(amplifiedTwinVolleyIndex(0),1);

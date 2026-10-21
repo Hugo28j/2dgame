@@ -4,7 +4,10 @@ export const BRAMBLE_CINEMATIC = Object.freeze({
   windMs: 1350,
   growthMs: 1580,
   explosionMs: 880,
-  handoffMs: 380,
+  // Let the enlarged Gunner tear into two visible halves before control returns.
+  handoffMs: 1120,
+  splitDistance: 90,
+  splitHalfWidth: 24,
   heroPush: 235,
   gunnerGrowthScale: 3.25,
   sentinelHpMultiplier: 1.5,

@@ -190,7 +190,7 @@ export class WeaponController {
       onUpdate: tween => {
         if (!effect.active || !this.owner.active) return;
         const progress=tween.getValue()??0;
-        if (!applied && progress >= (strike===2 ? 0.56 : 0.42)) {
+        if (!applied && progress >= (strike===2 ? 0.56 : 0.83)) {
           applied=true;
           this.hitGlacialStrike(strike,aim);
         }
@@ -214,7 +214,12 @@ export class WeaponController {
           effect.fillCircle(ox+Math.cos(center)*shape.reach,
             oy+Math.sin(center)*shape.reach,3);
         } else {
-          const reach=shape.reach*(.14+.86*progress);
+          // The stabbing tip reaches its FULL hitbox exactly at the
+          // contact frame (0.56). Previously the damage landed at 62% of
+          // the drawn sword length, leaving a misleading invisible reach.
+          const extension = Math.min(1, progress / 0.56);
+          const retract = progress <= 0.72 ? 1 : 1 - 0.38 * (progress - 0.72) / 0.28;
+          const reach = shape.reach * (.14 + .86 * extension) * retract;
           const sx=ox+aim.x*18, sy=oy+aim.y*18;
           const tx=ox+aim.x*reach,ty=oy+aim.y*reach;
           // Only a thin straight thrust is painted; width matches hitbox.
