@@ -2201,6 +2201,9 @@ export class GameScene extends Phaser.Scene {
       scaleY: BRAMBLE_CINEMATIC.gunnerGrowthScale,
       duration: BRAMBLE_CINEMATIC.growthMs, ease: 'Cubic.easeInOut'});
     const energy = this.trackBrambleFx(this.add.graphics().setDepth(169));
+    // A jagged glowing seam grows down the enlarged body, visibly warning
+    // that a single Gunner is about to tear into TWO independent Sentinels.
+    const fracture = this.trackBrambleFx(this.add.graphics().setDepth(187));
     const token = this.brambleSequence;
     this.tweens.addCounter({
       from: 0, to: 1, duration: BRAMBLE_CINEMATIC.growthMs,
@@ -2220,6 +2223,28 @@ export class GameScene extends Phaser.Scene {
         }
         energy.fillStyle(0x84cc16, 0.06 + t * 0.18);
         energy.fillCircle(enemy.x, enemy.y, 56 + t * 62);
+        fracture.clear();
+        if (t > 0.43) {
+          const seam = (t - 0.43) / 0.57;
+          const extent = 65 * seam;
+          fracture.lineStyle(11, 0x4d250e, 0.75 * seam);
+          fracture.beginPath();
+          fracture.moveTo(enemy.x, enemy.y - extent);
+          for (let i = 1; i <= 8; i++) {
+            const y = enemy.y - extent + (2 * extent * i / 8);
+            const x = enemy.x + (i % 2 ? 8 : -7) * seam;
+            fracture.lineTo(x, y);
+          }
+          fracture.strokePath();
+          fracture.lineStyle(4, 0xf2ffc0, seam);
+          fracture.beginPath();
+          fracture.moveTo(enemy.x, enemy.y - extent);
+          for (let i = 1; i <= 8; i++) {
+            fracture.lineTo(enemy.x + (i % 2 ? 8 : -7) * seam,
+              enemy.y - extent + (2 * extent * i / 8));
+          }
+          fracture.strokePath();
+        }
       },
     });
     this.scheduleBrambleStage(BRAMBLE_CINEMATIC.growthMs,
@@ -2262,7 +2287,10 @@ export class GameScene extends Phaser.Scene {
       () => this.spawnBrambleTwins(enemy));
   }
 
-  /** Stage 4: only now replace the body with exactly two living bosses. */
+  /** Stage 4: visibly tear the giant Gunner into two living Bloom Sentinels.
+   * Input, damage and physics stay paused until the visual halves reach the
+   * exact future enemy locations. Each FX object belongs to the cutscene and
+   * is removed on room transition, shutdown, or normal completion. */
   private spawnBrambleTwins(enemy: AdvancedEnemy): void {
     if (this.brambleStage !== 'explosion' || !this.currentRoom ||
         !this.enemySpawner || !this.player) return;
@@ -2270,18 +2298,89 @@ export class GameScene extends Phaser.Scene {
     const bounds = this.currentRoom.layout.bounds;
     const x = Phaser.Math.Clamp(enemy.x, bounds.x + 125, bounds.x + bounds.width - 125);
     const y = Phaser.Math.Clamp(enemy.y, bounds.y + 90, bounds.y + bounds.height - 90);
+    const scale = enemy.scaleX;
+    const texture = enemy.texture.key;
+    const spread = BRAMBLE_CINEMATIC.splitDistance;
+    const points = [{x:x-spread,y}, {x:x+spread,y}];
+
+    // Render actual LEFT and RIGHT halves of the enlarged Gunner texture.
+    // Its original texture is 48x48; the two cropped images make the tear
+    // legible instead of making one boss vanish and two unrelated ones spawn.
+    const halves = [-1,1].map((side,index) =>
+      this.trackBrambleFx(
+        this.add.image(x + side*12*scale,y,texture)
+          .setCrop(index*BRAMBLE_CINEMATIC.splitHalfWidth,0,
+            BRAMBLE_CINEMATIC.splitHalfWidth,48)
+          .setScale(scale).setDepth(190)
+      )
+    );
     enemy.destroy();
     this.brambleBoss = undefined;
-    const points = [{x:x-90,y}, {x:x+90,y}];
+
+    // Reserve / instantiate exactly two real bosses, but keep them invisible
+    // (and physics paused) until the two animated halves have fully formed.
     const twins = this.enemySpawner.spawnSplitBosses(points, 20);
     this.activeBosses = twins;
+    for (const twin of twins) twin.setVisible(false).setAlpha(0);
     this.updateEnemyCount();
-    this.setBrambleMessage('TWEE BLOOM SENTINELS VERSCHIJNEN');
+    this.setBrambleMessage('DE GUNNER SCHEURT OPEN — TWEE SENTINELS!');
+
+    // Each fading half buds into the ACTUAL Bloom Sentinel texture and
+    // smoothly moves to the identical position of the future hitbox.
+    const buds = twins.map(twin =>
+      this.trackBrambleFx(
+        this.add.image(x,y,twin.texture.key).setScale(0.35)
+          .setAlpha(0).setDepth(191).setTint(0xc6ffb0)
+      )
+    );
+    const tendrils = this.trackBrambleFx(this.add.graphics().setDepth(192));
+    const token = this.brambleSequence;
+    this.tweens.addCounter({
+      from:0,to:1,duration:BRAMBLE_CINEMATIC.handoffMs,ease:'Sine.easeInOut',
+      onUpdate:tween=>{
+        if (token !== this.brambleSequence || this.brambleStage !== 'handoff' ||
+            !tendrils.active) return;
+        const t = tween.getValue() ?? 0;
+        tendrils.clear();
+        for (let i=0;i<2;i++) {
+          const side = i===0 ? -1 : 1;
+          const travel = spread * Math.min(1, t / 0.88);
+          const offset = side * travel;
+          const half = halves[i]!;
+          half.setPosition(x + side*12*scale + offset*0.70,
+            y - Math.sin(t*Math.PI)*11)
+            .setScale(scale*(1-0.52*t))
+            .setAngle(side*31*t)
+            .setAlpha(Math.max(0,1-Math.max(0,t-0.55)/0.40));
+          const bud = buds[i]!;
+          bud.setPosition(x+offset,y)
+            .setScale(0.35+1.40*Math.min(1,t/0.90))
+            .setAlpha(Math.min(1,Math.max(0,(t-0.18)*2.7)));
+          // A bright tearing tether snaps as both new cores break free.
+          if(t<0.86){
+            const fade=1-t/0.86;
+            tendrils.lineStyle(6,0x275b2c,0.72*fade);
+            tendrils.lineBetween(x,y,x+offset,y);
+            tendrils.lineStyle(2.5,0xecffc5,0.9*fade);
+            tendrils.lineBetween(x,y-7,x+offset,y-6);
+          }
+          for(let leaf=0;leaf<5;leaf++){
+            const theta=(leaf+i*5)*Math.PI*2/10;
+            const radius = 12 + 95*t + (leaf%3)*9;
+            tendrils.fillStyle(leaf%2?0xd9f99d:0x84cc16,(1-t)*0.82);
+            tendrils.fillEllipse(x+Math.cos(theta)*radius,
+              y+Math.sin(theta)*radius,6+4*t,3+2*t);
+          }
+        }
+      },
+    });
     if (this.brambleOverlay) {
-      this.tweens.add({targets: this.brambleOverlay, alpha: 0,
-        duration: BRAMBLE_CINEMATIC.handoffMs});
+      this.tweens.add({targets:this.brambleOverlay,alpha:0,
+        duration:BRAMBLE_CINEMATIC.handoffMs});
     }
-    this.scheduleBrambleStage(BRAMBLE_CINEMATIC.handoffMs, () => {
+    this.scheduleBrambleStage(BRAMBLE_CINEMATIC.handoffMs,()=>{
+      // Swap the final visual buds for their matching real boss sprites.
+      for(const twin of twins) if(twin.active) twin.setVisible(true).setAlpha(1);
       this.clearBrambleCutscene();
       this.updateBossHud();
     });
