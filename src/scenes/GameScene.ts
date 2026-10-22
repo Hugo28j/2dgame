@@ -174,8 +174,6 @@ export class GameScene extends Phaser.Scene {
   private resumeRequested = false;
   private pausedByPlayer = false;
   private pausePanel?: Phaser.GameObjects.Container;
-  private pauseButton?: Phaser.GameObjects.Rectangle;
-  private checkpoint?: RunCheckpoint;
   private readonly damageSystem = new DamageSystem();
   private readonly roomProgress = new RoomProgress(CHAPTER_ROOM_COUNT);
 
@@ -209,7 +207,6 @@ export class GameScene extends Phaser.Scene {
     this.chapterComplete = false;
     this.choosingUpgrade = false;
     this.pausedByPlayer = false;
-    this.checkpoint = undefined;
     this.pausePanel = undefined;
     this.brambleStage = 'idle';
     this.brambleCutsceneUsed = false;
@@ -3224,7 +3221,7 @@ export class GameScene extends Phaser.Scene {
       upgrades: this.upgrades.snapshot(),
       ledger: this.run.snapshot(),
     };
-    if (runCheckpointStore.save(checkpoint)) this.checkpoint = checkpoint;
+    runCheckpointStore.save(checkpoint);
   }
 
   private createPauseButton(): void {
@@ -3238,7 +3235,6 @@ export class GameScene extends Phaser.Scene {
       fontStyle: 'bold', color: '#e0f2fe',
     }).setOrigin(.5).setScrollFactor(0).setDepth(181);
     button.on('pointerdown', () => this.openPausePanel());
-    this.pauseButton = button;
   }
 
   private openPausePanel(): void {
@@ -3299,7 +3295,6 @@ export class GameScene extends Phaser.Scene {
   private shutdown(): void {
     this.pausePanel?.destroy(true);
     this.pausePanel = undefined;
-    this.pauseButton = undefined;
     this.clearBrambleCutscene();
     this.physics.world.resume();
     this.clearCoins();
