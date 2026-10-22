@@ -11,7 +11,8 @@ export const poseForWeapon = (weapon: WeaponId): AttackPose | null =>
 export function poseLengthMs(pose: AttackPose, attackIntervalMs: number): number {
   const base = pose === 'hammer' ? 440 : pose === 'sword' ? 200 :
     pose === 'crossbow' ? 175 : pose === 'shotgun' ? 210 : 145;
-  return Math.max(75, Math.min(base, attackIntervalMs * .78));
+  return pose === 'hammer' ? Math.max(220, Math.min(base, attackIntervalMs * .78))
+    : Math.max(75, Math.min(base, attackIntervalMs * .78));
 }
 
 /** Fixed 135ms hammer anticipation: impact and actual hitbox occur together. */
@@ -174,6 +175,13 @@ export class CharacterAttackArt {
       g.lineBetween(gripX+30,gripY-8,gripX+41,gripY-8);
       g.lineBetween(gripX+30,gripY+8,gripX+41,gripY+8);
     }
+  }
+
+  /** Room changes cancel current poses but keep the same weapon renderer alive. */
+  public reset(): void {
+    this.activePose = null;
+    this.started = -100000;
+    this.graphics.clear();
   }
 
   public destroy(): void {
