@@ -96,7 +96,7 @@ export class WeaponController {
       const aim = normalizedDirection(direction);
       const timer = this.scene.time.delayedCall(HAMMER_IMPACT_DELAY_MS, () => {
         this.hammerTimers.delete(timer);
-        if (!this.owner.active || !this.scene.sys.isActive()) return;
+        if (!this.owner.active || this.owner.currentHp <= 0 || !this.scene.sys.isActive()) return;
         this.groundSlam(aim, this.scene.time.now);
       });
       this.hammerTimers.add(timer);
