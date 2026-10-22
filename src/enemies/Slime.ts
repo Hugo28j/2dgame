@@ -4,6 +4,8 @@ import type { AttackData, Damageable } from '../combat/damage';
 import { SLIME_TEXTURE_KEY } from '../config/constants';
 import type { SlimeRuntimeStats } from './enemyConfig';
 import { getChaseVelocity, getObstacleAvoidanceVelocity } from './slimeMovement';
+import { goblinKnifeAngle, goblinKnifeSwingActive,
+  GOBLIN_KNIFE_TOTAL_MS } from './goblinKnife';
 
 export const ENEMY_SPAWNED_EVENT = 'enemy-spawned';
 export const ENEMY_DEFEATED_EVENT = 'enemy-defeated';
@@ -30,6 +32,11 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
   private knockedUntil = 0;
   private knockbackX = 0;
   private knockbackY = 0;
+  /** World-1 goblin holds a real, individually animated knife. */
+  public readonly isKnifeGoblin: boolean;
+  private readonly knifeGraphic?: Phaser.GameObjects.Graphics;
+  private knifeAttackStartedAt = -100000;
+  private knifeAttackToken = 0;
 
   public constructor(
     scene: Phaser.Scene,
@@ -40,6 +47,7 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
     textureKey = SLIME_TEXTURE_KEY,
   ) {
     super(scene, x, y, textureKey);
+    this.isKnifeGoblin = textureKey === 'world-1-slime';
 
     this.defense = stats.defense;
     this.maxHp = stats.maxHp;
@@ -66,6 +74,10 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
     }
 
     this.healthBar = scene.add.graphics().setDepth(12);
+    if (this.isKnifeGoblin) {
+      this.knifeGraphic = scene.add.graphics().setDepth(11);
+      this.drawGoblinKnife(scene.time.now);
+    }
     this.drawHealthBar();
     if (textureKey.startsWith('world-3-')) {
       scene.tweens.add({ targets: this, scaleX: 1.06, scaleY: 0.94,
@@ -127,6 +139,87 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
     this.drawHealthBar();
   }
 
+  /** Render a held steel blade from the actual moving goblin's wrist.
+   * Single cached Graphics instance per goblin; never allocate a new effect
+   * every attack or paint a static double-knife onto the texture. */
+  private drawGoblinKnife(now: number): void {
+    const g = this.knifeGraphic;
+    if (!g || !g.active || !this.active || this.aiState === 'defeated') return;
+    g.clear();
+    g.setPosition(this.x, this.y);
+    g.setScale(this.flipX ? -1 : 1, 1);
+    const elapsed = now - this.knifeAttackStartedAt;
+    const swinging = elapsed >= 0 && elapsed < GOBLIN_KNIFE_TOTAL_MS &&
+      !this.isStunned(now);
+    const angle = goblinKnifeAngle(swinging ? elapsed : -1);
+    const dx = Math.cos(angle), dy = Math.sin(angle);
+    const px = -dy, py = dx;
+    const shoulderX = 11, shoulderY = 4, handX = 18, handY = 6;
+    // Exposed green forearm and worn bracer remain attached to the body.
+    g.lineStyle(8, 0x487d28, 1);
+    g.lineBetween(shoulderX, shoulderY, handX, handY);
+    g.lineStyle(5, 0x80502d, 1);
+    g.lineBetween(handX - dx * 3, handY - dy * 3, handX + dx * 6, handY + dy * 6);
+    g.fillStyle(0x88bf44, 1);
+    g.fillCircle(handX, handY, 4.4);
+    // Wrapped leather grip, iron crossguard and broad triangular steel blade.
+    const guardX = handX + dx * 13, guardY = handY + dy * 13;
+    const tipX = handX + dx * 37, tipY = handY + dy * 37;
+    g.lineStyle(5.5, 0x35261f, 1);
+    g.lineBetween(handX, handY, guardX, guardY);
+    g.lineStyle(2.4, 0xd19b5b, 1);
+    g.lineBetween(handX + dx * 3, handY + dy * 3,
+      handX + dx * 9, handY + dy * 9);
+    g.lineStyle(4, 0xae824c, 1);
+    g.lineBetween(guardX + px * 7, guardY + py * 7,
+      guardX - px * 7, guardY - py * 7);
+    g.fillStyle(0x627489, 1);
+    g.fillTriangle(tipX, tipY,
+      guardX + px * 6, guardY + py * 6,
+      guardX - px * 6, guardY - py * 6);
+    g.fillStyle(0xcbd9e4, 1);
+    g.fillTriangle(tipX, tipY,
+      guardX + px * 2.6, guardY + py * 2.6,
+      guardX + dx * 6, guardY + dy * 6);
+    g.lineStyle(1.6, 0xf8fafc, .88);
+    g.lineBetween(guardX + px * 2.6, guardY + py * 2.6, tipX, tipY);
+    if (swinging && goblinKnifeSwingActive(elapsed)) {
+      // A brief curved cut travels with the real sword hand and its blade.
+      const strength = Math.sin(Math.PI * (elapsed - 145) / (320 - 145));
+      g.lineStyle(3.6, 0xfde68a, Math.max(0, strength * .86));
+      g.beginPath();
+      g.arc(handX, handY, 41, angle - .30, angle + .07, false);
+      g.strokePath();
+      g.fillStyle(0xfff6cf, Math.max(0, strength));
+      g.fillCircle(tipX, tipY, 2.5);
+    }
+  }
+
+  public override preUpdate(time: number, delta: number): void {
+    super.preUpdate(time, delta);
+    // Scene-clock time freezes during the pause menu; graphics freeze with it.
+    if (this.isKnifeGoblin) this.drawGoblinKnife(this.scene.time.now);
+  }
+
+  /** Each goblin has its own winding-up knife swing and impact callback.
+   * The returned token cancels a pending hit if stun or death interrupts it. */
+  public beginKnifeAttack(now: number): number | null {
+    if (!this.isKnifeGoblin || !this.active || this.aiState !== 'chasing' ||
+        this.isStunned(now)) return null;
+    if (now - this.knifeAttackStartedAt < GOBLIN_KNIFE_TOTAL_MS) return null;
+    this.knifeAttackStartedAt = now;
+    this.knifeAttackToken += 1;
+    this.drawGoblinKnife(now);
+    return this.knifeAttackToken;
+  }
+
+  public knifeAttackIsValid(token: number, now: number): boolean {
+    return this.isKnifeGoblin && this.active && this.aiState === 'chasing' &&
+      this.knifeAttackToken === token && !this.isStunned(now) &&
+      now - this.knifeAttackStartedAt >= 0 &&
+      now - this.knifeAttackStartedAt <= GOBLIN_KNIFE_TOTAL_MS;
+  }
+
   /** Expose this mob's stun deadline to its own attack scheduler only. */
   public get stunEndsAt(): number { return this.stunnedUntil; }
   public isStunned(now: number): boolean { return this.aiState === 'chasing' && now < this.stunnedUntil; }
@@ -134,6 +227,10 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
   public applyStun(now: number, durationMs: number): void {
     if (this.aiState !== 'chasing' || durationMs <= 0) return;
     this.stunnedUntil = Math.max(this.stunnedUntil, now + durationMs);
+    if (this.isKnifeGoblin) {
+      this.knifeAttackToken += 1; // cancel an unfinished stab
+      this.knifeAttackStartedAt = -100000;
+    }
     this.setVelocity(0, 0);
     this.setTint(0xfde68a);
   }
@@ -193,6 +290,8 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
     }
 
     this.aiState = 'defeated';
+    this.knifeAttackToken += 1;
+    this.knifeGraphic?.destroy();
     this.playEmberDeathFx();
     this.healthBar.clear();
     const body = this.body;
@@ -219,6 +318,7 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
   }
 
   public override destroy(fromScene?: boolean): void {
+    this.knifeGraphic?.destroy();
     this.healthBar.destroy();
     super.destroy(fromScene);
   }
