@@ -231,7 +231,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.text(40,325,'✦  KIES JE BESTEMMING',11,'#f4dca7',false,true);
     this.text(349,325,'5 RIJKEN',10,COLOR.secondary)
       .setOrigin(1,.5);
-    const map=this.add.graphics().setDepth(1);
+    const map=this.add.graphics();
     const route: Array<[number,number]>=entries.map((_,i)=>[
       43+(i%2?5:0),378+i*62]);
     map.lineStyle(5,0x253e52,.95);
