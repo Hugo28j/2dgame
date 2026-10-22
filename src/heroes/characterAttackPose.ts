@@ -2,7 +2,9 @@ import type { WeaponId } from '../weapons/weaponConfig';
 
 /** Pure attack-pose selection and timing: no Phaser or browser dependencies. */
 export type AttackPose = 'sword' | 'hammer' | 'bow' | 'crossbow' | 'shotgun' |
-  'staff' | 'spellbook' | 'ice-dagger' | 'ice-wave';
+  'staff' | 'spellbook' | 'ice-dagger' | 'ice-wave' |
+  'ember-staff' | 'flamethrower' | 'storm-wand' | 'storm-lance' |
+  'abyss-orb' | 'shadow-scythe';
 
 export const poseForWeapon = (weapon: WeaponId): AttackPose | null =>
   weapon === 'sunblade' ? 'sword' : weapon === 'warhammer' ? 'hammer'
