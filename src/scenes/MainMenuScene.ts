@@ -19,7 +19,7 @@ import {
 } from '../progression/armor';
 import {
   HERO_WEAPONS, WEAPONS, getWeaponStats, weaponBaseAttackIntervalMs,
-  weaponUpgradeCost, MAX_WEAPON_LEVEL, SECOND_WEAPON_UNLOCK_LEVEL, type WeaponId,
+  weaponUpgradeCost, MAX_WEAPON_LEVEL, type WeaponId,
 } from '../weapons/weaponConfig';
 import {
   ABILITIES, HERO_ABILITIES, MAX_ABILITY_LEVEL, abilityUpgradeCost, getAbilityStats,
