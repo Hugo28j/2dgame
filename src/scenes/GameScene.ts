@@ -3260,7 +3260,7 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(.5);
     const desc = this.add.text(0, -54,
       'WERELD ' + this.worldId + '  ·  KAMER ' + this.roomProgress.roomNumber +
-      '\\nDoorgaan start deze kamer opnieuw.\\nVorige kamers en beloningen blijven bewaard.', {
+      '\nDoorgaan start deze kamer opnieuw.\nVorige kamers en beloningen blijven bewaard.', {
         fontFamily: 'system-ui, sans-serif', color: '#b6cce0', fontSize: '12px',
         align: 'center', lineSpacing: 6,
       }).setOrigin(.5);
