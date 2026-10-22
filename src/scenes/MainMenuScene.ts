@@ -175,47 +175,39 @@ export class MainMenuScene extends Phaser.Scene {
       this.drawWorldAtlas(entries);
       return;
     }
-    this.section('JOUW WERELD', 'Tik op het landschap om naar een ander rijk te reizen');
     const entry=entries[profile.selectedWorld-1]!;
     const world=entry.world;
     // Deep, painted foreground and distant 2.5D landscape: no external
     // downloads, no WebGL-only effects, sharp even on high-DPI mobile devices.
-    this.plate(195,482,338,327,0x0c1b28,world.accent,17);
+    // The illustration itself is the destination selector. With the
+    // redundant heading and button removed it fills the freed vertical space.
+    this.plate(195,484,338,425,0x0c1b28,world.accent,17);
     const key=ensureWorldDiorama(this,world.id);
-    const painting=this.add.image(195,479,key).setDisplaySize(326,314);
+    const painting=this.add.image(195,452,key).setDisplaySize(326,344);
     painting.setAlpha(1);
     // Deliberate layered interface vignette over the illustration, without
     // darkening the main painting or hiding its boss/mountain silhouette.
     for(let i=0;i<6;i++)
-      this.add.rectangle(195,553+i*11,325,12,0x06121b,0.08+i*.085);
-    this.add.rectangle(195,352,325,59,0x071622,.70);
-    this.add.rectangle(195,532,325,1,world.accent,.5);
-    this.add.circle(329,351,17,world.accent,.88);
-    this.text(329,351,String(world.id),14,'#07131f',true,true);
-    this.fittedText(52,339,world.name.toUpperCase(),20,'#fffdf4',251,true)
+      this.add.rectangle(195,543+i*13,325,14,0x06121b,0.07+i*.065);
+    this.add.rectangle(195,316,325,63,0x071622,.70);
+    this.add.circle(329,313,17,world.accent,.88);
+    this.text(329,313,String(world.id),14,'#07131f',true,true);
+    this.fittedText(52,305,world.name.toUpperCase(),20,'#fffdf4',251,true)
       .setStroke('#05131f',3);
-    this.fittedText(52,364,world.subtitle,10,'#d7e6eb',253);
-    if (entry.complete)
-      this.text(49,558,'✦  WERELD VOLTOOID',11,'#dcfce7',false,true);
-    else
-      this.text(49,558,'✦  ONTDEK HET RIJK',11,'#d8e9f4',false,true);
-    this.text(49,584,'BESTE KAMER',10,'#b2d1da',false,true);
-    this.text(341,584,entry.bestRoom+' / '+CHAPTER_ROOM_COUNT,
+    this.fittedText(52,332,world.subtitle,10,'#d7e6eb',253);
+    // Keep meaningful progress below the artwork, but eliminate decorative
+    // prompts, duplicate world-map buttons and unnecessary explanatory copy.
+    this.text(49,651,'BESTE KAMER',10,'#b2d1da',false,true);
+    this.text(341,651,entry.bestRoom+' / '+CHAPTER_ROOM_COUNT,
       12,'#fff8e4',false,true).setOrigin(1,.5);
-    this.add.rectangle(195,609,293,9,0x081926,.85);
-    this.add.rectangle(49,609,292*entry.progress,8,world.accent,1)
+    this.add.rectangle(195,676,293,9,0x081926,.85);
+    this.add.rectangle(49,676,292*entry.progress,8,world.accent,1)
       .setOrigin(0,.5);
-    this.add.rectangle(49,613,292*entry.progress,2,0xffffff,.34)
+    this.add.rectangle(49,680,292*entry.progress,2,0xffffff,.34)
       .setOrigin(0,.5);
-    this.add.rectangle(195,644,312,13,world.accent,.12);
-    this.text(195,644,'✧  VERKEN DE WERELDKAART  ✧',10,'#dceef5',true,true);
-    // GameObjects.Zone (not the texture) owns a mobile-sized true clickable
-    // hitbox, positioned exactly over the full displayed world artwork.
-    const hit=this.add.zone(195,479,326,314).setInteractive({useHandCursor:true});
+    // A full-size hit area matches the visible image on touch and desktop.
+    const hit=this.add.zone(195,452,326,344).setInteractive({useHandCursor:true});
     hit.on('pointerdown',()=>this.openWorldAtlas());
-    this.button(195,689,322,37,'✦   BEKIJK ALLE 5 WERELDEN   ›',
-      ()=>this.openWorldAtlas(),'selected',false,11);
-    this.text(195,718,'EEN GROOT RIJK • VIJF UNIEKE AVONTUREN',9,COLOR.secondary,true);
   }
 
   private openWorldAtlas(): void {
