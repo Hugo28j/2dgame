@@ -28,12 +28,13 @@ import {
   isAbilityUnlocked,
 } from '../abilities/abilityConfig';
 import { abilityMenuSummary } from '../ui/menuPresentation';
+import { SHOP_CHESTS, type ShopChest } from '../ui/shopCatalog';
 import { displayedHp } from '../ui/displayValues';
 import { canFuseArmor, EQUIPMENT_VISIBLE_ROWS, inventoryMaxOffset, isInventoryRowTap, moveInventoryOffset } from '../ui/equipmentInventory';
 import { advanceUpgradeIntent, sameUpgradeIntent, type UpgradeIntent } from '../ui/upgradeConfirmation';
 
-type MenuTab = 'worlds' | 'weapons' | 'upgrades' | 'settings';
-type EquipmentView = 'overview' | 'heroes' | 'list' | 'detail';
+type MenuTab = 'worlds' | 'weapons' | 'shop' | 'settings';
+type EquipmentView = 'overview' | 'heroes' | 'hero-detail' | 'list' | 'detail';
 type EquipmentSlot = ArmorSlot | 'weapon';
 type UpgradeProfileAction = Extract<ProfileAction, { type: 'upgradeArmor' | 'upgradeWeapon' | 'upgradeAbility' }>;
 type ButtonStyle = 'normal' | 'selected' | 'primary' | 'danger' | 'quiet';
@@ -78,7 +79,7 @@ export class MainMenuScene extends Phaser.Scene {
 
     if (this.tab === 'worlds') this.drawWorlds();
     else if (this.tab === 'weapons') this.drawEquipment();
-    else if (this.tab === 'upgrades') this.drawUpgrades();
+    else if (this.tab === 'shop') this.drawShop();
     else if (this.settingsView === 'controls') this.drawControls();
     else this.drawSettings();
 
@@ -151,7 +152,7 @@ export class MainMenuScene extends Phaser.Scene {
   private drawNavigation(): void {
     const tabs: Array<[MenuTab, string]> = [
       ['worlds', 'WERELDEN'], ['weapons', 'UITRUSTING'],
-      ['upgrades', 'UPGRADES'], ['settings', 'OPTIES'],
+      ['shop', 'SHOP'], ['settings', 'OPTIES'],
     ];
     tabs.forEach(([tab, label], index) => {
       const x = 63 + index * 88;
@@ -164,7 +165,7 @@ export class MainMenuScene extends Phaser.Scene {
 
   private chooseTab(tab: MenuTab): void {
     this.tab = tab;
-    if (tab === 'weapons' || tab === 'upgrades') {
+    if (tab === 'weapons') {
       this.armorHero = progressStore.current.selectedHero;
       this.armorPage = 0;
     }
@@ -375,6 +376,7 @@ export class MainMenuScene extends Phaser.Scene {
     if (!progressStore.current.unlockedHeroes.includes(this.armorHero))
       this.armorHero = progressStore.current.selectedHero;
     if (this.equipmentView === 'heroes') return this.drawHeroes();
+    if (this.equipmentView === 'hero-detail') return this.drawHeroDetail();
     if (this.equipmentView === 'list') return this.drawEquipmentList();
     if (this.equipmentView === 'detail') return this.drawEquipmentDetail();
 
@@ -769,166 +771,76 @@ export class MainMenuScene extends Phaser.Scene {
     }
   }
 
-  /** One shop for upgrading armor, weapons and hero abilities. */
-  private drawUpgrades(): void {
-    this.section('UPGRADES', 'Verbeter je items en vaardigheden met goud');
-    this.button(88, 339, 100, 40, 'ARMOR', () => this.setUpgradeCategory('armor'),
-      this.upgradeCategory === 'armor' ? 'selected' : 'quiet', false, 10);
-    this.button(195, 339, 100, 40, 'WAPENS', () => this.setUpgradeCategory('weapons'),
-      this.upgradeCategory === 'weapons' ? 'selected' : 'quiet', false, 10);
-    this.button(302, 339, 100, 40, 'ABILITIES', () => this.setUpgradeCategory('abilities'),
-      this.upgradeCategory === 'abilities' ? 'selected' : 'quiet', false, 10);
-    this.drawUpgradeHeroPicker();
-    if (this.upgradeCategory === 'armor') this.drawArmorUpgrades();
-    else if (this.upgradeCategory === 'weapons') this.drawWeaponUpgrades();
-    else this.drawAbilityUpgrades();
-  }
-
-  private setUpgradeCategory(category: 'weapons' | 'abilities' | 'armor'): void {
-    this.upgradeCategory = category;
-    this.pendingUpgrade = null;
-    this.armorPage = 0;
-    this.scene.restart();
-  }
-
-  private drawUpgradeHeroPicker(): void {
-    const profile = progressStore.current, heroes = profile.unlockedHeroes;
-    if (!heroes.includes(this.armorHero)) this.armorHero = profile.selectedHero;
-    const index = heroes.indexOf(this.armorHero);
-    this.plate(195, 394, 328, 47, COLOR.card, COLOR.border, 10);
-    this.button(60, 394, 45, 35, '‹', () => {
-      this.armorHero = heroes[(index + heroes.length - 1) % heroes.length]!;
-      this.pendingUpgrade = null;
-      this.armorPage = 0; this.scene.restart();
-    }, 'quiet', heroes.length <= 1, 15);
-    this.fittedText(195, 394, HEROES[this.armorHero].name.toUpperCase() +
-      ' · LV.' + profile.heroLevels[this.armorHero], 12, COLOR.white, 195, true).setOrigin(.5);
-    this.button(330, 394, 45, 35, '›', () => {
-      this.armorHero = heroes[(index + 1) % heroes.length]!;
-      this.pendingUpgrade = null;
-      this.armorPage = 0; this.scene.restart();
-    }, 'quiet', heroes.length <= 1, 15);
-  }
-
-  private drawUpgradeRows(rows: Array<{
-    label: string; description: string; nextDescription: string;
-    level: number; max: number; cost: number; unlocked: boolean;
-    action: UpgradeProfileAction;
-  }>): void {
-    rows.forEach((row, index) => {
-      const y = 477 + index * 104;
-      const confirming = this.isConfirmingUpgrade(row.action, row.level);
-      this.plate(195, y, 328, 95, COLOR.card, confirming ? COLOR.gold : COLOR.border, 10);
-      this.fittedText(44, y - 31, row.label.toUpperCase(), 13, COLOR.white, 283, true);
-      this.fittedText(44, y - 12, row.description, 10, COLOR.secondary, 293);
-      if (confirming)
-        this.fittedText(44, y + 5, '→ ' + row.nextDescription, 9, '#fcd34d', 277);
-      this.text(44, y + 24, 'LV.' + row.level + (confirming ? ' → ' + (row.level + 1) : '') +
-        '/' + row.max + ' · ' + row.cost + ' G', 10, COLOR.faint);
-      const allowed = row.unlocked && row.level < row.max && progressStore.current.gold >= row.cost;
-      this.button(305, y + 25, 92, 32, !row.unlocked ? 'SLOT' :
-        row.level >= row.max ? 'MAX' : confirming ? 'CONFIRM' :
-          row.cost.toLocaleString('nl-BE') + ' G',
-        () => this.requestUpgrade(row.action, row.level),
-        confirming ? 'selected' : 'normal', !allowed, 10);
+  /** Decorative chest previews. They have NO clicks, gold costs or loot logic yet. */
+  private drawShop(): void {
+    this.section('SHOP', '');
+    SHOP_CHESTS.forEach((chest, index) => {
+      const y = 381 + index * 122;
+      this.plate(195, y, 328, 112, index === 0 ? 0x292536 :
+        index === 1 ? 0x172f43 : 0x39283b, chest.trim, 13);
+      this.drawChest(96, y - 2, chest);
+      this.fittedText(148, y - 33, chest.name, 14, COLOR.white, 185, true);
+      this.fittedText(148, y - 11, chest.tier + ' · ' + chest.caption, 10,
+        '#' + chest.trim.toString(16).padStart(6, '0'), 186);
+      this.plate(232, y + 28, 168, 25, 0x172638, 0x50617a, 8);
+      this.text(232, y + 28, 'BINNENKORT', 10, COLOR.secondary, true, true);
     });
   }
 
-  private drawAbilityUpgrades(): void {
-    const profile = progressStore.current, heroId = this.armorHero;
-    const rows = HERO_ABILITIES[heroId].map(id => {
-      const skill = ABILITIES[id];
-      const unlocked = isAbilityUnlocked(id, profile.heroLevels[heroId]);
-      return { label: skill.name,
-        description: unlocked
-          ? abilityMenuSummary(getAbilityStats(id, profile.abilityLevels[id]))
-          : 'Vrij bij hero level ' + skill.unlockLevel,
-        nextDescription: abilityMenuSummary(getAbilityStats(id,
-          Math.min(MAX_ABILITY_LEVEL, profile.abilityLevels[id] + 1))),
-        level: profile.abilityLevels[id], max: MAX_ABILITY_LEVEL,
-        cost: abilityUpgradeCost(profile.abilityLevels[id]),
-        unlocked, action: { type: 'upgradeAbility', id } as UpgradeProfileAction };
-    });
-    this.drawUpgradeRows(rows);
-  }
-
-  private weaponUpgradeSummary(id: WeaponId, level: number): string {
-    const stats = getWeaponStats(id, level);
-    if (id === 'fireorbs') return 'VLAM ' + stats.damage.toFixed(1) +
-      ' DMG/SEC · BRAND 1/SEC · RANGE ' + stats.meleeRange.toFixed(0);
-    return 'DMG ' + stats.damage.toFixed(1) +
-      ' · ' + (weaponBaseAttackIntervalMs(stats) / 1000).toFixed(2) + ' SEC/AANVAL' +
-      (stats.attackMode === 'melee' ? ' · RANGE ' + stats.meleeRange.toFixed(0)
-        : ' · ' + stats.projectileCount + ' SCHOTEN');
-  }
-
-  private drawWeaponUpgrades(): void {
-    const profile = progressStore.current;
-    this.drawUpgradeRows(HERO_WEAPONS[this.armorHero].map(id => ({
-      label: WEAPONS[id].name,
-      description: this.weaponUpgradeSummary(id, profile.weaponLevels[id]),
-      nextDescription: this.weaponUpgradeSummary(id,
-        Math.min(MAX_WEAPON_LEVEL, profile.weaponLevels[id] + 1)),
-      level: profile.weaponLevels[id], max: MAX_WEAPON_LEVEL,
-      cost: weaponUpgradeCost(profile.weaponLevels[id]),
-      unlocked: profile.unlockedWeapons.includes(id),
-      action: { type: 'upgradeWeapon', id } as UpgradeProfileAction,
-    })));
-  }
-
-  private drawArmorUpgrades(): void {
-    const profile = progressStore.current;
-    const heroId = this.armorHero;
-    const slots: Record<ArmorSlot, string> = { helm: 'HELM', body: 'BODY', boots: 'BOOTS' };
-    ARMOR_SLOTS.forEach((slot, i) => this.button(81 + i * 114, 453, 106, 37,
-      slots[slot], () => { this.armorSlot = slot; this.armorPage = 0;
-        this.pendingUpgrade = null; this.scene.restart(); },
-      this.armorSlot === slot ? 'selected' : 'quiet', false, 10));
-    const items = profile.armorInventory.filter(item =>
-      item.heroId === heroId && armorDefinition(item).slot === this.armorSlot);
-    const pages = Math.max(1, Math.ceil(items.length / 2));
-    this.armorPage = Math.max(0, Math.min(this.armorPage, pages - 1));
-    if (items.length === 0) {
-      this.text(195, 560, 'Nog geen armor om te verbeteren', 12, COLOR.secondary, true);
+  /** Chest illustration with shaded hinged lid, bands, latch and rarity trim. */
+  private drawChest(x: number, y: number, chest: ShopChest): void {
+    const g = this.add.graphics().setPosition(x, y).setScale(chest.scale);
+    g.fillStyle(0x020617, .35);
+    g.fillEllipse(0, 41, 92, 16);
+    g.fillStyle(0x121a2a, 1);
+    g.fillRoundedRect(-43, -18, 86, 56, 8);
+    g.fillStyle(chest.color, 1);
+    g.fillRoundedRect(-38, -15, 76, 47, 5);
+    g.lineStyle(3, chest.trim, .96);
+    g.strokeRoundedRect(-38, -15, 76, 47, 5);
+    g.fillStyle(chest.color, 1);
+    g.fillRoundedRect(-44, -37, 88, 30, 10);
+    g.lineStyle(4, chest.trim, 1);
+    g.strokeRoundedRect(-44, -37, 88, 30, 10);
+    g.lineStyle(2, 0xffffff, .22);
+    g.lineBetween(-34, -27, 34, -27);
+    g.fillStyle(chest.trim, .85);
+    g.fillRoundedRect(-28, -31, 7, 59, 2);
+    g.fillRoundedRect(21, -31, 7, 59, 2);
+    g.lineStyle(2, 0x080f1a, .65);
+    g.lineBetween(-34, 20, 34, 20);
+    g.fillStyle(0x142031, 1);
+    g.fillRoundedRect(-11, -15, 22, 28, 5);
+    g.lineStyle(3, chest.trim, 1);
+    g.strokeRoundedRect(-11, -15, 22, 28, 5);
+    if (chest.id === 'small') {
+      g.fillStyle(0xd3bd9a, 1); g.fillCircle(0, -3, 4);
+      g.fillStyle(0x3b2a20, 1); g.fillCircle(0, -2, 1.7);
+    } else {
+      const gem = chest.id === 'medium' ? 0x7ee9ff : 0xff69ad;
+      g.fillStyle(gem, .96);
+      g.fillTriangle(0, -12, 8, -2, -8, -2);
+      g.fillTriangle(0, 10, 8, -2, -8, -2);
+      g.lineStyle(1.3, 0xfef9c3, .8);
+      g.lineBetween(0, -10, 0, 8);
+      if (chest.id === 'large') {
+        g.lineStyle(3, 0xffdc81, .95);
+        g.lineBetween(-33, -40, -25, -51);
+        g.lineBetween(-25, -51, -14, -42);
+        g.lineBetween(33, -40, 25, -51);
+        g.lineBetween(25, -51, 14, -42);
+        g.fillStyle(0xfff4ae, .9);
+        for (const dx of [-36, -17, 18, 35]) g.fillCircle(dx, -44, 2.4);
+      } else {
+        g.lineStyle(2, 0x9df4ff, .7);
+        g.strokeCircle(0, -24, 10);
+      }
     }
-    items.slice(this.armorPage * 2, this.armorPage * 2 + 2).forEach((item, i) => {
-      const rarity = RARITY_CONFIG[item.rarity];
-      const confirming = this.isConfirmingUpgrade({ type: 'upgradeArmor', id: item.id }, item.level);
-      const y = 528 + i * 100;
-      this.plate(195, y, 328, 95, COLOR.card, confirming ? COLOR.gold : rarity.color, 9);
-      this.fittedText(43, y - 35, armorDefinition(item).name.toUpperCase(),
-        12, '#' + rarity.color.toString(16).padStart(6, '0'), 294, true);
-      this.fittedText(43, y - 19, rarity.label + ' · LV.' + item.level +
-        (confirming ? ' → ' + (item.level + 1) : '') + '/' + ARMOR_MAX_LEVEL +
-        ' · ' + '★'.repeat(item.stars), 10, COLOR.secondary, 290);
-      this.fittedText(43, y - 4, armorStatText(item), 9, '#86efac', 297);
-      if (confirming)
-        this.fittedText(43, y + 9, '→ ' + armorStatText({ ...item,
-          level: Math.min(ARMOR_MAX_LEVEL, item.level + 1) }),
-          9, '#fcd34d', 294);
-      const cost = armorUpgradeCost(item);
-      const fuse = item.stars < ARMOR_MAX_STARS && items.some(other =>
-        other.id !== item.id && other.kind === item.kind &&
-        other.rarity === item.rarity && other.stars === item.stars);
-      this.button(99, y + 31, 113, 27, item.level >= ARMOR_MAX_LEVEL ? 'MAX' :
-        confirming ? 'CONFIRM' : cost + ' G · LV+',
-        () => this.requestUpgrade({ type: 'upgradeArmor', id: item.id }, item.level),
-        confirming ? 'selected' : 'normal',
-        item.level >= ARMOR_MAX_LEVEL || profile.gold < cost, 9);
-      this.button(216, y + 31, 101, 27, 'FUSION ★', () =>
-        this.runAction({ type: 'fuseArmor', id: item.id }), 'quiet', !fuse, 9);
-      this.button(321, y + 31, 67, 27, 'VERKOOP', () =>
-        this.runAction({ type: 'sellArmor', id: item.id }), 'quiet', false, 9);
-    });
-    this.button(92, 716, 95, 30, '‹ VORIGE', () => {
-      this.pendingUpgrade = null;
-      this.armorPage--; this.scene.restart();
-    }, 'quiet', this.armorPage === 0, 9);
-    this.text(195, 716, this.armorPage + 1 + '/' + pages, 10, COLOR.secondary, true);
-    this.button(298, 716, 95, 30, 'VOLGENDE ›', () => {
-      this.pendingUpgrade = null;
-      this.armorPage++; this.scene.restart();
-    }, 'quiet', this.armorPage >= pages - 1, 9);
+    if (chest.id !== 'small') {
+      g.fillStyle(chest.id === 'large' ? 0xffeaa2 : 0xa9f3ff, .77);
+      g.fillCircle(-40, -42, 2.1);
+      g.fillCircle(41, -31, 1.8);
+    }
   }
 
   private drawSettings(): void {
