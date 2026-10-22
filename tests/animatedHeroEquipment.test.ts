@@ -3,12 +3,32 @@ import { armorDefinition, rollEnemyArmor } from '../src/progression/armor';
 import { resolveHeroWardrobe, wardrobeKey, hasAnimatedHero } from '../src/heroes/heroEquipmentArt';
 import { applyProfileAction, defaultProfile } from '../src/progression/ProgressStore';
 
-describe('visible armor on the first four heroes', () => {
-  it('outfits Guardian, Ranger, Mage and Frostblade, leaving the other three unchanged', () => {
-    for (const hero of ['guardian','ranger','mage','frostblade'] as const)
+describe('visible armor on all seven heroes', () => {
+  it('outfits all seven playable heroes, including the final three', () => {
+    for (const hero of ['guardian','ranger','mage','frostblade',
+      'pyromancer','stormstrider','voidwalker'] as const)
       expect(hasAnimatedHero(hero)).toBe(true);
-    for (const hero of ['pyromancer','stormstrider','voidwalker'] as const)
-      expect(hasAnimatedHero(hero)).toBe(false);
+  });
+
+  it('renders the final three heroes with distinct owned helm, body and boots', () => {
+    for (const heroId of ['pyromancer','stormstrider','voidwalker'] as const) {
+      const helmet = rollEnemyArmor('boss',0,0,0,'test','h-'+heroId,heroId)!;
+      const body = { ...helmet, kind: heroId + '-iron-vest', id: 'body-'+heroId };
+      const boots = { ...helmet, kind: heroId + '-runner-treads', id: 'boots-'+heroId,
+        rarity: 'legendary' as const };
+      const pieces = [helmet, body, boots];
+      const selected = {helm:helmet.id,body:body.id,boots:boots.id};
+      const outfit=resolveHeroWardrobe(heroId,selected,pieces);
+      expect(outfit.helm?.id).toBe(helmet.id);
+      expect(outfit.body?.id).toBe(body.id);
+      expect(outfit.boots?.id).toBe(boots.id);
+      expect(wardrobeKey(heroId,outfit)).not.toBe(
+        wardrobeKey(heroId,resolveHeroWardrobe(heroId,
+          {...selected,helm:null},pieces)));
+      const other = heroId === 'pyromancer' ? 'stormstrider' : 'pyromancer';
+      expect(resolveHeroWardrobe(other,selected,pieces))
+        .toEqual({helm:null,body:null,boots:null});
+    }
   });
 
   it('resolves only pieces currently equipped by the matching hero', () => {
