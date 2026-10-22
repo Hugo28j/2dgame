@@ -29,7 +29,8 @@ import {
   isAbilityUnlocked,
 } from '../abilities/abilityConfig';
 import { abilityMenuSummary } from '../ui/menuPresentation';
-import { SHOP_CHESTS, previewChestArmor, type ShopChest, type ChestRoll } from '../ui/shopCatalog';
+import { SHOP_CHESTS, type ShopChest, type ChestRoll } from '../ui/shopCatalog';
+import { planChestReel } from '../ui/chestReel';
 import { displayedHp } from '../ui/displayValues';
 import { canFuseArmor, EQUIPMENT_VISIBLE_ROWS, inventoryMaxOffset, isInventoryRowTap, moveInventoryOffset } from '../ui/equipmentInventory';
 import { advanceUpgradeIntent, sameUpgradeIntent, type UpgradeIntent } from '../ui/upgradeConfirmation';
@@ -981,13 +982,13 @@ export class MainMenuScene extends Phaser.Scene {
       fontFamily: FONT, fontSize: '11px', color: '#b9d5ea',
     }).setOrigin(.5);
     modal.add([heading, caption]);
-    // Three cards are visible at once; scrolling down means the next icon
-    // enters from above. The center pointer marks the actual saved prize.
-    const centerY = -12, rowHeight = 86, targetIndex = 32;
-    const preview = Array.from({ length: targetIndex },
-      (_, index) => previewChestArmor(chest, profile.unlockedHeroes, Math.random,
-        'chest-preview-' + index));
-    const reelItems = [...preview, reward];
+    // Like a physical slot-machine belt, this NEVER ends at the won item.
+    // Plenty of cards continue ABOVE the winner and BELOW it at the stop,
+    // so the arrow simply selects the card at the center of a moving strip.
+    const centerY = -12, rowHeight = 86;
+    const plan = planChestReel(chest, profile.unlockedHeroes, reward, Math.random);
+    const targetIndex = plan.winnerIndex;
+    const reelItems = plan.items;
     const reelFrame = this.add.rectangle(0, centerY, 306, 320, 0x081421, 1)
       .setStrokeStyle(2, chest.trim, 1);
     modal.add(reelFrame);
@@ -1018,7 +1019,8 @@ export class MainMenuScene extends Phaser.Scene {
       reel.add([row, art, name, detail, rarityText]);
     });
     modal.add(reel);
-    // Mask uses scene/world coordinates because children are in modal-local space.
+    // Clip the uninterrupted belt to a window (works with centered desktop
+    // camera scroll and the narrower portrait layout on mobile).
     const clipShape = this.add.graphics();
     clipShape.fillStyle(0xffffff, 1).fillRect(43, 422 + centerY - 156, 304, 312);
     clipShape.setVisible(false);
@@ -1028,12 +1030,14 @@ export class MainMenuScene extends Phaser.Scene {
     const arrowL = this.add.triangle(-153, centerY, 0, -8, 0, 8, 10, 0, 0xffe28a);
     const arrowR = this.add.triangle(153, centerY, 0, -8, 0, 8, -10, 0, 0xffe28a);
     modal.add([pointer, arrowL, arrowR]);
-    const note = this.add.text(0, 188, 'De prijs is opgeslagen in je inventaris.', {
+    const note = this.add.text(0, 188, 'De band draait · De prijs is al veilig opgeslagen.', {
       fontFamily: FONT, fontSize: '11px', color: '#b7d8e8',
     }).setOrigin(.5);
     modal.add(note);
     this.tweens.add({
-      targets: reel, y: 0, duration: 5200, ease: 'Cubic.easeOut',
+      // Overshoot a fraction of a row then settle naturally back on the
+      // chosen marker; neighbours are still present above and below it.
+      targets: reel, y: 0, duration: 5300, ease: 'Cubic.easeOut',
       onComplete: () => {
         heading.setText('✦  ' + RARITY_CONFIG[reward.rarity].label.toUpperCase() + ' GEVONDEN!  ✦')
           .setColor('#' + RARITY_CONFIG[reward.rarity].color.toString(16).padStart(6,'0'));
