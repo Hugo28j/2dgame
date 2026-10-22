@@ -32,7 +32,7 @@ export class CharacterAttackArt {
   private activePose: AttackPose | null = null;
   private destroyed = false;
 
-  public constructor(private readonly scene: Phaser.Scene,
+  public constructor(scene: Phaser.Scene,
     private readonly player: Player, weaponId: WeaponId) {
     this.pose = hasAnimatedHero(player.heroId) ? poseForWeapon(weaponId) : null;
     this.graphics = scene.add.graphics().setDepth(24);
@@ -121,8 +121,9 @@ export class CharacterAttackArt {
       {x:headX-px*18-dx*9,y:headY-py*18-dy*9},
       {x:headX+px*18-dx*9,y:headY+py*18-dy*9},
     ];
-    g.fillStyle(0x34485b,1);g.fillPoints(corners,true);
-    g.lineStyle(3,0xfde68a,1);g.strokePoints(corners,true);
+    const hammerHead = corners.map(p => new Phaser.Math.Vector2(p.x, p.y));
+    g.fillStyle(0x34485b,1);g.fillPoints(hammerHead,true);
+    g.lineStyle(3,0xfde68a,1);g.strokePoints(hammerHead,true);
     g.lineStyle(3,0x9dd8e9,.88);
     g.lineBetween(headX+px*13+dx*4,headY+py*13+dy*4,
       headX-px*13+dx*4,headY-py*13+dy*4);
