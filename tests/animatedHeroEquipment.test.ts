@@ -3,11 +3,11 @@ import { armorDefinition, rollEnemyArmor } from '../src/progression/armor';
 import { resolveHeroWardrobe, wardrobeKey, hasAnimatedHero } from '../src/heroes/heroEquipmentArt';
 import { applyProfileAction, defaultProfile } from '../src/progression/ProgressStore';
 
-describe('visible Guardian and Ranger equipment', () => {
-  it('only outfits the first two heroes, leaving other heroes unchanged', () => {
-    expect(hasAnimatedHero('guardian')).toBe(true);
-    expect(hasAnimatedHero('ranger')).toBe(true);
-    for (const hero of ['mage','frostblade','pyromancer','stormstrider','voidwalker'] as const)
+describe('visible armor on the first four heroes', () => {
+  it('outfits Guardian, Ranger, Mage and Frostblade, leaving the other three unchanged', () => {
+    for (const hero of ['guardian','ranger','mage','frostblade'] as const)
+      expect(hasAnimatedHero(hero)).toBe(true);
+    for (const hero of ['pyromancer','stormstrider','voidwalker'] as const)
       expect(hasAnimatedHero(hero)).toBe(false);
   });
 
@@ -42,4 +42,24 @@ describe('visible Guardian and Ranger equipment', () => {
     const noGear=resolveHeroWardrobe('guardian',{helm:null,body:null,boots:null},[first]);
     expect(noGear).toEqual({helm:null,body:null,boots:null});
   });
+  it('shows all three equipped slots for Mage and Frostblade independently', () => {
+    for (const heroId of ['mage','frostblade'] as const) {
+      const helm = rollEnemyArmor('boss', 0, 0, 0, 'run', heroId + '-h', heroId)!;
+      const body = { ...helm, kind: heroId + '-bulwark-plate', id: heroId + '-b' };
+      const boots = { ...helm, kind: heroId + '-wind-boots', id: heroId + '-s',
+        rarity: 'legendary' as const };
+      const equipped = { helm: helm.id, body: body.id, boots: boots.id };
+      const all = [helm, body, boots];
+      const dressed = resolveHeroWardrobe(heroId, equipped, all);
+      expect(dressed.helm?.id).toBe(helm.id);
+      expect(dressed.body?.id).toBe(body.id);
+      expect(dressed.boots?.id).toBe(boots.id);
+      const noBoots = resolveHeroWardrobe(heroId, { ...equipped, boots: null }, all);
+      expect(wardrobeKey(heroId, dressed)).not.toBe(wardrobeKey(heroId, noBoots));
+      const wrongHero = heroId === 'mage' ? 'frostblade' : 'mage';
+      expect(resolveHeroWardrobe(wrongHero, equipped, all))
+        .toEqual({ helm: null, body: null, boots: null });
+    }
+  });
+
 });

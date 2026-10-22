@@ -6,7 +6,7 @@ import { ARROW_TEXTURE_KEY } from '../config/constants';
 import type { Vector2Value } from '../input/vectorMath';
 import type { WeaponEffect } from '../weapons/weaponConfig';
 import { ICE_SPIKE, iceSpikeCollisionSize } from '../weapons/iceSpike';
-import { RUNE_TOME, runeAimTarget, runeSteer,
+import { RUNE_TOME, runeAimTarget, runeRicochetHeading, runeSteer,
   type RuneEnemy, type RunePoint } from '../weapons/runeTome';
 
 export interface ProjectileOptions {
@@ -167,6 +167,11 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     this.runeBounceEnemyId = target.enemyId;
     this.runeBounceAt = now;
     this.runeBounceOrigin = {x:this.x,y:this.y};
+    // Snap to the second target at the impact, leaving an obvious corner in
+    // the persistent rune trail. This is a physical turn, not instant damage.
+    this.runeHeading = runeRicochetHeading(this, target);
+    this.setVelocity(Math.cos(this.runeHeading) * this.runeSpeed,
+      Math.sin(this.runeHeading) * this.runeSpeed);
     return true;
   }
 
