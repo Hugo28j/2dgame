@@ -27,6 +27,7 @@ export const RUN_UPGRADES: readonly RunUpgrade[] = [
 /** In-memory deck: no upgrade survives a new run; max stacks are enforced. */
 export class RunUpgradeDeck {
   private readonly stacks = new Map<RunUpgradeId, number>();
+  private readonly history: RunUpgradeId[] = [];
   public constructor(private readonly random: () => number = Math.random) {}
   public count(id: RunUpgradeId): number { return this.stacks.get(id) ?? 0; }
   public offer(allowHealing = true, attackMode: 'melee' | 'projectile' = 'projectile'): RunUpgrade[] {
@@ -56,7 +57,14 @@ export class RunUpgradeDeck {
     const upgrade = RUN_UPGRADES.find(item => item.id === id);
     if (!upgrade || this.count(id) >= upgrade.maxStacks) return false;
     this.stacks.set(id, this.count(id) + 1);
+    this.history.push(id);
     return true;
+  }
+  public snapshot(): RunUpgradeId[] { return [...this.history]; }
+  public restore(chosen: readonly RunUpgradeId[]): void {
+    this.stacks.clear();
+    this.history.length = 0;
+    for (const id of chosen) this.choose(id);
   }
   public chosen(): { name: string; stacks: number }[] {
     return RUN_UPGRADES.filter(item => this.count(item.id) > 0)
