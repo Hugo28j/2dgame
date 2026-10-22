@@ -43,7 +43,7 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityConfig>> = {
     cooldownMs: 30000, radius: 0, damage: 0, heal: 0, durationMs: 0, dashSpeed: 0,
     invulnerabilityMs: 0, slowFactor: 1 }),
   'guardian-slam': ability({ id: 'guardian-slam', heroId: 'guardian', slot: 2, unlockLevel: 20,
-    kind: 'wind', name: 'Gravitatiegreep', description: 'Trekt vijanden naar je toe en verdooft 1 seconde', symbol: '➠', color: 0xf59e0b,
+    kind: 'wind', name: 'Gravitatiegreep', description: 'Gerichte zwaartekrachtbalk trekt vijanden aan; stun 0,8–1,4 sec', symbol: '➠', color: 0xf59e0b,
     cooldownMs: 5000, radius: 225, damage: 37, heal: 0, durationMs: 320, dashSpeed: 0,
     invulnerabilityMs: 0, slowFactor: 1 }),
   'guardian-aegis': ability({ id: 'guardian-aegis', heroId: 'guardian', slot: 3, unlockLevel: 30,
