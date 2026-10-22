@@ -30,6 +30,7 @@ export class CharacterAttackArt {
   private started = -100000;
   private duration = 100;
   private activePose: AttackPose | null = null;
+  private attackFacing = 0;
   private destroyed = false;
 
   public constructor(scene: Phaser.Scene,
@@ -42,6 +43,7 @@ export class CharacterAttackArt {
   public begin(now: number, attackIntervalMs: number, pose: AttackPose | null = this.pose): void {
     if (!pose || this.destroyed) return;
     this.activePose = pose;
+    this.attackFacing = this.player.rotation;
     this.started = now;
     this.duration = poseLengthMs(pose, attackIntervalMs);
     this.update(now);
@@ -59,7 +61,7 @@ export class CharacterAttackArt {
     const sway = velocity > 15 ? Math.sin(now * .018) * 1.3 : 0;
     g.clear();
     g.setPosition(this.player.x, this.player.y);
-    g.setRotation(this.player.rotation);
+    g.setRotation(hasAttack ? this.attackFacing : this.player.rotation);
     if(pose==='sword')this.drawSword(g,hasAttack,t,sway);
     else if(pose==='hammer')this.drawHammer(g,hasAttack,t,sway);
     else if(pose==='bow'||pose==='crossbow'||pose==='shotgun')
