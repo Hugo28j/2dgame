@@ -1188,7 +1188,7 @@ export class GameScene extends Phaser.Scene {
               EMBER_BOSS_ATTACKS.laserWidth + 12) {
           nextDamageAt = this.time.now + 520;
           this.damagePlayer({ damage: enemy.stats.damage * 0.48,
-            criticalChance: 0, criticalMultiplier: 1 }, 480);
+            criticalChance: 0, criticalMultiplier: 1 });
         }
       }
       if (ticks >= totalTicks) finish();
