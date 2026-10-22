@@ -20,3 +20,14 @@ export function canFuseArmor(item: ArmorItem, inventory: readonly ArmorItem[], m
     other.id !== item.id && other.heroId === item.heroId && other.kind === item.kind &&
     other.rarity === item.rarity && other.stars === item.stars);
 }
+
+/** A row can open only after its own pointer-down, not a release from the overview. */
+export function isInventoryRowTap(
+  pressedId: string | null, rowId: string,
+  start: { x: number; y: number } | null, release: { x: number; y: number },
+  tolerance = 14,
+): boolean {
+  return pressedId === rowId && start !== null &&
+    Math.abs(release.x - start.x) <= tolerance &&
+    Math.abs(release.y - start.y) <= tolerance;
+}

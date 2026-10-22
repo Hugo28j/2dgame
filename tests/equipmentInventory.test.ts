@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyProfileAction, defaultProfile } from '../src/progression/ProgressStore';
 import { rollEnemyArmor, ARMOR_MAX_STARS } from '../src/progression/armor';
-import { canFuseArmor, inventoryMaxOffset, moveInventoryOffset } from '../src/ui/equipmentInventory';
+import { canFuseArmor, inventoryMaxOffset, isInventoryRowTap, moveInventoryOffset } from '../src/ui/equipmentInventory';
 
 describe('unified equipment inventory helpers', () => {
   it('scrolls through every item without switching pages', () => {
@@ -13,6 +13,16 @@ describe('unified equipment inventory helpers', () => {
     expect(moveInventoryOffset(21, 10, 24)).toBe(21);
     expect(moveInventoryOffset(0, -9, 24)).toBe(0);
     expect(moveInventoryOffset(21, 0, 1)).toBe(0);
+  });
+
+  it('requires a new press on the same row before its detail page opens', () => {
+    const press = { x: 180, y: 430 };
+    expect(isInventoryRowTap(null, 'bow', press, press)).toBe(false);
+    expect(isInventoryRowTap('crossbow', 'bow', press, press)).toBe(false);
+    expect(isInventoryRowTap('bow', 'bow', null, press)).toBe(false);
+    expect(isInventoryRowTap('bow', 'bow', press, press)).toBe(true);
+    expect(isInventoryRowTap('bow', 'bow', press, { x: 180, y: 449 })).toBe(false);
+    expect(isInventoryRowTap('bow', 'bow', press, { x: 195, y: 430 })).toBe(false);
   });
 
   it('only enables fusion for exact duplicates below maximum stars', () => {
