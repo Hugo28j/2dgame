@@ -46,6 +46,10 @@ function drawMinion(g: Phaser.GameObjects.Graphics, look: CharacterLook): void {
   }
   switch (look.kind) {
     case 'slime':
+      if (look.worldId === 1) {
+        drawGoblinScout(g);
+        break;
+      }
       g.fillStyle(look.primary);
       g.fillRoundedRect(6, 18, 36, 24, 10);
       g.fillCircle(16, 22, 9); g.fillCircle(32, 23, 9);
@@ -103,6 +107,58 @@ function drawMinion(g: Phaser.GameObjects.Graphics, look: CharacterLook): void {
       break;
     default: break;
   }
+}
+
+/** 48x48 forest goblin: pointed ears, green face, snarling teeth,
+ * patched leather tunic, hand wraps, brown boots and a metal belt buckle.
+ * Its steel knife is drawn separately by Slime, because it must physically
+ * swing instead of being permanently stamped into the sprite. */
+function drawGoblinScout(g: Phaser.GameObjects.Graphics): void {
+  // Floor shadow and two separated boots make the silhouette clearly bipedal.
+  g.fillStyle(0x07130b, .55); g.fillEllipse(24, 43, 35, 7);
+  g.fillStyle(0x332317); g.fillRoundedRect(12, 36, 9, 9, 3);
+  g.fillRoundedRect(29, 36, 9, 9, 3);
+  g.fillStyle(0x7c5431); g.fillRoundedRect(12, 41, 11, 4, 2);
+  g.fillRoundedRect(27, 41, 12, 4, 2);
+  // Wide angular arms and a rugged leather vest, not a spherical slime.
+  g.fillStyle(0x39771e); g.fillRoundedRect(8, 23, 9, 16, 4);
+  g.fillRoundedRect(34, 23, 8, 16, 4);
+  g.fillStyle(0x364427); g.fillRoundedRect(16, 20, 19, 22, 5);
+  g.fillStyle(0x75422b); g.fillRoundedRect(17, 22, 17, 19, 3);
+  g.fillStyle(0x9b6744); g.fillTriangle(18, 24, 24, 29, 18, 34);
+  g.fillStyle(0x4a3124); g.fillRoundedRect(17, 32, 18, 5, 1);
+  g.fillStyle(0xe3b45b); g.fillRoundedRect(23, 32, 6, 5, 1);
+  g.fillStyle(0x302719); g.fillRoundedRect(25, 33, 2, 3, 1);
+  // Green shoulders/neck, then giant spear-point ears read at phone size.
+  g.fillStyle(0x5d9b2a);
+  g.fillTriangle(13, 13, 0, 7, 13, 24);
+  g.fillTriangle(36, 13, 48, 7, 36, 24);
+  g.fillStyle(0x9b5c45);
+  g.fillTriangle(10, 15, 3, 10, 13, 22);
+  g.fillTriangle(39, 15, 45, 10, 36, 22);
+  // Squared green head, dark hair/hood and chin to avoid slime appearance.
+  g.fillStyle(0x294d1b); g.fillEllipse(24, 13, 28, 19);
+  g.fillStyle(0x75bb3c); g.fillRoundedRect(10, 13, 29, 18, 7);
+  g.fillStyle(0xa2d653); g.fillRoundedRect(13, 18, 23, 10, 5);
+  g.fillStyle(0x335722); g.fillTriangle(12, 16, 18, 7, 23, 14);
+  g.fillTriangle(18, 10, 27, 5, 32, 13);
+  g.fillTriangle(27, 8, 38, 13, 35, 18);
+  // Angry golden eyes and heavy brow.
+  g.fillStyle(0x253719); g.fillRoundedRect(14, 17, 10, 6, 2);
+  g.fillRoundedRect(27, 17, 10, 6, 2);
+  g.fillStyle(0xffd76a); g.fillRoundedRect(17, 19, 5, 3, 1);
+  g.fillRoundedRect(29, 19, 5, 3, 1);
+  g.fillStyle(0x1b2815); g.fillRect(20, 19, 2, 3); g.fillRect(29, 19, 2, 3);
+  g.lineStyle(2.5, 0x27431c); g.lineBetween(13, 17, 23, 18);
+  g.lineBetween(28, 18, 38, 16);
+  // Hooked nose, jagged mouth, two ivory fangs.
+  g.fillStyle(0x548f26); g.fillTriangle(25, 20, 21, 27, 29, 26);
+  g.fillStyle(0x26321b); g.fillRoundedRect(19, 27, 14, 4, 1);
+  g.fillStyle(0xffefc0); g.fillTriangle(20, 27, 23, 27, 22, 31);
+  g.fillTriangle(29, 27, 32, 27, 30, 31);
+  // A raised leather wrist is left clear for the animated knife overlay.
+  g.fillStyle(0x4e8d26); g.fillCircle(38, 31, 4);
+  g.lineStyle(2, 0xc38a57); g.lineBetween(37, 33, 41, 34);
 }
 
 /** Six purpose-built silhouettes for Ember Wastes instead of recolored mobs. */
