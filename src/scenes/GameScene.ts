@@ -32,6 +32,7 @@ import {
   Slime,
 } from '../enemies/Slime';
 import { Player } from '../entities/Player';
+import { ensureDressedHeroTexture } from '../heroes/heroEquipmentArt';
 import { CoinPickup } from '../entities/CoinPickup';
 import { XpPickup } from '../entities/XpPickup';
 import { ArmorPickup } from '../entities/ArmorPickup';
@@ -202,6 +203,9 @@ export class GameScene extends Phaser.Scene {
       profile.heroLevels[profile.selectedHero],
       gear,
     );
+    // Equipment now changes the real gameplay sprite, not just an inventory icon.
+    this.player.setTexture(ensureDressedHeroTexture(this, profile.selectedHero,
+      profile.equippedArmor[profile.selectedHero], profile.armorInventory));
     this.controls = new InputController(this);
     this.projectiles = this.physics.add.group({ allowGravity: false });
     this.enemies = this.physics.add.group({ allowGravity: false, collideWorldBounds: true });

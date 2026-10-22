@@ -10,6 +10,8 @@ import { isInsideMeleeSwing } from './meleeCombat';
 import { inForwardRectangle, normalizedDirection } from '../abilities/directedGeometry';
 import { BIG_WAVE, FLAMETHROWER, bigWaveHitKind, flameConeHits } from './elementalMelee';
 import { SHOTGUN_TRANSFORM, shotgunVolleyAngles } from '../abilities/phase9Balance';
+import { hasAnimatedHero } from '../heroes/heroEquipmentArt';
+import { CharacterAttackArt, HAMMER_IMPACT_DELAY_MS } from '../heroes/characterAttackArt';
 
 export class WeaponController {
   private nextShotAt = 0;
@@ -22,6 +24,8 @@ export class WeaponController {
     expiresAt: number; nextTickAt: number; damage: number;
   }>();
   private readonly groundEffects = new Set<Phaser.GameObjects.Graphics>();
+  private readonly hammerTimers = new Set<Phaser.Time.TimerEvent>();
+  private readonly combatArt?: CharacterAttackArt;
   public extraProjectiles = 0;
   public extraPiercing = 0;
   public extraMeleeRange = 0;
@@ -37,7 +41,12 @@ export class WeaponController {
     private readonly meleeTargets?: Phaser.Physics.Arcade.Group,
     private readonly onMeleeHit?: (target: Slime, attack: Readonly<AttackData>) => void,
     private readonly armorDamageMultiplier = 1,
-  ) {}
+  ) {
+    if (hasAnimatedHero(owner.heroId)) {
+      this.combatArt = new CharacterAttackArt(scene, owner, weaponId);
+      scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.combatArt?.destroy());
+    }
+  }
   public get attackMode(): 'melee' | 'projectile' { return this.config.attackMode; }
   public get config() { return getWeaponStats(this.weaponId, this.upgradeLevel); }
   /** Transient override: never alters weaponId, weapon level, save data or inventory. */
@@ -55,6 +64,7 @@ export class WeaponController {
   }
 
   public update(time: number, firing: boolean, direction: Readonly<Vector2Value>): void {
+    this.combatArt?.update(time);
     this.tickBurning(time);
     if (this.shotgunUntil > 0 && time >= this.shotgunUntil) {
       this.shotgunUntil = 0;
@@ -66,6 +76,7 @@ export class WeaponController {
       // to move and steer the aim. No normal shots can fire alongside it.
       if (time >= this.nextShotAt) {
         this.fireShotgunVolley(direction);
+        this.combatArt?.begin(time, SHOTGUN_TRANSFORM.cadenceMs, 'shotgun');
         this.nextShotAt = time + SHOTGUN_TRANSFORM.cadenceMs;
       }
       return;
@@ -78,11 +89,21 @@ export class WeaponController {
     }
     if (!firing || time < this.nextShotAt) return;
     const config = this.config;
+    const interval = fireIntervalMs(config.fireRate * this.owner.attackSpeedAt(time) * this.permanentSpeed);
     if (this.weaponId === 'iceblade') this.launchBigWave(direction);
-    else if (this.weaponId === 'warhammer') this.groundSlam(direction, time);
-    else if (config.attackMode === 'melee') this.swing(direction);
+    else if (this.weaponId === 'warhammer') {
+      // The hitbox lands when the visible hammer-head actually reaches the floor.
+      const aim = normalizedDirection(direction);
+      const timer = this.scene.time.delayedCall(HAMMER_IMPACT_DELAY_MS, () => {
+        this.hammerTimers.delete(timer);
+        if (!this.owner.active || this.owner.currentHp <= 0 || !this.scene.sys.isActive()) return;
+        this.groundSlam(aim, this.scene.time.now);
+      });
+      this.hammerTimers.add(timer);
+    } else if (config.attackMode === 'melee') this.swing(direction);
     else this.fire(direction);
-    this.nextShotAt = time + fireIntervalMs(config.fireRate * this.owner.attackSpeedAt(time) * this.permanentSpeed);
+    this.combatArt?.begin(time, interval);
+    this.nextShotAt = time + interval;
   }
 
   private fire(direction: Readonly<Vector2Value>): void {
@@ -473,6 +494,9 @@ export class WeaponController {
 
   /** Room transitions must not leave old ground effects visible in the next arena. */
   public clearGroundEffects(): void {
+    for (const timer of this.hammerTimers) timer.remove(false);
+    this.hammerTimers.clear();
+    this.combatArt?.reset();
     for (const effect of this.groundEffects) {
       this.scene.tweens.killTweensOf(effect);
       effect.destroy();

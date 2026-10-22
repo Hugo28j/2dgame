@@ -22,9 +22,8 @@ function heroShape(g: Phaser.GameObjects.Graphics, id: HeroId, color: number): v
       g.fillStyle(0x164e63); g.fillTriangle(13, 8, 7, 55, 38, 34); // cloak
       body(g, color, 0x155e75);
       g.fillStyle(color); g.fillTriangle(38, 10, 58, 22, 42, 39); // hood
-      g.lineStyle(3, 0xfde68a); g.strokeCircle(56, 34, 13);
-      g.lineStyle(2, 0xf8fafc); g.lineBetween(56, 20, 56, 48);
-      g.fillStyle(0xfef3c7); g.fillTriangle(58, 31, 64, 34, 58, 37);
+      // The equipped bow/crossbow is now physically drawn and animated in combat.
+      // Keep the hood but remove the duplicate baked-in bow and arrow.
       break;
     case 'mage':
       g.fillStyle(0x4c1d95); g.fillTriangle(8, 9, 4, 58, 42, 38);
@@ -40,8 +39,7 @@ function heroShape(g: Phaser.GameObjects.Graphics, id: HeroId, color: number): v
       g.fillStyle(color); g.fillRoundedRect(27, 11, 15, 42, 5); // plate
       g.fillStyle(0x334155); g.fillCircle(35, 52, 12); // shield
       g.lineStyle(3, 0xf8fafc); g.strokeCircle(35, 52, 11);
-      g.lineStyle(4, 0xf8fafc); g.lineBetween(48, 13, 62, 4); // sword
-      g.fillStyle(0xfbbf24); g.fillTriangle(58, 3, 64, 0, 62, 7);
+      // Sword and hammer are now held by an independently animated foreground arm.
       break;
     case 'frostblade':
       g.fillStyle(0x0c4a6e); g.fillTriangle(9, 7, 4, 57, 40, 36);
