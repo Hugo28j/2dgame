@@ -992,7 +992,10 @@ export class MainMenuScene extends Phaser.Scene {
     const reelFrame = this.add.rectangle(0, centerY, 306, 320, 0x081421, 1)
       .setStrokeStyle(2, chest.trim, 1);
     modal.add(reelFrame);
-    const reel = this.add.container(0, -targetIndex * rowHeight);
+    // Begin inside the strip (not on its first card), and stop inside it
+    // (not on its last card). No empty edges are ever shown through the mask.
+    const openingIndex = 4;
+    const reel = this.add.container(0, -(targetIndex - openingIndex) * rowHeight);
     reelItems.forEach((item, i) => {
       if (!item) return;
       const y = centerY + (targetIndex - i) * rowHeight;
