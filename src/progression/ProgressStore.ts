@@ -1,4 +1,5 @@
 import { HERO_IDS, HEROES, MAX_HERO_LEVEL, type HeroId } from '../heroes/heroConfig';
+import { runCheckpointStore } from './RunCheckpoint';
 import {
   HERO_STARTER_WEAPON, MAX_WEAPON_LEVEL, WEAPON_IDS, WEAPONS, isWeaponUnlockedForHero,
   weaponBelongsToHero, weaponUpgradeCost, type WeaponId,
@@ -427,6 +428,7 @@ export class SaveManager {
     return true;
   }
   public reset(): void {
+    runCheckpointStore.clear();
     this.profile = defaultProfile();
     try {
       const store = this.storage ?? (typeof window === 'undefined' ? undefined : window.localStorage);
