@@ -29,8 +29,8 @@ function heroShape(g: Phaser.GameObjects.Graphics, id: HeroId, color: number): v
       g.fillStyle(0x4c1d95); g.fillTriangle(8, 9, 4, 58, 42, 38);
       body(g, color, 0x6b21a8);
       g.fillStyle(color); g.fillTriangle(37, 20, 48, 1, 59, 25); // hat
-      g.lineStyle(3, 0xd8b4fe); g.lineBetween(38, 53, 60, 8);
-      g.fillStyle(0xf5d0fe); g.fillCircle(60, 8, 5); g.fillStyle(0xffffff); g.fillCircle(60, 8, 2);
+      // The long crystal staff is now carried and physically swung by the
+      // foreground arm. Do not stamp a second motionless staff on the body.
       break;
     case 'guardian':
       body(g, 0xb45309, color);
@@ -46,10 +46,8 @@ function heroShape(g: Phaser.GameObjects.Graphics, id: HeroId, color: number): v
       body(g, color, 0x0369a1);
       g.fillStyle(0xe0f2fe); g.fillTriangle(40, 21, 46, 6, 51, 22);
       g.fillTriangle(47, 20, 55, 7, 58, 25); // ice crown
-      g.lineStyle(4, 0xe0f2fe); g.lineBetween(40, 13, 61, 3);
-      g.lineBetween(42, 52, 62, 61);
-      g.fillStyle(0x7dd3fc); g.fillTriangle(58, 0, 64, 1, 60, 7);
-      g.fillTriangle(59, 57, 64, 63, 57, 63);
+      // Keep the crown: icy daggers and the wave are now conjured by moving
+      // hands instead of showing permanently welded swords in both arms.
       break;
     case 'pyromancer':
       g.fillStyle(0x7c2d12); g.fillTriangle(10, 5, 5, 59, 43, 36);
