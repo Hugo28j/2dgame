@@ -62,8 +62,7 @@ function heroShape(g: Phaser.GameObjects.Graphics, id: HeroId, color: number): v
       g.fillTriangle(13, 52, 1, 44, 18, 33); // winged cloak
       body(g, color, 0x1d4ed8);
       g.fillStyle(0xfef9c3); g.fillTriangle(40, 18, 49, 3, 57, 23);
-      g.lineStyle(4, 0xfef08a); g.lineBetween(36, 54, 62, 8); // spear
-      g.fillStyle(0xffffff); g.fillTriangle(58, 5, 64, 1, 63, 10);
+      // Tempest Spear now moves with the hands in its attack renderer.
       g.lineStyle(3, 0xffffff); g.lineBetween(25, 6, 32, 15);
       g.lineBetween(32, 15, 27, 20);
       break;
@@ -72,8 +71,7 @@ function heroShape(g: Phaser.GameObjects.Graphics, id: HeroId, color: number): v
       body(g, color, 0x581c87, 0xc4a0b5);
       g.fillStyle(0x160c2e); g.fillRoundedRect(39, 21, 20, 25, 9);
       g.fillStyle(0xf5d0fe); g.fillCircle(54, 31, 4);
-      g.lineStyle(4, 0xe9d5ff); g.beginPath(); g.arc(51, 34, 18, -1.2, 1.25); g.strokePath();
-      g.lineStyle(3, 0x7e22ce); g.lineBetween(39, 53, 61, 13); // scythe
+      // The Shadow Scythe's crescent and shaft are animated independently.
       break;
   }
 }

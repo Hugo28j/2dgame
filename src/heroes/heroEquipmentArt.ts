@@ -5,10 +5,12 @@ import {
 } from '../progression/armor';
 import { armorIconLook } from '../ui/armorIconArt';
 
-/** First four playable heroes have equipment-aware bodies and physical attack poses. */
-export const ANIMATED_HEROES = ['guardian', 'ranger', 'mage', 'frostblade'] as const;
+/** All seven heroes use physical weapon poses and visibly worn armor. */
+export const ANIMATED_HEROES = [
+  'guardian', 'ranger', 'mage', 'frostblade', 'pyromancer', 'stormstrider', 'voidwalker',
+] as const;
 export const hasAnimatedHero = (id: HeroId): boolean =>
-  id === 'guardian' || id === 'ranger' || id === 'mage' || id === 'frostblade';
+  ANIMATED_HEROES.some(hero => hero === id);
 export type HeroWardrobe = Readonly<Record<ArmorSlot, ArmorItem | null>>;
 
 /** Equipment is resolved from the saved IDs, never inferred from current hero or item rarity. */

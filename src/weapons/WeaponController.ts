@@ -64,6 +64,10 @@ export class WeaponController {
   }
 
   public update(time: number, firing: boolean, direction: Readonly<Vector2Value>): void {
+    // Unlike discrete shots, Inferno Flamethrower is sustained while held:
+    // animate the caster's hands/nozzle continuously without changing its
+    // existing 200ms damage ticks, range or burn rules.
+    this.combatArt?.setChanneling(this.weaponId === 'fireorbs' && firing);
     this.combatArt?.update(time);
     this.tickBurning(time);
     if (this.shotgunUntil > 0 && time >= this.shotgunUntil) {
