@@ -662,7 +662,7 @@ export class MainMenuScene extends Phaser.Scene {
       15, COLOR.white, 294, true);
     this.add.circle(195, 427, 34, accent, .20).setStrokeStyle(2, accent);
     if (piece)
-      this.add.image(195, 427, ensureArmorIcon(this, piece)).setDisplaySize(80, 80);
+      this.add.image(195, 427, ensureArmorIcon(this, piece)).setDisplaySize(70, 70);
     else
       this.text(195, 427, weapon?.attackMode === 'melee' ? '⚔' : '➶',
         34, COLOR.white, true, true);
