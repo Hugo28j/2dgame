@@ -3198,7 +3198,6 @@ export class GameScene extends Phaser.Scene {
     this.pendingSpawnIndices = [];
     const report = this.run.report(victory);
     runCheckpointStore.clear();
-    this.checkpoint = undefined;
     progressStore.dispatch({ type: 'settleRun', report, heroId: this.player?.heroId });
     this.scene.launch(GAME_OVER_SCENE_KEY, {
       report, chosenUpgrades: this.upgrades.chosen(),
