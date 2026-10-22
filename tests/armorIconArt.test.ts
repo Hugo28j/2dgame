@@ -44,7 +44,7 @@ describe('unique themed armor icons', () => {
       armorIconLook(itemFor(definition.kind, definition.heroId, rarity)).decorationCount);
     expect(ornaments).toEqual([0,1,2,3,4]);
     const initial = itemFor(definition.kind, definition.heroId, 'epic');
-    expect(armorIconLook({ ...initial, level: 30, stars: 5 }).key)
-      .toBe(armorIconLook(initial).key);
+    const leveled: ArmorItem = { ...initial, level: 30, stars: 5 };
+    expect(armorIconLook(leveled).key).toBe(armorIconLook(initial).key);
   });
 });
