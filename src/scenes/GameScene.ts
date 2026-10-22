@@ -21,7 +21,7 @@ import { HomingEnemyProjectile } from '../enemies/HomingEnemyProjectile';
 import { coverIsClose, firstShieldOnPath, type ShieldPoint } from '../enemies/treantShield';
 import { ICE_WALL, HOMING_ORB, wallGapCenter, wallHitsCircle, wallXAt } from '../enemies/frozenBossAttacks';
 import { FROZEN_EARLY, canSummonFrostMinions } from '../enemies/frozenEarlyGame';
-import { PLAYER_HIT_INVULNERABILITY_MS, playerHitProtectionMs } from '../combat/playerHitProtection';
+import { contactHitReady, nextContactHitAt } from '../combat/enemyContactDamage';
 import { FROZEN_BALANCE } from '../enemies/frozenBalance';
 import { shouldSplitFrozenGiant } from '../enemies/frozenSplit';
 import { withinRadius } from '../enemies/enemyMovement';
@@ -144,6 +144,8 @@ export class GameScene extends Phaser.Scene {
   private iceTrailGraphics?: Phaser.GameObjects.Graphics;
   private iceMarks: { x: number; y: number; vx: number; vy: number; expires: number }[] = [];
   private iceMarkCooldown = new WeakMap<Phaser.Physics.Arcade.Sprite, number>();
+  /** Each touching enemy has its own strike interval, never a shared hero i-frame. */
+  private readonly nextContactHit = new WeakMap<Slime, number>();
   private lastIceTrailRender = 0;
   private currentRoom?: RoomDefinition;
   private healthBar?: Phaser.GameObjects.Graphics;
@@ -1948,7 +1950,7 @@ export class GameScene extends Phaser.Scene {
           groveBranchHits(lane,t,this.player)) {
         active.nextHitAt=now+JADE_BRANCH.hitCooldownMs;
         this.damagePlayer({damage:owner.stats.damage*0.62,
-          criticalChance:0,criticalMultiplier:1},JADE_BRANCH.hitCooldownMs);
+          criticalChance:0,criticalMultiplier:1});
       }
     }
   }
@@ -2189,7 +2191,7 @@ export class GameScene extends Phaser.Scene {
       if (!this.player || !poisonTickDue(now, pool.nextTickAt)) continue;
       if (!poisonCovers(pool.x, pool.y, pool.radius, this.player.x, this.player.y)) continue;
       pool.nextTickAt = now + SPORE_POISON.tickMs;
-      this.damagePlayer({ damage: pool.damage, criticalChance: 0, criticalMultiplier: 1 }, 600);
+      this.damagePlayer({ damage: pool.damage, criticalChance: 0, criticalMultiplier: 1 });
     }
   }
 
@@ -2252,7 +2254,7 @@ export class GameScene extends Phaser.Scene {
   ): void => {
     if (!(playerObject instanceof Player) || !(bulletObject instanceof EnemyProjectile) ||
         !bulletObject.active) return;
-    // Consume once on overlap (including i-frames), even for AoE ice impacts.
+    // Consume each projectile once on overlap; all separate bullets can damage.
     const attack = bulletObject.attack;
     const effect = bulletObject.effect;
     const x = bulletObject.x, y = bulletObject.y;
@@ -2322,28 +2324,27 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    if (enemyObject.aiState === 'defeated') return;
-    this.damagePlayer(enemyObject.contactAttack, enemyObject.attackIntervalMs);
+    if (enemyObject.aiState === 'defeated' || this.gameOver) return;
+    const now = this.time.now;
+    if (!contactHitReady(now, this.nextContactHit.get(enemyObject) ?? 0)) return;
+    // Avoid damage every physics frame from ONE touching enemy, while other
+    // enemies, bullets and hazards are never blocked by this enemy's timer.
+    this.nextContactHit.set(enemyObject, nextContactHitAt(now, enemyObject.attackIntervalMs));
+    this.damagePlayer(enemyObject.contactAttack);
   };
 
-  private damagePlayer(attack: Readonly<Projectile['attack']>,
-    iframeMs = PLAYER_HIT_INVULNERABILITY_MS): void {
+  private damagePlayer(attack: Readonly<Projectile['attack']>): void {
     if (!this.player || this.gameOver || !brambleDamageAllowed(this.brambleStage) ||
         !this.player.canReceiveContactDamage(this.time.now)) return;
-    // Fast enemy attack timers cannot shorten the hero's global hit protection.
-    // A second contact, bullet or boss explosion in the same window is ignored.
-    const protectedFor = playerHitProtectionMs(iframeMs);
     if (shouldParryHit(this.player.heroId, Math.random())) {
-      // A parried hit deals zero damage but still grants the same protection.
-      this.player.beginInvulnerability(this.time.now, protectedFor);
+      // Parrying cancels this hit only; it grants NO immunity to the next shot.
       this.showPlayerParry();
       return;
     }
     const result = this.damageSystem.apply(this.player, attack);
-    this.player.beginInvulnerability(this.time.now, protectedFor);
     this.drawPlayerHealth();
     if (result.defeated) this.endRun();
-    else this.showPlayerHit(protectedFor);
+    else this.showPlayerHit();
   }
 
   private updateBossHud(): void {
@@ -3022,26 +3023,12 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private showPlayerHit(protectedFor: number): void {
-    if (!this.player) {
-      return;
-    }
-
+  private showPlayerHit(): void {
+    if (!this.player) return;
+    // Short red impact tint is purely visual; it never prevents another hit.
     this.player.setTint(0xef4444).setTintMode(Phaser.TintModes.FILL);
-    // Flash throughout the real protection window, so immunity is visible.
-    this.tweens.killTweensOf(this.player);
-    this.tweens.add({
-      targets: this.player,
-      alpha: 0.35,
-      duration: 100,
-      yoyo: true,
-      repeat: Math.max(0, Math.ceil(protectedFor / 200) - 1),
-      onComplete: () => this.player?.setAlpha(1),
-    });
-    this.time.delayedCall(100, () => {
-      if (this.player?.active && !this.gameOver) {
-        this.player.clearTint();
-      }
+    this.time.delayedCall(90, () => {
+      if (this.player?.active && !this.gameOver) this.player.clearTint();
     });
   }
 
