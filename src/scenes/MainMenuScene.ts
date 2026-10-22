@@ -10,6 +10,7 @@ import {
   HERO_IDS, HEROES, getHeroStats, MAX_HERO_LEVEL, type HeroId,
 } from '../heroes/heroConfig';
 import { progressStore, heroXpRequirement, type ProfileAction } from '../progression/ProgressStore';
+import { runCheckpointStore } from '../progression/RunCheckpoint';
 import {
   CONTROL_ACTIONS, CONTROL_LABELS, formatBinding, mouseButtonKey, normalizeBindKey, rebindKey,
   type ControlAction,
@@ -80,10 +81,27 @@ export class MainMenuScene extends Phaser.Scene {
     else if (this.settingsView === 'controls') this.drawControls();
     else this.drawSettings();
 
-    this.button(195, 766, 342, 60, '▶   START AVONTUUR',
-      () => this.scene.start(GAME_SCENE_KEY), 'primary', false, 17);
-    this.text(195, 810, getWorld(progressStore.current.selectedWorld).name.toUpperCase() +
-      '  ·  KAMER 1–' + CHAPTER_ROOM_COUNT, 11, COLOR.secondary, true);
+    const loaded = runCheckpointStore.load();
+    const checkpoint = loaded && !progressStore.current.settledRunIds.includes(
+      loaded.ledger.runId) && progressStore.current.unlockedHeroes.includes(loaded.heroId)
+      ? loaded : null;
+    if (checkpoint) {
+      this.button(195, 756, 342, 50,
+        '▶  VERDER SPELEN  ·  W' + checkpoint.worldId + ' KAMER ' + checkpoint.room,
+        () => this.scene.start(GAME_SCENE_KEY, { resume: true }), 'primary', false, 14);
+      this.button(195, 811, 342, 37, 'NIEUWE RUN (BEWAARDE RUN WISSEN)', () => {
+        if (!window.confirm('Je opgeslagen run wordt verwijderd. Nieuwe run starten?')) return;
+        runCheckpointStore.clear();
+        this.scene.start(GAME_SCENE_KEY, { resume: false });
+      }, 'quiet', false, 11);
+    } else {
+      this.button(195, 766, 342, 60, '▶   START AVONTUUR', () => {
+        runCheckpointStore.clear();
+        this.scene.start(GAME_SCENE_KEY, { resume: false });
+      }, 'primary', false, 17);
+      this.text(195, 810, getWorld(progressStore.current.selectedWorld).name.toUpperCase() +
+        '  ·  KAMER 1–' + CHAPTER_ROOM_COUNT, 11, COLOR.secondary, true);
+    }
 
     this.input.keyboard?.on('keydown', this.captureBinding);
     this.input.on('wheel', this.handleInventoryWheel);
