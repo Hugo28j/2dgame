@@ -317,39 +317,48 @@ export class MainMenuScene extends Phaser.Scene {
       'quiet',false,10);
   }
 
+  /** Three readable hero cards per page; each has a full-width selection button. */
   private drawHeroes(): void {
-    this.section('KIES JE HELD', 'Kies of ontgrendel je held voor je uitrusting');
-    this.button(313, 277, 80, 27, '‹ TERUG', () => {
+    this.section('KIES JE HELD', '');
+    this.button(311, 330, 86, 30, '‹ TERUG', () => {
       this.equipmentView = 'overview'; this.scene.restart();
     }, 'quiet', false, 10);
     const profile = progressStore.current;
-    const pageSize = 4;
+    const pageSize = 3;
     const pages = Math.ceil(HERO_IDS.length / pageSize);
     this.heroPage = Math.max(0, Math.min(this.heroPage, pages - 1));
     HERO_IDS.slice(this.heroPage * pageSize, (this.heroPage + 1) * pageSize).forEach((id, index) => {
       const hero = HEROES[id];
-      const y = 347 + index * 91;
+      const y = 393 + index * 116;
       const unlocked = profile.unlockedHeroes.includes(id);
       const available = isWorldUnlocked(hero.requiredWorld, profile.completedWorlds);
       const milestone = id === 'ranger' ? 10 : id === 'mage' ? 20 : 0;
       const selected = profile.selectedHero === id;
-      this.plate(195, y, 328, 85,
-        selected ? 0x1b3844 : COLOR.card, selected ? hero.color : COLOR.border, 11);
-      this.add.circle(61, y - 15, 24, hero.color, 0.15);
-      this.add.image(61, y - 15, ensureDressedHeroTexture(this, id,
-        profile.equippedArmor[id], profile.armorInventory)).setDisplaySize(47, 47);
-      this.fittedText(93, y - 29, hero.name.toUpperCase(), 13, COLOR.white, 169, true);
-      this.fittedText(93, y - 10, 'LV.' + profile.heroLevels[id] +
+      this.plate(195, y, 328, 112, selected ? 0x193b45 : COLOR.card,
+        selected ? hero.color : COLOR.border, 12);
+      this.add.circle(68, y - 28, 21, hero.color, .19).setStrokeStyle(1.5, hero.color);
+      this.add.image(68, y - 28, ensureDressedHeroTexture(this, id,
+        profile.equippedArmor[id], profile.armorInventory)).setDisplaySize(42, 42);
+      this.fittedText(100, y - 42, hero.name.toUpperCase(), 13, COLOR.white, 157, true);
+      this.fittedText(100, y - 23, 'LV.' + profile.heroLevels[id] +
         ' · XP ' + profile.heroXp[id] + '/' + (profile.heroLevels[id] >= MAX_HERO_LEVEL
-          ? 'MAX' : heroXpRequirement(profile.heroLevels[id])), 10, COLOR.secondary, 168);
-      this.fittedText(44, y + 14, 'PASSIEF: ' + hero.passive, 10, '#fcd34d', 304);
+          ? 'MAX' : heroXpRequirement(profile.heroLevels[id])), 9, COLOR.secondary, 163);
+      this.button(307, y - 29, 74, 27, 'SKILLS ›', () => {
+        this.armorHero = id;
+        this.equipmentView = 'hero-detail';
+        this.pendingUpgrade = null;
+        this.scene.restart();
+      }, 'quiet', false, 9);
+      this.fittedText(44, y - 3, 'PASSIEF: ' + hero.passive, 9, '#fcd34d', 299);
       const stats = getHeroStats(id, profile.heroLevels[id]);
-      this.fittedText(44, y + 32, 'HP ' + displayedHp(stats.maxHp) +
-        '   ·   SCHADE ' + stats.damage + '   ·   DEF ' + stats.defense,
-        10, COLOR.secondary, 302);
-      const label = selected ? 'ACTIEF' : unlocked ? 'KIES' :
-        milestone ? 'W1 · ' + milestone : !available ? 'WERELD ' + hero.requiredWorld : hero.unlockCost + ' G';
-      this.button(313, y - 10, 86, 34, label, () => {
+      this.fittedText(44, y + 13, 'HP ' + displayedHp(stats.maxHp) +
+        '  ·  SCHADE ' + stats.damage + '  ·  DEF ' + stats.defense,
+        10, COLOR.secondary, 299);
+      const label = selected ? 'GESELECTEERD' : unlocked ? 'SELECTEREN' :
+        milestone ? 'VRIJ BIJ W1-' + milestone :
+          !available ? 'VRIJ IN WERELD ' + hero.requiredWorld :
+            'ONTGRENDELEN · ' + hero.unlockCost + ' G';
+      this.button(195, y + 40, 300, 29, label, () => {
         this.equipmentView = 'overview';
         this.armorHero = id;
         this.runAction(unlocked ? { type: 'selectHero', id } : { type: 'unlockHero', id });
@@ -357,17 +366,85 @@ export class MainMenuScene extends Phaser.Scene {
       selected || (!unlocked && (milestone > 0 || !available || profile.gold < hero.unlockCost)), 10);
     });
     if (pages > 1) {
-      this.button(100, 700, 107, 34, '‹ VORIGE', () => {
+      this.button(93, 717, 95, 30, '‹ VORIGE', () => {
         this.heroPage = Math.max(0, this.heroPage - 1);
         this.scene.restart();
       }, 'quiet', this.heroPage === 0, 10);
-      this.text(195, 700, (this.heroPage + 1) + ' / ' + pages,
-        12, COLOR.secondary, true, true);
-      this.button(290, 700, 107, 34, 'VOLGENDE ›', () => {
+      this.text(195, 717, (this.heroPage + 1) + ' / ' + pages,
+        11, COLOR.secondary, true, true);
+      this.button(297, 717, 95, 30, 'VOLGENDE ›', () => {
         this.heroPage = Math.min(pages - 1, this.heroPage + 1);
         this.scene.restart();
       }, 'quiet', this.heroPage === pages - 1, 10);
     }
+  }
+
+  /** Abilities live with their hero now that the standalone Upgrades tab is gone. */
+  private drawHeroDetail(): void {
+    const profile = progressStore.current;
+    const id = this.armorHero;
+    const hero = HEROES[id];
+    const unlocked = profile.unlockedHeroes.includes(id);
+    const selected = profile.selectedHero === id;
+    const available = isWorldUnlocked(hero.requiredWorld, profile.completedWorlds);
+    const milestone = id === 'ranger' ? 10 : id === 'mage' ? 20 : 0;
+    this.section('HELDDETAILS', '');
+    this.button(91, 330, 105, 31, '‹ HELDEN', () => {
+      this.pendingUpgrade = null;
+      this.equipmentView = 'heroes';
+      this.scene.restart();
+    }, 'quiet', false, 10);
+    this.plate(195, 391, 328, 80, COLOR.card, hero.color, 12);
+    this.add.circle(72, 391, 29, hero.color, .20);
+    this.add.image(72, 391, ensureDressedHeroTexture(this, id,
+      profile.equippedArmor[id], profile.armorInventory)).setDisplaySize(56, 56);
+    this.fittedText(118, 373, hero.name.toUpperCase() + ' · LV.' + profile.heroLevels[id],
+      13, COLOR.white, 221, true);
+    const stats = getHeroStats(id, profile.heroLevels[id]);
+    this.fittedText(118, 396, 'HP ' + displayedHp(stats.maxHp) +
+      '  ·  DMG ' + stats.damage + '  ·  DEF ' + stats.defense, 10, COLOR.secondary, 218);
+    this.fittedText(118, 414, 'PASSIEF: ' + hero.passive, 9, '#fcd34d', 216);
+    const label = selected ? 'GESELECTEERD' : unlocked ? 'SELECTEREN' :
+      milestone ? 'VRIJ BIJ W1-' + milestone :
+        !available ? 'VRIJ IN WERELD ' + hero.requiredWorld :
+          'ONTGRENDELEN · ' + hero.unlockCost + ' G';
+    this.button(195, 457, 326, 39, label, () => {
+      this.equipmentView = 'overview';
+      this.armorHero = id;
+      this.runAction(unlocked ? { type: 'selectHero', id } : { type: 'unlockHero', id });
+    }, selected ? 'selected' : 'normal',
+    selected || (!unlocked && (milestone > 0 || !available || profile.gold < hero.unlockCost)), 11);
+    this.text(45, 493, 'VAARDIGHEDEN UPGRADEN', 11, COLOR.secondary, false, true);
+
+    HERO_ABILITIES[id].forEach((abilityId, index) => {
+      const ability = ABILITIES[abilityId];
+      const level = profile.abilityLevels[abilityId];
+      const action: UpgradeProfileAction = { type: 'upgradeAbility', id: abilityId };
+      const preview = this.isConfirmingUpgrade(action, level);
+      const canUse = unlocked && isAbilityUnlocked(abilityId, profile.heroLevels[id]);
+      const cost = abilityUpgradeCost(level);
+      const cy = 539 + index * 68;
+      this.plate(195, cy, 328, 63, COLOR.card,
+        preview ? COLOR.gold : ability.color, 10);
+      this.fittedText(44, cy - 19, ability.name.toUpperCase(), 11, COLOR.white, 197, true);
+      const current = canUse
+        ? abilityMenuSummary(getAbilityStats(abilityId, level))
+        : 'VRIJ VANAF HELD LV.' + ability.unlockLevel;
+      this.fittedText(44, cy - 2, current, 9, COLOR.secondary, 194);
+      if (preview) {
+        this.fittedText(44, cy + 13, '→ ' + abilityMenuSummary(getAbilityStats(abilityId,
+          Math.min(MAX_ABILITY_LEVEL, level + 1))), 9, '#fcd34d', 194);
+      } else {
+        this.text(44, cy + 17, 'LV.' + level + '/' + MAX_ABILITY_LEVEL,
+          9, COLOR.faint);
+      }
+      this.button(307, cy + 11, 96, 31,
+        !canUse ? 'SLOT' : level >= MAX_ABILITY_LEVEL ? 'MAX LEVEL' :
+          preview ? 'CONFIRM' : 'UPGRADE ' + cost + ' G',
+        () => this.requestUpgrade(action, level),
+        preview ? 'selected' : 'normal',
+        !canUse || level >= MAX_ABILITY_LEVEL || profile.gold < cost, 9);
+    });
   }
 
 
