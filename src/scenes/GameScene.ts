@@ -57,7 +57,6 @@ import { progressStore } from '../progression/ProgressStore';
 import { armorBonuses } from '../progression/armor';
 import { RunLedger } from '../progression/RunLedger';
 import { runCheckpointStore, type RunCheckpoint } from '../progression/RunCheckpoint';
-import { MENU_SCENE_KEY } from '../config/constants';
 import { coinDropsForEnemy } from '../progression/coinRewards';
 import { roomClearHealing } from '../progression/roomHealing';
 import { RunUpgradeDeck, type RunUpgradeId } from '../progression/runUpgrades';
@@ -3307,8 +3306,8 @@ export class GameScene extends Phaser.Scene {
     const description = document.createElement('div');
     description.textContent = 'WERELD ' + this.worldId +
       '  ·  KAMER ' + this.roomProgress.roomNumber +
-      '\\nBij hervatten begint deze kamer opnieuw.' +
-      '\\nVorige kamers en beloningen blijven bewaard.';
+      '\nBij hervatten begint deze kamer opnieuw.' +
+      '\nVorige kamers en beloningen blijven bewaard.';
     Object.assign(description.style, {
       whiteSpace: 'pre-line', lineHeight: '1.6',
       fontSize: '12px', color: '#b6cce0',
