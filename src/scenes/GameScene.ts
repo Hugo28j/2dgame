@@ -35,10 +35,10 @@ import { Player } from '../entities/Player';
 import { CoinPickup } from '../entities/CoinPickup';
 import { XpPickup } from '../entities/XpPickup';
 import { ArmorPickup } from '../entities/ArmorPickup';
-import { rollEnemyArmor, armorDefinition, RARITY_CONFIG, type ArmorItem } from '../progression/armor';
+import { rollEnemyArmor, chooseArmorDropHero, armorDefinition, RARITY_CONFIG, type ArmorItem } from '../progression/armor';
 import { xpDropsForEnemy } from '../progression/heroXp';
 import { heroXpRequirement } from '../progression/ProgressStore';
-import { MAX_HERO_LEVEL } from '../heroes/heroConfig';
+import { HEROES, MAX_HERO_LEVEL } from '../heroes/heroConfig';
 import { Projectile } from '../entities/Projectile';
 import { InputController } from '../input/InputController';
 import {
@@ -2766,9 +2766,13 @@ export class GameScene extends Phaser.Scene {
 
   private spawnArmor(enemy: Slime, kind: Parameters<typeof rollEnemyArmor>[0] | string): void {
     if (!this.player || !this.currentRoom) return;
+    // Any owned hero can receive the gear, regardless of which hero is in this run.
+    // The fourth random roll is independent from rarity and armor-slot selection.
+    const heroId = chooseArmorDropHero(progressStore.current.unlockedHeroes, Math.random());
+    if (!heroId) return;
     const item = rollEnemyArmor(kind === 'boss' ? 'boss' : 'normal',
       Math.random(), Math.random(), Math.random(), this.run.runId, enemy.enemyId,
-      this.player.heroId);
+      heroId);
     if (!item) return;
     const bounds = this.currentRoom.layout.bounds;
     this.armorDrops.add(new ArmorPickup(this,
@@ -2785,9 +2789,10 @@ export class GameScene extends Phaser.Scene {
       if (collected) {
         // Include only successfully collected drops on the results screen.
         this.collectedRunArmor.push(item);
-        const name = armorDefinition(item).slot.toUpperCase();
+        const slotName = armorDefinition(item).slot.toUpperCase();
         const text = this.add.text(this.player.x, this.player.y - 48,
-          name + ' · ' + RARITY_CONFIG[item.rarity].label.toUpperCase(), {
+          HEROES[item.heroId].name.toUpperCase() + ' ' + slotName +
+          ' · ' + RARITY_CONFIG[item.rarity].label.toUpperCase(), {
             color: '#' + RARITY_CONFIG[item.rarity].color.toString(16).padStart(6, '0'),
             fontFamily: 'system-ui, sans-serif', fontSize: '13px', fontStyle: 'bold',
             stroke: '#020617', strokeThickness: 4,
