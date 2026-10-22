@@ -5,6 +5,7 @@ import { SLIME_TEXTURE_KEY } from '../config/constants';
 import type { SlimeRuntimeStats } from './enemyConfig';
 import { getChaseVelocity, getObstacleAvoidanceVelocity } from './slimeMovement';
 import { goblinKnifeAngle, goblinKnifeSwingActive,
+  GOBLIN_KNIFE_WINDUP_MS, GOBLIN_KNIFE_SLASH_END_MS,
   GOBLIN_KNIFE_TOTAL_MS } from './goblinKnife';
 
 export const ENEMY_SPAWNED_EVENT = 'enemy-spawned';
@@ -185,7 +186,8 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
     g.lineBetween(guardX + px * 2.6, guardY + py * 2.6, tipX, tipY);
     if (swinging && goblinKnifeSwingActive(elapsed)) {
       // A brief curved cut travels with the real sword hand and its blade.
-      const strength = Math.sin(Math.PI * (elapsed - 145) / (320 - 145));
+      const strength = Math.sin(Math.PI * (elapsed - GOBLIN_KNIFE_WINDUP_MS) /
+        (GOBLIN_KNIFE_SLASH_END_MS - GOBLIN_KNIFE_WINDUP_MS));
       g.lineStyle(3.6, 0xfde68a, Math.max(0, strength * .86));
       g.beginPath();
       g.arc(handX, handY, 41, angle - .30, angle + .07, false);
@@ -291,7 +293,7 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
 
     this.aiState = 'defeated';
     this.knifeAttackToken += 1;
-    this.knifeGraphic?.destroy();
+    if (this.knifeGraphic?.active) this.knifeGraphic.destroy();
     this.playEmberDeathFx();
     this.healthBar.clear();
     const body = this.body;
@@ -318,7 +320,7 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
   }
 
   public override destroy(fromScene?: boolean): void {
-    this.knifeGraphic?.destroy();
+    if (this.knifeGraphic?.active) this.knifeGraphic.destroy();
     this.healthBar.destroy();
     super.destroy(fromScene);
   }
