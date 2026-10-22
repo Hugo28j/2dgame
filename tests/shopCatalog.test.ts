@@ -8,10 +8,10 @@ describe('shop preview catalog', () => {
     expect(SHOP_CHESTS[0]!.scale).toBeLessThan(SHOP_CHESTS[1]!.scale);
     expect(SHOP_CHESTS[1]!.scale).toBeLessThan(SHOP_CHESTS[2]!.scale);
   });
-  it('never exposes a price, purchase or reward action yet', () => {
-    expect(SHOP_CHESTS.every(chest => chest.available === false)).toBe(true);
+  it('charges earned game gold and clearly publishes all five rarity odds', () => {
+    expect(SHOP_CHESTS.every(chest => chest.cost > 0)).toBe(true);
     for (const chest of SHOP_CHESTS) {
-      expect(Object.keys(chest)).not.toContain('cost');
+      expect(Object.values(chest.odds).reduce((a,b) => a+b, 0)).toBe(100);
       expect(Object.keys(chest)).not.toContain('reward');
       expect(Object.keys(chest)).not.toContain('action');
     }
