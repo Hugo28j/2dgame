@@ -172,7 +172,7 @@ function frozen(ctx:CanvasRenderingContext2D,rand:()=>number):void {
   }
   ridge(ctx,rand,352,155,'#aacddc',65);
   for(const [x,y,w,h] of [[102,468,155,247],[282,441,180,298],
-    [521,479,150,259],[435,465,119,172]]){
+    [521,479,150,259],[435,465,119,172]] as const){
     polygon(ctx,[[x-w*.58,y],[x,y-h],[x+w*.62,y]],'#9dc7d9');
     polygon(ctx,[[x-w*.58,y],[x,y-h],[x-.02*w,y]],'#d7f9ff');
     polygon(ctx,[[x-w*.1,y-h*.7],[x,y-h],[x+w*.62,y]],'#4e8fac');
@@ -232,7 +232,7 @@ function storm(ctx:CanvasRenderingContext2D,rand:()=>number):void {
   cloud(ctx,527,194,1.2,'#f2edff',.32);
   ridge(ctx,rand,391,122,'#7f89ad',71);
   // Floating tiered islands: layered underside silhouettes establish depth.
-  for(const [x,y,w] of [[127,433,157],[510,404,159],[324,468,390]]){
+  for(const [x,y,w] of [[127,433,157],[510,404,159],[324,468,390]] as const){
     ellipse(ctx,x,y,w*.52,24,'#717da6',.72);
     polygon(ctx,[[x-w*.52,y],[x-w*.24,y+53],
       [x-w*.08,y+118],[x,y+151],[x+w*.16,y+106],
@@ -244,7 +244,7 @@ function storm(ctx:CanvasRenderingContext2D,rand:()=>number):void {
   // Golden-tipped spires of the airborne citadel.
   polygon(ctx,[[214,449],[239,329],[421,329],[450,449]],'#353959');
   polygon(ctx,[[248,345],[331,279],[399,345]],'#6b729a');
-  for(const [x,h,w] of [[229,195,50],[291,246,49],[369,252,50],[436,186,50]])
+  for(const [x,h,w] of [[229,195,50],[291,246,49],[369,252,50],[436,186,50]] as const)
     tower(ctx,x,430,w,h,'#48547e','#414c75','#2f375c');
   polygon(ctx,[[307,341],[331,237],[354,341]],'#b1aece');
   ellipse(ctx,332,388,24,37,'#201f3c',1);
@@ -290,7 +290,7 @@ function voidRealm(ctx:CanvasRenderingContext2D,rand:()=>number):void {
   ridge(ctx,rand,507,121,'#2b1d4c',52);
   // Tilted, levitating carved monoliths over a broken crystal abyss.
   for(const [x,y,scale,tilt] of [[109,445,1.1,-.28],[533,398,.95,.22],
-    [185,515,.68,-.15],[455,524,.76,.12]]){
+    [185,515,.68,-.15],[455,524,.76,.12]] as const){
     ctx.save();ctx.translate(x,y);ctx.rotate(tilt);
     polygon(ctx,[[-22*scale,51*scale],[-30*scale,-82*scale],
       [0,-119*scale],[31*scale,-70*scale],[23*scale,50*scale]],'#29204c');
@@ -309,6 +309,7 @@ export function ensureWorldDiorama(scene:Phaser.Scene, id:WorldId):string {
   const key='dungeon-atlas-2p5d-'+id;
   if(scene.textures.exists(key))return key;
   const texture=scene.textures.createCanvas(key,WIDTH,HEIGHT);
+  if (!texture) throw new Error('Could not create world atlas texture '+key);
   const ctx=texture.getContext();
   const rand=seeded(48751+id*991);
   const palette=COLORS[id];
