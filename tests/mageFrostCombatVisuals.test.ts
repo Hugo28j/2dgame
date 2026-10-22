@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { poseForWeapon, poseLengthMs } from '../src/heroes/characterAttackArt';
+import { poseForWeapon, poseLengthMs } from '../src/heroes/characterAttackPose';
 import {
   RUNE_TOME, runeAimTarget, runeBounceTarget, runeAngleDifference,
   runeRicochetHeading, runeSteer,
