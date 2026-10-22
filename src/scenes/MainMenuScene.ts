@@ -15,11 +15,11 @@ import {
 import {
   ARMOR_SLOTS, ARMOR_MAX_LEVEL, ARMOR_MAX_STARS, RARITY_CONFIG,
   armorDefinition, armorUpgradeCost, armorBonuses, armorStatText,
-  type ArmorSlot,
+  type ArmorItem, type ArmorSlot,
 } from '../progression/armor';
 import {
   HERO_WEAPONS, WEAPONS, getWeaponStats, weaponBaseAttackIntervalMs,
-  weaponUpgradeCost, MAX_WEAPON_LEVEL, SECOND_WEAPON_UNLOCK_LEVEL,
+  weaponUpgradeCost, MAX_WEAPON_LEVEL, type WeaponId,
 } from '../weapons/weaponConfig';
 import {
   ABILITIES, HERO_ABILITIES, MAX_ABILITY_LEVEL, abilityUpgradeCost, getAbilityStats,
@@ -27,8 +27,11 @@ import {
 } from '../abilities/abilityConfig';
 import { abilityMenuSummary } from '../ui/menuPresentation';
 import { displayedHp } from '../ui/displayValues';
+import { canFuseArmor, EQUIPMENT_VISIBLE_ROWS, inventoryMaxOffset, moveInventoryOffset } from '../ui/equipmentInventory';
 
-type MenuTab = 'worlds' | 'heroes' | 'weapons' | 'upgrades' | 'settings';
+type MenuTab = 'worlds' | 'weapons' | 'upgrades' | 'settings';
+type EquipmentView = 'overview' | 'heroes' | 'list' | 'detail';
+type EquipmentSlot = ArmorSlot | 'weapon';
 type ButtonStyle = 'normal' | 'selected' | 'primary' | 'danger' | 'quiet';
 const FONT = 'system-ui, sans-serif';
 const COLOR = {
@@ -43,7 +46,11 @@ export class MainMenuScene extends Phaser.Scene {
   private worldMessage = '';
   private heroPage = 0;
   private upgradeCategory: 'weapons' | 'abilities' | 'armor' = 'armor';
-  private equipmentCategory: 'weapons' | 'armor' = 'armor';
+  private equipmentView: EquipmentView = 'overview';
+  private equipmentSlot: EquipmentSlot = 'weapon';
+  private equipmentItemId: string | null = null;
+  private inventoryOffset = 0;
+  private inventoryTouchStart: { x: number; y: number } | null = null;
   private armorPage = 0;
   private armorSlot: ArmorSlot = 'helm';
   private armorHero: HeroId = 'guardian';
@@ -64,7 +71,6 @@ export class MainMenuScene extends Phaser.Scene {
     this.plate(195, 490, 354, 476, COLOR.panel, COLOR.border, 17);
 
     if (this.tab === 'worlds') this.drawWorlds();
-    else if (this.tab === 'heroes') this.drawHeroes();
     else if (this.tab === 'weapons') this.drawEquipment();
     else if (this.tab === 'upgrades') this.drawUpgrades();
     else if (this.settingsView === 'controls') this.drawControls();
@@ -76,12 +82,18 @@ export class MainMenuScene extends Phaser.Scene {
       '  ·  KAMER 1–' + CHAPTER_ROOM_COUNT, 11, COLOR.secondary, true);
 
     this.input.keyboard?.on('keydown', this.captureBinding);
+    this.input.on('wheel', this.handleInventoryWheel);
+    this.input.on('pointerdown', this.handleInventoryTouchStart);
+    this.input.on('pointerup', this.handleInventoryTouchEnd);
     // Capture before Phaser delivers game-object clicks; the click that opens
     // the remap modal is not captured because awaitingKey is still undefined.
     window.addEventListener('pointerdown', this.captureMouseButton, true);
     window.addEventListener('contextmenu', this.preventCaptureContextMenu, true);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.input.keyboard?.off('keydown', this.captureBinding);
+      this.input.off('wheel', this.handleInventoryWheel);
+      this.input.off('pointerdown', this.handleInventoryTouchStart);
+      this.input.off('pointerup', this.handleInventoryTouchEnd);
       window.removeEventListener('pointerdown', this.captureMouseButton, true);
       window.removeEventListener('contextmenu', this.preventCaptureContextMenu, true);
     });
@@ -131,15 +143,15 @@ export class MainMenuScene extends Phaser.Scene {
 
   private drawNavigation(): void {
     const tabs: Array<[MenuTab, string]> = [
-      ['worlds', 'WERELDEN'], ['heroes', 'HELDEN'], ['weapons', 'UITRUSTING'],
+      ['worlds', 'WERELDEN'], ['weapons', 'UITRUSTING'],
       ['upgrades', 'UPGRADES'], ['settings', 'OPTIES'],
     ];
     tabs.forEach(([tab, label], index) => {
-      const x = 42 + index * 76.5;
+      const x = 63 + index * 88;
       const active = this.tab === tab;
-      this.button(x, 227, 74, 42, label, () => this.chooseTab(tab),
-        active ? 'selected' : 'quiet', false, label === 'UITRUSTING' ? 8 : 9);
-      if (active) this.add.rectangle(x, 247, 38, 3, COLOR.accent, 0.9);
+      this.button(x, 227, 84, 42, label, () => this.chooseTab(tab),
+        active ? 'selected' : 'quiet', false, label === 'UITRUSTING' ? 9 : 10);
+      if (active) this.add.rectangle(x, 247, 42, 3, COLOR.accent, 0.9);
     });
   }
 
@@ -149,8 +161,9 @@ export class MainMenuScene extends Phaser.Scene {
       this.armorHero = progressStore.current.selectedHero;
       this.armorPage = 0;
     }
-    if (tab === 'heroes') this.heroPage = Math.floor(
-      Math.max(0, HERO_IDS.indexOf(progressStore.current.selectedHero)) / 4);
+    this.equipmentView = 'overview';
+    this.inventoryOffset = 0;
+    this.equipmentItemId = null;
     if (tab !== 'settings') this.settingsView = 'general';
     if (tab !== 'worlds') {
       this.worldView = 'showcase';
@@ -288,7 +301,10 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   private drawHeroes(): void {
-    this.section('KIES JE HELD', 'Guardian eerst · Ranger W1-10 · Mage W1-20');
+    this.section('KIES JE HELD', 'Kies of ontgrendel je held voor je uitrusting');
+    this.button(313, 277, 80, 27, '‹ TERUG', () => {
+      this.equipmentView = 'overview'; this.scene.restart();
+    }, 'quiet', false, 10);
     const profile = progressStore.current;
     const pageSize = 4;
     const pages = Math.ceil(HERO_IDS.length / pageSize);
@@ -315,9 +331,11 @@ export class MainMenuScene extends Phaser.Scene {
         10, COLOR.secondary, 302);
       const label = selected ? 'ACTIEF' : unlocked ? 'KIES' :
         milestone ? 'W1 · ' + milestone : !available ? 'WERELD ' + hero.requiredWorld : hero.unlockCost + ' G';
-      this.button(313, y - 10, 86, 34, label, () => this.runAction(
-        unlocked ? { type: 'selectHero', id } : { type: 'unlockHero', id },
-      ), selected ? 'selected' : 'normal',
+      this.button(313, y - 10, 86, 34, label, () => {
+        this.equipmentView = 'overview';
+        this.armorHero = id;
+        this.runAction(unlocked ? { type: 'selectHero', id } : { type: 'unlockHero', id });
+      }, selected ? 'selected' : 'normal',
       selected || (!unlocked && (milestone > 0 || !available || profile.gold < hero.unlockCost)), 10);
     });
     if (pages > 1) {
@@ -334,121 +352,327 @@ export class MainMenuScene extends Phaser.Scene {
     }
   }
 
-  /** One clearly separated screen to equip weapons and armor; upgrades live elsewhere. */
+
+  /** A single loadout: hero, weapon and all three pieces are visible at a glance. */
   private drawEquipment(): void {
-    this.section('UITRUSTING', 'Kies je wapen en armor · upgrades staan apart');
-    this.drawEquipmentHeroSelector(350);
-    this.button(112, 410, 154, 40, 'ARMOR', () => {
-      this.equipmentCategory = 'armor'; this.armorPage = 0; this.scene.restart();
-    }, this.equipmentCategory === 'armor' ? 'selected' : 'quiet', false, 11);
-    this.button(278, 410, 154, 40, 'WAPENS', () => {
-      this.equipmentCategory = 'weapons'; this.scene.restart();
-    }, this.equipmentCategory === 'weapons' ? 'selected' : 'quiet', false, 11);
-    if (this.equipmentCategory === 'weapons') this.drawWeaponSelection();
-    else this.drawArmorSelection();
-  }
+    if (!progressStore.current.unlockedHeroes.includes(this.armorHero))
+      this.armorHero = progressStore.current.selectedHero;
+    if (this.equipmentView === 'heroes') return this.drawHeroes();
+    if (this.equipmentView === 'list') return this.drawEquipmentList();
+    if (this.equipmentView === 'detail') return this.drawEquipmentDetail();
 
-  private drawEquipmentHeroSelector(y: number): void {
-    const profile = progressStore.current;
-    const heroes = profile.unlockedHeroes;
-    if (!heroes.includes(this.armorHero)) this.armorHero = profile.selectedHero;
-    const index = heroes.indexOf(this.armorHero);
-    const hero = HEROES[this.armorHero];
-    this.plate(195, y, 328, 66, COLOR.card, COLOR.border, 11);
-    this.button(60, y, 43, 43, '‹', () => {
-      this.armorHero = heroes[(index + heroes.length - 1) % heroes.length]!;
-      this.armorPage = 0; this.scene.restart();
-    }, 'quiet', heroes.length <= 1, 17);
-    this.add.image(110, y, hero.textureKey).setDisplaySize(40, 40);
-    this.fittedText(136, y - 9, hero.name.toUpperCase(), 13, COLOR.white, 158, true);
-    this.text(136, y + 12, 'LEVEL ' + profile.heroLevels[this.armorHero], 10, COLOR.faint);
-    this.button(333, y, 43, 43, '›', () => {
-      this.armorHero = heroes[(index + 1) % heroes.length]!;
-      this.armorPage = 0; this.scene.restart();
-    }, 'quiet', heroes.length <= 1, 17);
-  }
-
-  private drawWeaponSelection(): void {
     const profile = progressStore.current;
     const heroId = this.armorHero;
-    this.text(37, 455, 'WAPENS VAN ' + HEROES[heroId].name.toUpperCase(), 12, COLOR.white, false, true);
-    HERO_WEAPONS[heroId].forEach((id, index) => {
-      const weapon = WEAPONS[id], level = profile.weaponLevels[id];
-      const unlocked = profile.unlockedWeapons.includes(id);
-      const selected = profile.selectedWeapons[heroId] === id;
-      const y = 512 + index * 104;
-      this.plate(195, y, 328, 98, selected ? 0x1c3c49 : COLOR.card,
-        selected ? COLOR.accent : COLOR.border, 10);
-      this.add.circle(65, y - 15, 22, weapon.color, .20).setStrokeStyle(2, weapon.color);
-      this.text(65, y - 16, weapon.attackMode === 'melee' ? '⚔' : '➶', 20, COLOR.white, true, true);
-      this.fittedText(98, y - 32, weapon.name.toUpperCase(), 12, COLOR.white, 228, true);
-      const stats = getWeaponStats(id, level);
-      const shownFireRate = 1000 / weaponBaseAttackIntervalMs(stats);
-      const attackLabel = id === 'fireorbs'
-        ? 'CONTINU · ' + stats.meleeRange.toFixed(0) + ' RANGE'
-        : shownFireRate.toFixed(2) + '/S' +
-          (id === 'sunblade' ? ' · ' + stats.meleeRange.toFixed(0) + ' RANGE' :
-            (id === 'staff' || id === 'bow' || id === 'daggers')
-              ? ' · ' + stats.projectileCount + ' PROJECTIELEN' : '');
-      this.fittedText(98, y - 10, 'LV.' + level + ' · DMG ' + stats.damage +
-        ' · ' + attackLabel, 10, COLOR.secondary, 222);
-      this.fittedText(43, y + 15, unlocked ? weapon.description :
-        'ONTGRENDELT GRATIS OP HERO LEVEL ' + SECOND_WEAPON_UNLOCK_LEVEL, 10, COLOR.faint, 298);
-      this.button(291, y + 34, 102, 28, selected ? 'ACTIEF' : unlocked ? 'UITRUSTEN' : 'SLOT',
-        () => {
-          if (profile.selectedHero !== heroId) progressStore.dispatch({ type: 'selectHero', id: heroId });
-          this.runAction({ type: 'selectWeapon', id });
-        }, selected ? 'selected' : 'normal', !unlocked || selected, 10);
+    const hero = HEROES[heroId];
+    const weaponId = profile.selectedWeapons[heroId];
+    const weapon = WEAPONS[weaponId];
+    const armor = profile.equippedArmor[heroId];
+    const labels: Record<ArmorSlot, string> = { helm: 'HELM', body: 'PANTSER', boots: 'SCHOENEN' };
+    this.section('JOUW UITRUSTING', 'Tik op een vak om je inventaris te openen');
+
+    // The hero itself is a large tappable card; locked heroes appear in its chooser.
+    const heroCard = this.plate(195, 361, 328, 86, 0x172e42, hero.color, 13);
+    heroCard.setInteractive(new Phaser.Geom.Rectangle(0, 0, 328, 86),
+      Phaser.Geom.Rectangle.Contains);
+    heroCard.on('pointerdown', () => {
+      this.heroPage = Math.floor(Math.max(0, HERO_IDS.indexOf(heroId)) / 4);
+      this.equipmentView = 'heroes';
+      this.scene.restart();
     });
-    this.text(195, 715, 'Wapen verbeteren? Ga naar UPGRADES.',
-      10, COLOR.secondary, true);
+    this.add.circle(78, 361, 32, hero.color, .20).setStrokeStyle(2, hero.color);
+    this.add.image(78, 361, hero.textureKey).setDisplaySize(61, 61);
+    this.fittedText(125, 337, hero.name.toUpperCase(), 16, COLOR.white, 181, true);
+    this.fittedText(125, 358, 'HELD  ·  LEVEL ' + profile.heroLevels[heroId], 11,
+      '#9de4f3', 182);
+    this.fittedText(125, 381, 'TIK OM VAN HELD TE WISSELEN  ›', 9, COLOR.faint, 198);
+
+    const weaponCard = this.plate(195, 463, 328, 92, 0x172c3f, COLOR.accent, 12);
+    weaponCard.setInteractive(new Phaser.Geom.Rectangle(0, 0, 328, 92),
+      Phaser.Geom.Rectangle.Contains);
+    weaponCard.on('pointerdown', () => this.openEquipmentList('weapon'));
+    this.add.circle(77, 463, 31, weapon.color, .15).setStrokeStyle(2, weapon.color);
+    this.text(77, 462, weapon.attackMode === 'melee' ? '⚔' : '➶', 28, COLOR.white, true, true);
+    this.text(122, 429, 'WAPEN', 10, '#89dbe8', false, true);
+    this.fittedText(122, 450, weapon.name.toUpperCase(), 14, COLOR.white, 187, true);
+    const weaponStats = getWeaponStats(weaponId, profile.weaponLevels[weaponId]);
+    this.fittedText(122, 475,
+      'LV.' + profile.weaponLevels[weaponId] + '  ·  DMG ' + weaponStats.damage.toFixed(1),
+      11, COLOR.secondary, 190);
+    this.text(317, 462, '›', 26, '#8ce3f1', true, true);
+
+    ARMOR_SLOTS.forEach((slot, index) => {
+      const item = profile.armorInventory.find(piece => piece.id === armor[slot]);
+      const rarity = item ? RARITY_CONFIG[item.rarity] : undefined;
+      const d = item ? armorDefinition(item) : undefined;
+      const center = 81 + index * 114;
+      const card = this.plate(center, 588, 105, 102, item ? 0x1b3344 : COLOR.card,
+        rarity?.color ?? COLOR.border, 12);
+      card.setInteractive(new Phaser.Geom.Rectangle(0, 0, 105, 102),
+        Phaser.Geom.Rectangle.Contains);
+      card.on('pointerdown', () => this.openEquipmentList(slot));
+      this.text(center, 555, labels[slot], 10, COLOR.secondary, true, true);
+      this.text(center, 585, d?.symbol ?? '+', 26,
+        rarity ? '#' + rarity.color.toString(16).padStart(6, '0') : '#8ca9bf', true, true);
+      this.fittedText(center - 45, 614,
+        item ? 'LV.' + item.level + '  ' + '★'.repeat(item.stars) : 'LEEG · KIES',
+        10, item ? '#f8d77b' : COLOR.faint, 90, true).setOrigin(.5);
+    });
+    const bonus = armorBonuses(profile.armorInventory, armor, heroId);
+    this.fittedText(37, 663,
+      'HP +' + (bonus.hp * 100).toFixed(1) + '%  ·  DEF +' +
+      (bonus.defense * 100).toFixed(1) + '%  ·  DMG +' +
+      (bonus.weaponDamage * 100).toFixed(1) + '%', 10, '#86efac', 308);
+    this.fittedText(37, 681,
+      'AANVAL +' + (bonus.attackSpeed * 100).toFixed(1) + '%  ·  SNELHEID +' +
+      (bonus.movementSpeed * 100).toFixed(1) + '%', 10, '#86efac', 308);
+    this.text(195, 710, 'Alles beheren vanuit deze vijf vakken',
+      10, COLOR.faint, true);
   }
 
-  private drawArmorSelection(): void {
-    const profile = progressStore.current, heroId = this.armorHero;
-    const equipped = profile.equippedArmor[heroId];
-    const totals = armorBonuses(profile.armorInventory, equipped, heroId);
-    const labels: Record<ArmorSlot, string> = { helm: 'HELM', body: 'BODY', boots: 'BOOTS' };
-    ARMOR_SLOTS.forEach((slot, i) => {
-      const item = profile.armorInventory.find(x => x.id === equipped[slot]);
-      this.button(81 + i * 114, 475, 105, 52,
-        labels[slot] + (item ? ' ★' + item.stars : ' · LEEG'), () => {
-          this.armorSlot = slot; this.armorPage = 0; this.scene.restart();
-        }, this.armorSlot === slot ? 'selected' : 'quiet', false, 10);
-    });
-    this.fittedText(36, 515, 'HP +' + (totals.hp * 100).toFixed(1) + '%  ·  DEF +' +
-      (totals.defense * 100).toFixed(1) + '%  ·  DMG +' +
-      (totals.weaponDamage * 100).toFixed(1) + '%', 10, '#86efac', 315);
-    this.fittedText(36, 531, 'FIRE +' + (totals.attackSpeed * 100).toFixed(1) + '%  ·  SPEED +' +
-      (totals.movementSpeed * 100).toFixed(1) + '%', 10, '#86efac', 315);
-    const items = profile.armorInventory.filter(item =>
-      item.heroId === heroId && armorDefinition(item).slot === this.armorSlot);
-    this.text(38, 555, labels[this.armorSlot] + '  ·  ' + items.length + ' ITEMS',
-      11, COLOR.white, false, true);
-    if (!items.length) this.text(195, 624, 'Nog geen armor voor dit slot', 12, COLOR.secondary, true);
-    const pages = Math.max(1, Math.ceil(items.length / 2));
-    this.armorPage = Math.max(0, Math.min(this.armorPage, pages - 1));
-    items.slice(this.armorPage * 2, this.armorPage * 2 + 2).forEach((item, index) => {
-      const d = armorDefinition(item), rarity = RARITY_CONFIG[item.rarity];
-      const color = '#' + rarity.color.toString(16).padStart(6, '0');
-      const y = 594 + index * 64;
-      const worn = equipped[this.armorSlot] === item.id;
-      this.plate(195, y, 328, 59, worn ? 0x1d3947 : COLOR.card, rarity.color, 9);
-      this.fittedText(44, y - 17, d.symbol + ' ' + d.name, 11, color, 210, true);
-      this.fittedText(44, y + 1, rarity.label + '  ·  LV.' + item.level +
-        '  ' + '★'.repeat(item.stars), 9, COLOR.secondary, 210);
-      this.fittedText(44, y + 17, armorStatText(item), 9, '#86efac', 210);
-      this.button(308, y, 68, 35, worn ? 'UIT' : 'DRAAG', () => this.runAction(
-        worn ? { type: 'unequipArmor', heroId, slot: this.armorSlot } :
-          { type: 'equipArmor', id: item.id }), worn ? 'quiet' : 'normal', false, 10);
-    });
-    this.button(95, 714, 95, 28, '‹ TERUG', () => {
-      this.armorPage--; this.scene.restart();
-    }, 'quiet', this.armorPage <= 0, 9);
-    this.text(195, 714, this.armorPage + 1 + '/' + pages, 10, COLOR.secondary, true);
-    this.button(294, 714, 95, 28, 'VOLGENDE ›', () => {
-      this.armorPage++; this.scene.restart();
-    }, 'quiet', this.armorPage >= pages - 1, 9);
+  private openEquipmentList(slot: EquipmentSlot): void {
+    this.equipmentSlot = slot;
+    this.equipmentItemId = null;
+    this.inventoryOffset = 0;
+    this.equipmentView = 'list';
+    this.scene.restart();
+  }
+
+  /** Equipment uses one continuous list, navigable by wheel, swipe or scrollbar. */
+  private equipmentInventoryIds(): string[] {
+    const profile = progressStore.current;
+    if (this.equipmentSlot === 'weapon') return [...HERO_WEAPONS[this.armorHero]];
+    return profile.armorInventory.filter(piece =>
+      piece.heroId === this.armorHero && armorDefinition(piece).slot === this.equipmentSlot)
+      .sort((a, b) =>
+        Number(profile.equippedArmor[this.armorHero][this.equipmentSlot as ArmorSlot] === b.id) -
+        Number(profile.equippedArmor[this.armorHero][this.equipmentSlot as ArmorSlot] === a.id))
+      .map(piece => piece.id);
+  }
+
+  private drawEquipmentList(): void {
+    const profile = progressStore.current;
+    const ids = this.equipmentInventoryIds();
+    const title: Record<EquipmentSlot, string> = {
+      weapon: 'WAPENS', helm: 'HELMS', body: 'PANTSERS', boots: 'SCHOENEN',
+    };
+    const max = inventoryMaxOffset(ids.length);
+    this.inventoryOffset = moveInventoryOffset(this.inventoryOffset, 0, ids.length);
+    this.section(title[this.equipmentSlot], 'Tik een item aan voor alle stats en acties');
+    this.button(84, 338, 101, 37, '‹ TERUG', () => {
+      this.equipmentView = 'overview'; this.scene.restart();
+    }, 'quiet', false, 11);
+    this.fittedText(161, 339, HEROES[this.armorHero].name.toUpperCase() +
+      '  ·  ' + ids.length + ' ITEMS', 11, COLOR.secondary, 185, true);
+
+    if (!ids.length) {
+      this.text(195, 494, 'Nog geen uitrusting voor dit vak', 12, COLOR.secondary, true);
+      this.text(195, 522, 'Versla vijanden om nieuwe items te vinden.', 10, COLOR.faint, true);
+    }
+
+    ids.slice(this.inventoryOffset, this.inventoryOffset + EQUIPMENT_VISIBLE_ROWS)
+      .forEach((id, index) => {
+        const cy = 430 + index * 85;
+        const isWeapon = this.equipmentSlot === 'weapon';
+        const piece = isWeapon ? undefined : profile.armorInventory.find(x => x.id === id);
+        const d = piece ? armorDefinition(piece) : undefined;
+        const rarity = piece ? RARITY_CONFIG[piece.rarity] : undefined;
+        const weapon = isWeapon ? WEAPONS[id as WeaponId] : undefined;
+        const active = piece
+          ? profile.equippedArmor[this.armorHero][this.equipmentSlot as ArmorSlot] === id
+          : profile.selectedWeapons[this.armorHero] === id;
+        const color = rarity?.color ?? weapon?.color ?? COLOR.accent;
+        const panel = this.plate(184, cy, 300, 76,
+          active ? 0x1b3e49 : COLOR.card, color, 10);
+        panel.setInteractive(new Phaser.Geom.Rectangle(0, 0, 300, 76),
+          Phaser.Geom.Rectangle.Contains);
+        // Select on release rather than down so a finger can drag to scroll.
+        panel.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+          const first = this.inventoryTouchStart;
+          if (!first || Math.abs(pointer.worldY - first.y) > 14 ||
+            Math.abs(pointer.worldX - first.x) > 14) return;
+          this.equipmentItemId = id;
+          this.equipmentView = 'detail';
+          this.scene.restart();
+        });
+        this.add.circle(68, cy, 25, color, .18).setStrokeStyle(1.5, color);
+        this.text(68, cy, weapon ? (weapon.attackMode === 'melee' ? '⚔' : '➶') :
+          d?.symbol ?? '◆', 24, COLOR.white, true, true);
+        this.fittedText(106, cy - 22, weapon?.name ?? d?.name ?? '', 13,
+          COLOR.white, 195, true);
+        this.fittedText(106, cy, piece
+          ? (rarity?.label ?? '') + '  ·  LV.' + piece.level + '  ' + '★'.repeat(piece.stars)
+          : 'LV.' + profile.weaponLevels[id as WeaponId] +
+            (profile.unlockedWeapons.includes(id as WeaponId) ? '' : '  ·  GESLOTEN'),
+          10, COLOR.secondary, 195);
+        this.fittedText(106, cy + 21,
+          active ? 'UITGERUST  ✓' : piece ? armorStatText(piece) :
+            weapon?.description ?? '', 9, active ? '#86efac' : COLOR.faint, 187);
+        this.text(313, cy, '›', 23, '#9cc9d5', true);
+      });
+
+    if (max > 0) {
+      const rail = this.add.rectangle(349, 515, 5, 245, 0x334960, 0.85);
+      rail.setInteractive(new Phaser.Geom.Rectangle(0, 0, 5, 245),
+        Phaser.Geom.Rectangle.Contains);
+      rail.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        const fraction = Math.max(0, Math.min(1, (pointer.worldY - 392) / 245));
+        this.inventoryOffset = Math.round(fraction * max);
+        this.scene.restart();
+      });
+      const thumbH = Math.max(26, 245 * EQUIPMENT_VISIBLE_ROWS / ids.length);
+      const thumbY = 392 + thumbH / 2 + (245 - thumbH) * (this.inventoryOffset / max);
+      this.add.rectangle(349, thumbY, 7, thumbH, COLOR.accent);
+    }
+    this.button(93, 699, 95, 35, '↑ OMHOOG', () => this.scrollEquipment(-1),
+      'quiet', this.inventoryOffset <= 0, 10);
+    this.text(195, 699, ids.length
+      ? (this.inventoryOffset + 1) + '–' +
+        Math.min(ids.length, this.inventoryOffset + EQUIPMENT_VISIBLE_ROWS) + ' / ' + ids.length
+      : '0 ITEMS', 10, COLOR.secondary, true);
+    this.button(295, 699, 95, 35, 'OMLAAG ↓', () => this.scrollEquipment(1),
+      'quiet', this.inventoryOffset >= max, 10);
+  }
+
+  private scrollEquipment(delta: number): void {
+    const next = moveInventoryOffset(this.inventoryOffset, delta, this.equipmentInventoryIds().length);
+    if (next !== this.inventoryOffset) {
+      this.inventoryOffset = next;
+      this.scene.restart();
+    }
+  }
+
+  private insideEquipmentList(pointer: Phaser.Input.Pointer): boolean {
+    return this.tab === 'weapons' && this.equipmentView === 'list' &&
+      pointer.worldX >= 33 && pointer.worldX <= 356 &&
+      pointer.worldY >= 390 && pointer.worldY <= 674;
+  }
+
+  private readonly handleInventoryWheel = (
+    pointer: Phaser.Input.Pointer, _over: Phaser.GameObjects.GameObject[],
+    _dx: number, dy: number,
+  ): void => {
+    if (this.insideEquipmentList(pointer) && dy !== 0)
+      this.scrollEquipment(Math.sign(dy));
+  };
+
+  private readonly handleInventoryTouchStart = (pointer: Phaser.Input.Pointer): void => {
+    this.inventoryTouchStart = this.insideEquipmentList(pointer)
+      ? { x: pointer.worldX, y: pointer.worldY } : null;
+  };
+
+  private readonly handleInventoryTouchEnd = (pointer: Phaser.Input.Pointer): void => {
+    const first = this.inventoryTouchStart;
+    this.inventoryTouchStart = null;
+    if (!first || this.equipmentView !== 'list') return;
+    const distance = first.y - pointer.worldY;
+    if (Math.abs(distance) >= 24 && Math.abs(pointer.worldX - first.x) < 130)
+      this.scrollEquipment(Math.sign(distance) * Math.max(1, Math.round(Math.abs(distance) / 60)));
+  };
+
+  private drawEquipmentDetail(): void {
+    const profile = progressStore.current;
+    const id = this.equipmentItemId;
+    const weaponId = this.equipmentSlot === 'weapon' ? id as WeaponId | null : null;
+    const weapon = weaponId ? WEAPONS[weaponId] : undefined;
+    const piece: ArmorItem | undefined = this.equipmentSlot === 'weapon' ? undefined :
+      profile.armorInventory.find(item => item.id === id && item.heroId === this.armorHero &&
+        armorDefinition(item).slot === this.equipmentSlot);
+    if (!piece && !weapon) {
+      this.equipmentView = 'list';
+      this.drawEquipmentList();
+      return;
+    }
+    const d = piece ? armorDefinition(piece) : undefined;
+    const rarity = piece ? RARITY_CONFIG[piece.rarity] : undefined;
+    const accent = rarity?.color ?? weapon?.color ?? COLOR.accent;
+    const worn = piece
+      ? profile.equippedArmor[this.armorHero][d!.slot] === piece.id
+      : profile.selectedWeapons[this.armorHero] === weaponId;
+    this.section('ITEM DETAILS', 'Bekijk stats en beheer je gekozen uitrusting');
+    this.button(87, 337, 109, 36, '‹ LIJST', () => {
+      this.equipmentView = 'list'; this.scene.restart();
+    }, 'quiet', false, 11);
+    this.fittedText(162, 337, HEROES[this.armorHero].name.toUpperCase(), 11,
+      COLOR.secondary, 174, true);
+    this.plate(195, 474, 328, 226, 0x192e40, accent, 13);
+    this.fittedText(48, 381, weapon?.name.toUpperCase() ?? d?.name.toUpperCase() ?? '',
+      15, COLOR.white, 294, true);
+    this.add.circle(195, 427, 34, accent, .20).setStrokeStyle(2, accent);
+    this.text(195, 427, weapon
+      ? (weapon.attackMode === 'melee' ? '⚔' : '➶') : d?.symbol ?? '◆',
+    34, COLOR.white, true, true);
+    this.text(195, 468, piece
+      ? rarity!.label.toUpperCase() + '  ·  LV.' + piece.level + '/' + ARMOR_MAX_LEVEL
+      : 'WAPEN  ·  LV.' + profile.weaponLevels[weaponId!] + '/' + MAX_WEAPON_LEVEL,
+    11, COLOR.secondary, true, true);
+    this.text(195, 489, piece ? '★'.repeat(piece.stars) + '☆'.repeat(ARMOR_MAX_STARS - piece.stars)
+      : 'SCHADE & AANVAL', 14, '#fbd36b', true, true);
+
+    if (piece) {
+      const bonus = armorBonuses([piece], {
+        helm: d!.slot === 'helm' ? piece.id : null,
+        body: d!.slot === 'body' ? piece.id : null,
+        boots: d!.slot === 'boots' ? piece.id : null,
+      }, piece.heroId);
+      const stats: Array<[string, number]> = [
+        ['HP', bonus.hp], ['DEFENSE', bonus.defense], ['WAPENSCHADE', bonus.weaponDamage],
+        ['AANVALSSNELHEID', bonus.attackSpeed], ['LOOPSNELHEID', bonus.movementSpeed],
+      ];
+      stats.filter(([, value]) => value > 0).forEach(([name, value], i) => {
+        this.text(65, 514 + i * 22, name, 11, COLOR.secondary);
+        this.text(314, 514 + i * 22, '+' + (value * 100).toFixed(1) + '%',
+          12, '#86efac').setOrigin(1, .5);
+      });
+      const canFuse = canFuseArmor(piece, profile.armorInventory, ARMOR_MAX_STARS);
+      const cost = armorUpgradeCost(piece);
+      this.fittedText(42, 598, canFuse
+        ? 'FUSION: 1 dubbel item wordt verbruikt voor +1 ★'
+        : piece.stars === ARMOR_MAX_STARS ? 'Maximum aantal sterren bereikt'
+          : 'Fusion vereist 2 gelijke items met dezelfde sterren',
+        10, canFuse ? '#fbd36b' : COLOR.faint, 309);
+      this.button(110, 642, 153, 43, worn ? 'UITDOEN' : 'SELECTEREN', () => this.runAction(
+        worn ? { type: 'unequipArmor', heroId: this.armorHero, slot: d!.slot }
+          : { type: 'equipArmor', id: piece.id }), worn ? 'quiet' : 'selected', false, 11);
+      this.button(280, 642, 153, 43,
+        piece.level >= ARMOR_MAX_LEVEL ? 'MAX LEVEL' : 'UPGRADE ' + cost + ' G',
+        () => this.runAction({ type: 'upgradeArmor', id: piece.id }),
+        'normal', piece.level >= ARMOR_MAX_LEVEL || profile.gold < cost, 10);
+      this.button(110, 694, 153, 43, '‹ TERUG', () => {
+        this.equipmentView = 'list'; this.scene.restart();
+      }, 'quiet', false, 11);
+      this.button(280, 694, 153, 43, 'FUSION +1 ★', () =>
+        this.runAction({ type: 'fuseArmor', id: piece.id }), 'selected', !canFuse, 11);
+    } else if (weapon && weaponId) {
+      const level = profile.weaponLevels[weaponId];
+      const stats = getWeaponStats(weaponId, level);
+      this.text(65, 518, 'SCHADE', 11, COLOR.secondary);
+      this.text(314, 518, stats.damage.toFixed(1), 12, '#86efac').setOrigin(1, .5);
+      this.text(65, 540, 'AANVALLEN PER SEC', 11, COLOR.secondary);
+      this.text(314, 540, (1000 / weaponBaseAttackIntervalMs(stats)).toFixed(2),
+        12, '#86efac').setOrigin(1, .5);
+      this.text(65, 562, stats.attackMode === 'melee' ? 'BEREIK' : 'PROJECTIELEN',
+        11, COLOR.secondary);
+      this.text(314, 562, (stats.attackMode === 'melee' ? stats.meleeRange :
+        stats.projectileCount).toString(), 12, '#86efac').setOrigin(1, .5);
+      this.fittedText(42, 596, weapon.description, 10, COLOR.faint, 309);
+      const unlocked = profile.unlockedWeapons.includes(weaponId);
+      const cost = weaponUpgradeCost(level);
+      this.button(110, 642, 153, 43, worn ? 'ACTIEF' : unlocked ? 'SELECTEREN' : 'SLOT',
+        () => {
+          if (profile.selectedHero !== this.armorHero)
+            progressStore.dispatch({ type: 'selectHero', id: this.armorHero });
+          this.runAction({ type: 'selectWeapon', id: weaponId });
+        }, worn ? 'selected' : 'normal', worn || !unlocked, 11);
+      this.button(280, 642, 153, 43,
+        level >= MAX_WEAPON_LEVEL ? 'MAX LEVEL' : 'UPGRADE ' + cost + ' G',
+        () => this.runAction({ type: 'upgradeWeapon', id: weaponId }),
+        'normal', !unlocked || level >= MAX_WEAPON_LEVEL || profile.gold < cost, 10);
+      this.button(110, 694, 153, 43, '‹ TERUG', () => {
+        this.equipmentView = 'list'; this.scene.restart();
+      }, 'quiet', false, 11);
+      this.button(280, 694, 153, 43, 'GEEN WAPENFUSION', () => {},
+        'quiet', true, 9);
+    }
   }
 
   /** One shop for upgrading armor, weapons and hero abilities. */
