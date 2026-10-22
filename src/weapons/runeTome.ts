@@ -1,11 +1,11 @@
-/** Single Rune Tome orb: subtle steering before hit and ONE ricochet after it. */
+/** Rune Tome orb: slightly stronger aim assist, then one sharp corner to a second enemy. */
 export interface RunePoint { x: number; y: number }
 export interface RuneEnemy extends RunePoint { enemyId: string }
 export const RUNE_TOME = Object.freeze({
-  initialAssistRadius: 315,
-  // Less than 20 degrees of correction relative to the ORIGINAL firing angle.
-  maxAimDeviation: Math.PI / 9,
-  initialTurnRadiansPerSecond: 1.15,
+  initialAssistRadius: 350,
+  // A little more forgiving than before (24 degrees, formerly 20), never full homing.
+  maxAimDeviation: Math.PI * 2 / 15,
+  initialTurnRadiansPerSecond: 1.55,
   bounceSearchRadius: 230,
   bounceTurnRadiansPerSecond: 7.8,
   bounceMaxDurationMs: 920,
@@ -30,7 +30,7 @@ export function runeAimTarget(
     if (distance<10 || distance>RUNE_TOME.initialAssistRadius) continue;
     const off=Math.abs(runeAngleDifference(originalHeading,Math.atan2(dy,dx)));
     if (off>RUNE_TOME.maxAimDeviation) continue;
-    const candidateScore=off*440 + distance;
+    const candidateScore=off*385 + distance;
     if(candidateScore<score){best=enemy;score=candidateScore;}
   }
   return best;
@@ -50,6 +50,13 @@ export function runeSteer(
       Math.min(RUNE_TOME.maxAimDeviation,deviation));
   }
   return next;
+}
+
+/** Aim the ricochet directly away from the first impact and toward the
+ * selected second enemy. Applying it immediately creates a visibly sharp
+ * corner instead of a wide, slow curve. Later frames can still track motion. */
+export function runeRicochetHeading(impact: RunePoint, nextEnemy: RunePoint): number {
+  return Math.atan2(nextEnemy.y - impact.y, nextEnemy.x - impact.x);
 }
 
 /** One distinct, nearby target; no chain beyond that second enemy. */
