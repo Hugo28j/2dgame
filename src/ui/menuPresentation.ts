@@ -1,6 +1,7 @@
 import { HERO_WEAPONS, type WeaponId } from '../weapons/weaponConfig';
 import type { HeroId } from '../heroes/heroConfig';
 import type { AbilityStats } from '../abilities/abilityConfig';
+import { guardianPullStunMs } from '../abilities/guardianPull';
 
 /** Only show upgrades relevant to the current loadout; other heroes remain
  * upgradeable by selecting them first. All saved levels remain intact.
@@ -28,7 +29,10 @@ export function abilityMenuSummary(stats: Readonly<AbilityStats>): string {
     case 'slow': return stats.damage + ' DMG  ·  ' +
       Math.round((1 - stats.slowFactor) * 100) + '% SLOW';
     case 'drain': return stats.damage + ' DMG  ·  +' + stats.heal + ' HP';
-    case 'wind': return stats.damage + ' DMG  ·  KNOCKBACK  ·  ' + cooldown;
+    case 'wind': return stats.id === 'guardian-slam'
+      ? stats.damage + ' DMG · TREKBALK · ' +
+        (guardianPullStunMs(stats.upgradeLevel) / 1000).toFixed(1) + 'S STUN'
+      : stats.damage + ' DMG  ·  KNOCKBACK  ·  ' + cooldown;
     case 'bomb': return stats.damage + ' DMG  ·  EXPLOSIE  ·  ' + cooldown;
     case 'shotgun': return stats.damage + ' DMG  ·  SALVO  ·  ' + cooldown;
     default: return stats.damage + ' DMG  ·  ' + cooldown;
