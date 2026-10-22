@@ -3,14 +3,19 @@ import type { Player } from '../entities/Player';
 import type { WeaponId } from '../weapons/weaponConfig';
 import { hasAnimatedHero } from './heroEquipmentArt';
 
-export type AttackPose = 'sword' | 'hammer' | 'bow' | 'crossbow' | 'shotgun';
+export type AttackPose = 'sword' | 'hammer' | 'bow' | 'crossbow' | 'shotgun' |
+  'staff' | 'spellbook' | 'ice-dagger' | 'ice-wave';
 export const poseForWeapon = (weapon: WeaponId): AttackPose | null =>
   weapon === 'sunblade' ? 'sword' : weapon === 'warhammer' ? 'hammer'
-    : weapon === 'bow' ? 'bow' : weapon === 'crossbow' ? 'crossbow' : null;
+    : weapon === 'bow' ? 'bow' : weapon === 'crossbow' ? 'crossbow'
+      : weapon === 'staff' ? 'staff' : weapon === 'spellbook' ? 'spellbook'
+        : weapon === 'daggers' ? 'ice-dagger' : weapon === 'iceblade' ? 'ice-wave' : null;
 
 export function poseLengthMs(pose: AttackPose, attackIntervalMs: number): number {
   const base = pose === 'hammer' ? 440 : pose === 'sword' ? 200 :
-    pose === 'crossbow' ? 175 : pose === 'shotgun' ? 210 : 145;
+    pose === 'staff' ? 285 : pose === 'spellbook' ? 250 : pose === 'ice-wave' ? 380 :
+      pose === 'ice-dagger' ? 165 : pose === 'crossbow' ? 175 :
+        pose === 'shotgun' ? 210 : 145;
   return pose === 'hammer' ? Math.max(220, Math.min(base, attackIntervalMs * .78))
     : Math.max(75, Math.min(base, attackIntervalMs * .78));
 }
@@ -66,6 +71,10 @@ export class CharacterAttackArt {
     else if(pose==='hammer')this.drawHammer(g,hasAttack,t,sway);
     else if(pose==='bow'||pose==='crossbow'||pose==='shotgun')
       this.drawRanged(g,pose,hasAttack,t,sway);
+    else if(pose==='staff'||pose==='spellbook')
+      this.drawMageStaff(g,pose,hasAttack,t,sway,now);
+    else if(pose==='ice-dagger'||pose==='ice-wave')
+      this.drawFrostCast(g,pose,hasAttack,t,sway);
   }
 
   private drawSword(g:Phaser.GameObjects.Graphics,attacking:boolean,t:number,sway:number):void {
@@ -177,6 +186,114 @@ export class CharacterAttackArt {
       g.lineStyle(1.4,0xafffe0,.8*f);
       g.lineBetween(gripX+30,gripY-8,gripX+41,gripY-8);
       g.lineBetween(gripX+30,gripY+8,gripX+41,gripY+8);
+    }
+  }
+
+  /** A long staff is physically gripped and sweeps from overhead to a forward cast.
+   * Spellbook uses the same staff, with purple rune rings at the release point.
+   * All geometry is drawn in hero-local coordinates, thus follows facing and walking. */
+  private drawMageStaff(g: Phaser.GameObjects.Graphics, pose: 'staff' | 'spellbook',
+    attacking: boolean, t: number, sway: number, now: number): void {
+    // Arm winds up before release, staff tip leads the magic projectile.
+    const swing = attacking ? (t < .28 ? -1.05 - t * 1.4 :
+      t < .7 ? -1.44 + (t - .28) / .42 * 2.05 :
+        .61 - (t - .7) / .3 * .67) : -.43 + sway * .018;
+    const handle = { x: 20, y: -9 + sway * .25 };
+    const dx = Math.cos(swing), dy = Math.sin(swing);
+    const px = -dy, py = dx;
+    const tipX = handle.x + dx * 56, tipY = handle.y + dy * 56;
+    // Animated sleeve, forearm, glove and grip.
+    g.lineStyle(8, 0x533398, 1); g.lineBetween(10, -11, handle.x - 3, handle.y);
+    g.lineStyle(4, 0xd8b4fe, .82); g.lineBetween(13, -12, handle.x - 3, handle.y);
+    g.fillStyle(0xeac6aa); g.fillCircle(handle.x, handle.y, 5.5);
+    // Forged and ornamented staff, thick enough to read on phones.
+    g.lineStyle(9, 0x342251, 1);
+    g.lineBetween(handle.x - dx * 10, handle.y - dy * 10, tipX, tipY);
+    g.lineStyle(4, 0xcca1f9, 1);
+    g.lineBetween(handle.x + dx * 9, handle.y + dy * 9, tipX - dx * 4, tipY - dy * 4);
+    for (let i = 0; i < 4; i++) {
+      const q = 16 + i * 9, x = handle.x + dx * q, y = handle.y + dy * q;
+      g.lineStyle(2.2, 0xf2dcff, .87);
+      g.lineBetween(x + px * 5, y + py * 5, x - px * 5, y - py * 5);
+    }
+    // Crescent-shaped head and a faceted crystal. Alternate texture for Rune Tome.
+    const trim = pose === 'staff' ? 0xe9d5ff : 0xffd0fd;
+    g.lineStyle(4, 0x8c62dd, 1);
+    g.lineBetween(tipX + px * 12 - dx * 5, tipY + py * 12 - dy * 5,
+      tipX + px * 6 + dx * 9, tipY + py * 6 + dy * 9);
+    g.lineBetween(tipX - px * 12 - dx * 5, tipY - py * 12 - dy * 5,
+      tipX - px * 6 + dx * 9, tipY - py * 6 + dy * 9);
+    g.fillStyle(0xf4c6ff, .92);
+    g.fillTriangle(tipX + dx * 14, tipY + dy * 14,
+      tipX + px * 7, tipY + py * 7,
+      tipX - px * 7, tipY - py * 7);
+    g.fillStyle(0xa866ff, 1); g.fillCircle(tipX, tipY, 7);
+    g.fillStyle(0xffffff, .92); g.fillCircle(tipX + dx * 2, tipY + dy * 1, 2.7);
+    // Charge -> pulse at the exact firing moment. No new projectile or damage.
+    if (attacking) {
+      const pulse = t < .53 ? t / .53 : (1 - t) / .47;
+      const strength = Math.max(0, Math.min(1, pulse));
+      g.lineStyle(2.5, trim, strength * .9);
+      g.strokeCircle(tipX, tipY, 9 + strength * (pose === 'spellbook' ? 15 : 10));
+      if (pose === 'spellbook') {
+        const a = now / 320;
+        for (let i = 0; i < 4; i++) {
+          const angle = a + i * Math.PI / 2;
+          g.fillStyle(trim, strength * .8);
+          g.fillCircle(tipX + Math.cos(angle) * 17, tipY + Math.sin(angle) * 17, 2.1);
+        }
+      }
+    }
+  }
+
+  /** Ice Daggers: shoulder lifts, open palm flicks forward to throw a crystal.
+   * Big Wave: both hands sweep outward, meeting in a frosty crest that grows
+   * from the player's palms. Only existing gameplay projectiles cause damage. */
+  private drawFrostCast(g: Phaser.GameObjects.Graphics, pose: 'ice-dagger' | 'ice-wave',
+    attacking: boolean, t: number, sway: number): void {
+    const icy = 0xcafaff, edge = 0x7dd3fc, sleeve = 0x155f97;
+    const wave = pose === 'ice-wave';
+    if (wave) {
+      const reach = attacking ? (t < .62 ? t / .62 : Math.max(0, 1 - (t - .62) / .38)) : .15;
+      for (const side of [-1, 1]) {
+        const shoulderX = 9, shoulderY = side * 12;
+        const palmX = 19 + reach * 18, palmY = side * (13 + 13 * reach) + sway * .2;
+        g.lineStyle(8, sleeve, 1); g.lineBetween(shoulderX, shoulderY, palmX - 3, palmY);
+        g.lineStyle(3, edge, .95); g.lineBetween(shoulderX + 2, shoulderY, palmX, palmY);
+        g.fillStyle(icy, 1); g.fillCircle(palmX, palmY, 5.4);
+        if (attacking && t < .9) {
+          const strength = Math.sin(Math.PI * Math.min(1, t / .9));
+          g.lineStyle(2.5, 0xbff7ff, strength * .85);
+          g.beginPath(); g.arc(palmX + 4, palmY,
+            12 + 16 * strength, side < 0 ? -1.6 : 0,
+            side < 0 ? 0 : 1.6, false); g.strokePath();
+          g.fillStyle(0xffffff, strength * .75);
+          for (let i = 0; i < 3; i++)
+            g.fillCircle(palmX + 9 + i * 8, palmY + side * (i + 2) * 4, 1.6 + i * .4);
+        }
+      }
+    } else {
+      const progress = attacking ? (t < .3 ? -t / .3 :
+        t < .65 ? -1 + (t - .3) / .35 * 2.5 :
+          1.5 - (t - .65) / .35 * 1.25) : -.08;
+      const handX = 16 + Math.cos(progress) * 13, handY = -10 + Math.sin(progress) * 17 + sway * .2;
+      g.lineStyle(8, sleeve, 1); g.lineBetween(8, -10, handX, handY);
+      g.lineStyle(3, icy, .84); g.lineBetween(10, -12, handX - 2, handY - 1);
+      g.fillStyle(0xd2f6ff); g.fillCircle(handX, handY, 5.5);
+      const holdsSpike = !attacking || t < .39;
+      if (holdsSpike) {
+        g.fillStyle(0x9ce8ff, .95);
+        g.fillTriangle(handX + 25, handY, handX + 4, handY - 5, handX + 4, handY + 5);
+        g.fillStyle(0xffffff, .9);
+        g.fillTriangle(handX + 19, handY, handX + 6, handY - 2.1, handX + 6, handY + 2.1);
+      }
+      if (attacking && t >= .25 && t < .75) {
+        const alpha = Math.sin(Math.PI * (t - .25) / .5);
+        g.lineStyle(2.7, edge, alpha);
+        g.lineBetween(handX - 11, handY - 13, handX + 17, handY);
+        g.fillStyle(0xffffff, alpha);
+        g.fillCircle(handX + 21, handY, 3);
+      }
     }
   }
 
