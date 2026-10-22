@@ -954,6 +954,114 @@ export class MainMenuScene extends Phaser.Scene {
     });
   }
 
+  /** Genuine vertical downward roulette. The reward is already persisted before
+   * animation starts; decoration cannot reroll the result or charge twice. */
+  private beginChestRoll(chest: ShopChest): void {
+    const profile = progressStore.current;
+    const rolls: ChestRoll = {
+      rarity: Math.random(), hero: Math.random(), kind: Math.random(),
+    };
+    const itemId = 'chest-' + Date.now().toString(36) + '-' +
+      Math.random().toString(36).slice(2, 12);
+    const paid = progressStore.dispatch({ type: 'openChest',
+      chestId: chest.id, itemId, rolls });
+    const reward = progressStore.current.armorInventory.find(item => item.id === itemId);
+    if (!paid || !reward) {
+      this.shopOpening = false;
+      this.notice = 'Kon de kist niet openen. Je goud is niet afgetrokken.';
+      this.scene.restart();
+      return;
+    }
+    const modal = this.chestModal();
+    const heading = this.add.text(0, -263, '✦  ' + chest.name + '  ✦', {
+      fontFamily: FONT, fontSize: '18px', fontStyle: 'bold',
+      color: '#fff5c7',
+    }).setOrigin(.5);
+    const caption = this.add.text(0, -229, 'JE BELONING WORDT GEKOZEN...', {
+      fontFamily: FONT, fontSize: '11px', color: '#b9d5ea',
+    }).setOrigin(.5);
+    modal.add([heading, caption]);
+    // Three cards are visible at once; scrolling down means the next icon
+    // enters from above. The center pointer marks the actual saved prize.
+    const centerY = -12, rowHeight = 86, targetIndex = 32;
+    const preview = Array.from({ length: targetIndex },
+      (_, index) => previewChestArmor(chest, profile.unlockedHeroes, Math.random,
+        'chest-preview-' + index));
+    const reelItems = [...preview, reward];
+    const reelFrame = this.add.rectangle(0, centerY, 306, 320, 0x081421, 1)
+      .setStrokeStyle(2, chest.trim, 1);
+    modal.add(reelFrame);
+    const reel = this.add.container(0, -targetIndex * rowHeight);
+    reelItems.forEach((item, i) => {
+      if (!item) return;
+      const y = centerY + (targetIndex - i) * rowHeight;
+      const rarity = RARITY_CONFIG[item.rarity];
+      const row = this.add.rectangle(0, y, 290, 78, 0x172a3d, .98)
+        .setStrokeStyle(2, rarity.color, 1);
+      const art = this.add.image(-106, y, ensureArmorIcon(this, item))
+        .setDisplaySize(65, 65);
+      const definition = armorDefinition(item);
+      const fullName = definition.name.toUpperCase();
+      const name = this.add.text(-64, y - 18,
+        fullName.length > 23 ? fullName.slice(0, 21) + '…' : fullName, {
+          fontFamily: FONT, fontSize: '11px', fontStyle: 'bold', color: '#f1f5f9',
+        }).setOrigin(0,.5);
+      const detail = this.add.text(-64, y + 4, HEROES[item.heroId].name.toUpperCase() +
+        ' · ' + definition.slot.toUpperCase(), {
+        fontFamily: FONT, fontSize: '10px', color: '#bdcee0',
+      }).setOrigin(0,.5);
+      const rarityText = this.add.text(-64, y + 23,
+        rarity.label.toUpperCase(), {
+        fontFamily: FONT, fontSize: '10px', fontStyle: 'bold',
+        color: '#' + rarity.color.toString(16).padStart(6, '0'),
+      }).setOrigin(0,.5);
+      reel.add([row, art, name, detail, rarityText]);
+    });
+    modal.add(reel);
+    // Mask uses scene/world coordinates because children are in modal-local space.
+    const clipShape = this.add.graphics();
+    clipShape.fillStyle(0xffffff, 1).fillRect(43, 422 + centerY - 156, 304, 312);
+    clipShape.setVisible(false);
+    reel.setMask(clipShape.createGeometryMask());
+    const pointer = this.add.rectangle(0, centerY, 302, 83, 0xfef08a, .04)
+      .setStrokeStyle(3, 0xfde68a, 1);
+    const arrowL = this.add.triangle(-153, centerY, 0, -8, 0, 8, 10, 0, 0xffe28a);
+    const arrowR = this.add.triangle(153, centerY, 0, -8, 0, 8, -10, 0, 0xffe28a);
+    modal.add([pointer, arrowL, arrowR]);
+    const note = this.add.text(0, 188, 'De prijs is opgeslagen in je inventaris.', {
+      fontFamily: FONT, fontSize: '11px', color: '#b7d8e8',
+    }).setOrigin(.5);
+    modal.add(note);
+    this.tweens.add({
+      targets: reel, y: 0, duration: 5200, ease: 'Cubic.easeOut',
+      onComplete: () => {
+        heading.setText('✦  ' + RARITY_CONFIG[reward.rarity].label.toUpperCase() + ' GEVONDEN!  ✦')
+          .setColor('#' + RARITY_CONFIG[reward.rarity].color.toString(16).padStart(6,'0'));
+        caption.setText(armorDefinition(reward).name.toUpperCase());
+        this.tweens.add({ targets: pointer, alpha: .47,
+          duration: 330, yoyo: true, repeat: 3 });
+        this.chestModalButton(modal, 244, 'BEKIJK IN UITRUSTING  ›', () => {
+          clipShape.destroy();
+          modal.destroy(true);
+          this.armorHero = reward.heroId;
+          this.equipmentSlot = armorDefinition(reward).slot;
+          this.equipmentItemId = reward.id;
+          this.equipmentView = 'detail';
+          this.tab = 'weapons';
+          this.shopOpening = false;
+          this.scene.restart();
+        });
+        this.chestModalButton(modal, 299, 'TERUG NAAR SHOP', () => {
+          clipShape.destroy();
+          modal.destroy(true);
+          this.shopOpening = false;
+          this.scene.restart();
+        });
+      },
+    });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => clipShape.destroy());
+  }
+
   /** Chest illustration with shaded hinged lid, bands, latch and rarity trim. */
   private drawChest(x: number, y: number, chest: ShopChest,
     parent?: Phaser.GameObjects.Container): void {
