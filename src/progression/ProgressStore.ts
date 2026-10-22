@@ -1,5 +1,6 @@
 import { HERO_IDS, HEROES, MAX_HERO_LEVEL, type HeroId } from '../heroes/heroConfig';
 import { runCheckpointStore } from './RunCheckpoint';
+import { getShopChest, rollChestArmor, type ChestSize, type ChestRoll } from '../ui/shopCatalog';
 import {
   HERO_STARTER_WEAPON, MAX_WEAPON_LEVEL, WEAPON_IDS, WEAPONS, isWeaponUnlockedForHero,
   weaponBelongsToHero, weaponUpgradeCost, type WeaponId,
@@ -204,6 +205,7 @@ export type ProfileAction =
   | { type: 'upgradeAbility'; id: AbilityId }
   | { type: 'upgradePermanent'; id: PermanentUpgradeId }
   | { type: 'collectArmor'; item: ArmorItem }
+  | { type: 'openChest'; chestId: ChestSize; itemId: string; rolls: ChestRoll }
   | { type: 'reachRoom'; worldId: WorldId; room: number }
   | { type: 'equipArmor'; id: string }
   | { type: 'unequipArmor'; heroId: HeroId; slot: ArmorSlot }
@@ -260,6 +262,20 @@ export function applyProfileAction(profile: Profile, action: ProfileAction): Pro
         isWeaponUnlockedForHero(id, WEAPONS[id].heroId, p.heroLevels[WEAPONS[id].heroId]));
       return { ...p, highestRoom: Math.max(p.highestRoom, action.room),
         worldBestRooms, unlockedHeroes, unlockedWeapons };
+    }
+    case 'openChest': {
+      const chest = getShopChest(action.chestId);
+      if (!chest || p.gold < chest.cost || p.armorInventory.length >= 250 ||
+          p.armorInventory.some(piece => piece.id === action.itemId)) return p;
+      const item = rollChestArmor(chest, p.unlockedHeroes, action.rolls, action.itemId);
+      if (!item || !validArmorItem(item)) return p;
+      // Atomic profile update: a failed roll NEVER spends gold. Successful
+      // rolls spend and award in one local save, even if the player reloads
+      // halfway through the visual reel.
+      return {
+        ...p, gold: p.gold - chest.cost,
+        armorInventory: [...p.armorInventory, item],
+      };
     }
     case 'collectArmor': {
       const item = action.item;

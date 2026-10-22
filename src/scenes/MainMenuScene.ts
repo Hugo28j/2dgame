@@ -29,7 +29,7 @@ import {
   isAbilityUnlocked,
 } from '../abilities/abilityConfig';
 import { abilityMenuSummary } from '../ui/menuPresentation';
-import { SHOP_CHESTS, type ShopChest } from '../ui/shopCatalog';
+import { SHOP_CHESTS, previewChestArmor, type ShopChest, type ChestRoll } from '../ui/shopCatalog';
 import { displayedHp } from '../ui/displayValues';
 import { canFuseArmor, EQUIPMENT_VISIBLE_ROWS, inventoryMaxOffset, isInventoryRowTap, moveInventoryOffset } from '../ui/equipmentInventory';
 import { advanceUpgradeIntent, sameUpgradeIntent, type UpgradeIntent } from '../ui/upgradeConfirmation';
@@ -64,12 +64,14 @@ export class MainMenuScene extends Phaser.Scene {
   private awaitingKey?: ControlAction;
   private notice = '';
   private suppressNextContextMenu = false;
+  private shopOpening = false;
 
   public constructor() { super(MENU_SCENE_KEY); }
 
   public create(): void {
     // Center the original menu inside the wider desktop viewport.
     this.cameras.main.setScroll((390 - GAME_WIDTH) / 2, 0);
+    this.shopOpening = false;
     this.drawBackground();
     this.drawHeader();
     this.drawNavigation();
@@ -857,25 +859,214 @@ export class MainMenuScene extends Phaser.Scene {
     }
   }
 
-  /** Decorative chest previews. They have NO clicks, gold costs or loot logic yet. */
+  /** Three clickable, gold-only cases. Precise rarity rates are visible before buying. */
   private drawShop(): void {
     this.section('SHOP', '');
+    const profile = progressStore.current;
     SHOP_CHESTS.forEach((chest, index) => {
-      const y = 381 + index * 122;
+      const y = 378 + index * 122;
+      const affordable = profile.gold >= chest.cost && profile.armorInventory.length < 250;
       this.plate(195, y, 328, 112, index === 0 ? 0x292536 :
         index === 1 ? 0x172f43 : 0x39283b, chest.trim, 13);
-      this.drawChest(96, y - 2, chest);
-      this.fittedText(148, y - 33, chest.name, 14, COLOR.white, 185, true);
-      this.fittedText(148, y - 11, chest.tier + ' · ' + chest.caption, 10,
-        '#' + chest.trim.toString(16).padStart(6, '0'), 186);
-      this.plate(232, y + 28, 168, 25, 0x172638, 0x50617a, 8);
-      this.text(232, y + 28, 'BINNENKORT', 10, COLOR.secondary, true, true);
+      this.drawChest(93, y - 5, chest);
+      this.fittedText(143, y - 40, chest.name, 13, COLOR.white, 194, true);
+      this.fittedText(143, y - 20, chest.tier + ' · ' + chest.caption, 9, COLOR.secondary, 188);
+      const rarities = ['rare','epic','legendary'] as const;
+      const rates = rarities.map(r => r.toUpperCase() + ' ' + chest.odds[r] + '%').join(' · ');
+      this.fittedText(143, y - 3, rates, 8, '#fcd34d', 194);
+      this.button(238, y + 34, 186, 31,
+        affordable ? 'OPENEN  ·  ' + chest.cost + ' G' : chest.cost + ' G  ·  BEKIJK',
+        () => this.showChestPreview(chest), affordable ? 'selected' : 'normal', false, 10);
+    });
+    this.text(195, 724, 'ALLEEN ARMOR VAN ONTGRENDELDE HELDEN', 9, COLOR.faint, true);
+  }
+
+  private chestModal(): Phaser.GameObjects.Container {
+    const modal = this.add.container(195, 422).setDepth(290);
+    const shade = this.add.rectangle(0, 0, GAME_WIDTH + 180, 880, 0x030914, .94)
+      .setInteractive();
+    const panel = this.add.rectangle(0, 0, 344, 625, 0x112238, 1)
+      .setStrokeStyle(2, 0x55d5ee, 1);
+    modal.add([shade, panel]);
+    return modal;
+  }
+
+  /** Buttons live in the overlay itself, above all shop/menu hit targets. */
+  private chestModalButton(modal: Phaser.GameObjects.Container, y: number,
+    label: string, action: () => void, disabled = false): void {
+    const bg = this.add.rectangle(0, y, 294, 43,
+      disabled ? 0x253344 : 0x087b9b, 1)
+      .setStrokeStyle(2, disabled ? 0x405267 : 0x67e8f9, 1);
+    const txt = this.add.text(0, y, label, {
+      fontFamily: FONT, fontStyle: 'bold', fontSize: '12px',
+      color: disabled ? '#788b9e' : '#f8fafc',
+    }).setOrigin(.5);
+    modal.add([bg,txt]);
+    if (!disabled) bg.setInteractive({ useHandCursor: true }).on('pointerdown', action);
+  }
+
+  private showChestPreview(chest: ShopChest): void {
+    if (this.shopOpening) return;
+    const profile = progressStore.current;
+    const modal = this.chestModal();
+    this.shopOpening = true;
+    const label = (y: number, value: string, color = '#edf7ff', size = 13) => {
+      const text = this.add.text(0, y, value, {
+        fontFamily: FONT, fontSize: size + 'px', fontStyle: 'bold',
+        color, align: 'center',
+      }).setOrigin(.5);
+      modal.add(text);
+    };
+    label(-267, chest.name, '#ffffff', 21);
+    label(-238, '1 UITRUSTINGSSTUK  ·  ' + chest.cost + ' GOUD', '#fcd34d', 12);
+    this.drawChest(-112, -174, chest, modal);
+    label(-169, 'KANSEN PER RARITY', '#cfe8f7', 13);
+    // Five explicit, always-visible drop probabilities.
+    const rarities = ['common','uncommon','rare','epic','legendary'] as const;
+    rarities.forEach((rarity, index) => {
+      const config = RARITY_CONFIG[rarity];
+      const y = -111 + index * 37;
+      const chip = this.add.rectangle(-2, y, 290, 32, COLOR.card, .96)
+        .setStrokeStyle(1, config.color, .65);
+      const name = this.add.text(-134, y, config.label.toUpperCase(), {
+        fontFamily: FONT, fontSize: '12px', color: '#f8fafc',
+      }).setOrigin(0, .5);
+      const value = this.add.text(132, y, chest.odds[rarity] + '%', {
+        fontFamily: FONT, fontStyle: 'bold', fontSize: '14px',
+        color: '#' + config.color.toString(16).padStart(6,'0'),
+      }).setOrigin(1, .5);
+      modal.add([chip,name,value]);
+    });
+    label(96, '9 ARMORONTWERPEN PER ONTGRENDELDE HELD', '#b9c9d8', 10);
+    label(117, 'Helm · Body armor · Boots', '#b9c9d8', 10);
+    const full = profile.armorInventory.length >= 250;
+    const notEnough = profile.gold < chest.cost;
+    this.chestModalButton(modal, 178,
+      full ? 'INVENTARIS VOL' : notEnough ? 'ONVOLDOENDE GOUD' :
+        'OPEN KIST  ·  ' + chest.cost + ' G',
+      () => {
+        modal.destroy(true);
+        this.beginChestRoll(chest);
+      }, full || notEnough);
+    this.chestModalButton(modal, 248, '‹  TERUG NAAR SHOP', () => {
+      modal.destroy(true);
+      this.shopOpening = false;
     });
   }
 
+  /** Genuine vertical downward roulette. The reward is already persisted before
+   * animation starts; decoration cannot reroll the result or charge twice. */
+  private beginChestRoll(chest: ShopChest): void {
+    const profile = progressStore.current;
+    const rolls: ChestRoll = {
+      rarity: Math.random(), hero: Math.random(), kind: Math.random(),
+    };
+    const itemId = 'chest-' + Date.now().toString(36) + '-' +
+      Math.random().toString(36).slice(2, 12);
+    const paid = progressStore.dispatch({ type: 'openChest',
+      chestId: chest.id, itemId, rolls });
+    const reward = progressStore.current.armorInventory.find(item => item.id === itemId);
+    if (!paid || !reward) {
+      this.shopOpening = false;
+      this.notice = 'Kon de kist niet openen. Je goud is niet afgetrokken.';
+      this.scene.restart();
+      return;
+    }
+    const modal = this.chestModal();
+    const heading = this.add.text(0, -263, '✦  ' + chest.name + '  ✦', {
+      fontFamily: FONT, fontSize: '18px', fontStyle: 'bold',
+      color: '#fff5c7',
+    }).setOrigin(.5);
+    const caption = this.add.text(0, -229, 'JE BELONING WORDT GEKOZEN...', {
+      fontFamily: FONT, fontSize: '11px', color: '#b9d5ea',
+    }).setOrigin(.5);
+    modal.add([heading, caption]);
+    // Three cards are visible at once; scrolling down means the next icon
+    // enters from above. The center pointer marks the actual saved prize.
+    const centerY = -12, rowHeight = 86, targetIndex = 32;
+    const preview = Array.from({ length: targetIndex },
+      (_, index) => previewChestArmor(chest, profile.unlockedHeroes, Math.random,
+        'chest-preview-' + index));
+    const reelItems = [...preview, reward];
+    const reelFrame = this.add.rectangle(0, centerY, 306, 320, 0x081421, 1)
+      .setStrokeStyle(2, chest.trim, 1);
+    modal.add(reelFrame);
+    const reel = this.add.container(0, -targetIndex * rowHeight);
+    reelItems.forEach((item, i) => {
+      if (!item) return;
+      const y = centerY + (targetIndex - i) * rowHeight;
+      const rarity = RARITY_CONFIG[item.rarity];
+      const row = this.add.rectangle(0, y, 290, 78, 0x172a3d, .98)
+        .setStrokeStyle(2, rarity.color, 1);
+      const art = this.add.image(-106, y, ensureArmorIcon(this, item))
+        .setDisplaySize(65, 65);
+      const definition = armorDefinition(item);
+      const fullName = definition.name.toUpperCase();
+      const name = this.add.text(-64, y - 18,
+        fullName.length > 23 ? fullName.slice(0, 21) + '…' : fullName, {
+          fontFamily: FONT, fontSize: '11px', fontStyle: 'bold', color: '#f1f5f9',
+        }).setOrigin(0,.5);
+      const detail = this.add.text(-64, y + 4, HEROES[item.heroId].name.toUpperCase() +
+        ' · ' + definition.slot.toUpperCase(), {
+        fontFamily: FONT, fontSize: '10px', color: '#bdcee0',
+      }).setOrigin(0,.5);
+      const rarityText = this.add.text(-64, y + 23,
+        rarity.label.toUpperCase(), {
+        fontFamily: FONT, fontSize: '10px', fontStyle: 'bold',
+        color: '#' + rarity.color.toString(16).padStart(6, '0'),
+      }).setOrigin(0,.5);
+      reel.add([row, art, name, detail, rarityText]);
+    });
+    modal.add(reel);
+    // Mask uses scene/world coordinates because children are in modal-local space.
+    const clipShape = this.add.graphics();
+    clipShape.fillStyle(0xffffff, 1).fillRect(43, 422 + centerY - 156, 304, 312);
+    clipShape.setVisible(false);
+    reel.setMask(clipShape.createGeometryMask());
+    const pointer = this.add.rectangle(0, centerY, 302, 83, 0xfef08a, .04)
+      .setStrokeStyle(3, 0xfde68a, 1);
+    const arrowL = this.add.triangle(-153, centerY, 0, -8, 0, 8, 10, 0, 0xffe28a);
+    const arrowR = this.add.triangle(153, centerY, 0, -8, 0, 8, -10, 0, 0xffe28a);
+    modal.add([pointer, arrowL, arrowR]);
+    const note = this.add.text(0, 188, 'De prijs is opgeslagen in je inventaris.', {
+      fontFamily: FONT, fontSize: '11px', color: '#b7d8e8',
+    }).setOrigin(.5);
+    modal.add(note);
+    this.tweens.add({
+      targets: reel, y: 0, duration: 5200, ease: 'Cubic.easeOut',
+      onComplete: () => {
+        heading.setText('✦  ' + RARITY_CONFIG[reward.rarity].label.toUpperCase() + ' GEVONDEN!  ✦')
+          .setColor('#' + RARITY_CONFIG[reward.rarity].color.toString(16).padStart(6,'0'));
+        caption.setText(armorDefinition(reward).name.toUpperCase());
+        this.tweens.add({ targets: pointer, alpha: .47,
+          duration: 330, yoyo: true, repeat: 3 });
+        this.chestModalButton(modal, 244, 'BEKIJK IN UITRUSTING  ›', () => {
+          clipShape.destroy();
+          modal.destroy(true);
+          this.armorHero = reward.heroId;
+          this.equipmentSlot = armorDefinition(reward).slot;
+          this.equipmentItemId = reward.id;
+          this.equipmentView = 'detail';
+          this.tab = 'weapons';
+          this.shopOpening = false;
+          this.scene.restart();
+        });
+        this.chestModalButton(modal, 299, 'TERUG NAAR SHOP', () => {
+          clipShape.destroy();
+          modal.destroy(true);
+          this.shopOpening = false;
+          this.scene.restart();
+        });
+      },
+    });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => clipShape.destroy());
+  }
+
   /** Chest illustration with shaded hinged lid, bands, latch and rarity trim. */
-  private drawChest(x: number, y: number, chest: ShopChest): void {
+  private drawChest(x: number, y: number, chest: ShopChest,
+    parent?: Phaser.GameObjects.Container): void {
     const g = this.add.graphics().setPosition(x, y).setScale(chest.scale);
+    parent?.add(g);
     g.fillStyle(0x020617, .35);
     g.fillEllipse(0, 41, 92, 16);
     g.fillStyle(0x121a2a, 1);
