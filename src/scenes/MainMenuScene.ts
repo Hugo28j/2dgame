@@ -27,7 +27,7 @@ import {
 } from '../abilities/abilityConfig';
 import { abilityMenuSummary } from '../ui/menuPresentation';
 import { displayedHp } from '../ui/displayValues';
-import { canFuseArmor, EQUIPMENT_VISIBLE_ROWS, inventoryMaxOffset, moveInventoryOffset } from '../ui/equipmentInventory';
+import { canFuseArmor, EQUIPMENT_VISIBLE_ROWS, inventoryMaxOffset, isInventoryRowTap, moveInventoryOffset } from '../ui/equipmentInventory';
 
 type MenuTab = 'worlds' | 'weapons' | 'upgrades' | 'settings';
 type EquipmentView = 'overview' | 'heroes' | 'list' | 'detail';
@@ -51,6 +51,7 @@ export class MainMenuScene extends Phaser.Scene {
   private equipmentItemId: string | null = null;
   private inventoryOffset = 0;
   private inventoryTouchStart: { x: number; y: number } | null = null;
+  private inventoryPressedRowId: string | null = null;
   private armorPage = 0;
   private armorSlot: ArmorSlot = 'helm';
   private armorHero: HeroId = 'guardian';
@@ -368,70 +369,105 @@ export class MainMenuScene extends Phaser.Scene {
     const weapon = WEAPONS[weaponId];
     const armor = profile.equippedArmor[heroId];
     const labels: Record<ArmorSlot, string> = { helm: 'HELM', body: 'PANTSER', boots: 'SCHOENEN' };
-    this.section('JOUW UITRUSTING', 'Tik op een vak om je inventaris te openen');
+    const heroStats = getHeroStats(heroId, profile.heroLevels[heroId]);
 
-    // The hero itself is a large tappable card; locked heroes appear in its chooser.
-    const heroCard = this.plate(195, 361, 328, 86, 0x172e42, hero.color, 13);
-    heroCard.setInteractive(new Phaser.Geom.Rectangle(0, 0, 328, 86),
+    // Use pointer-up to open a new screen. Starting it on pointer-down allowed
+    // the same finger release to select the first inventory row accidentally.
+    const heroCard = this.plate(195, 345, 328, 112, 0x172e42, hero.color, 13);
+    heroCard.setInteractive(new Phaser.Geom.Rectangle(0, 0, 328, 112),
       Phaser.Geom.Rectangle.Contains);
-    heroCard.on('pointerdown', () => {
+    let heroPressed = false;
+    heroCard.on('pointerdown', () => { heroPressed = true; });
+    heroCard.on('pointerout', () => { heroPressed = false; });
+    heroCard.on('pointerup', () => {
+      if (!heroPressed) return;
+      heroPressed = false;
       this.heroPage = Math.floor(Math.max(0, HERO_IDS.indexOf(heroId)) / 4);
       this.equipmentView = 'heroes';
       this.scene.restart();
     });
-    this.add.circle(78, 361, 32, hero.color, .20).setStrokeStyle(2, hero.color);
-    this.add.image(78, 361, hero.textureKey).setDisplaySize(61, 61);
-    this.fittedText(125, 337, hero.name.toUpperCase(), 16, COLOR.white, 181, true);
-    this.fittedText(125, 358, 'HELD  ·  LEVEL ' + profile.heroLevels[heroId], 11,
-      '#9de4f3', 182);
-    this.fittedText(125, 381, 'TIK OM VAN HELD TE WISSELEN  ›', 9, COLOR.faint, 198);
+    this.add.circle(77, 345, 30, hero.color, .20).setStrokeStyle(2, hero.color);
+    this.add.image(77, 345, hero.textureKey).setDisplaySize(57, 57);
+    this.fittedText(118, 309, hero.name.toUpperCase(), 16, COLOR.white, 195, true);
+    this.fittedText(118, 330, 'HELD  ·  LEVEL ' + profile.heroLevels[heroId], 10,
+      '#9de4f3', 194);
+    this.fittedText(118, 352, 'HP ' + displayedHp(heroStats.maxHp) +
+      '  ·  DEF ' + heroStats.defense.toFixed(1) +
+      '  ·  DMG ' + heroStats.damage.toFixed(1), 10, COLOR.secondary, 207);
+    this.fittedText(118, 374, 'ATK ×' + heroStats.attackSpeed.toFixed(2) +
+      '  ·  LOOP ' + heroStats.movementSpeed.toFixed(0) +
+      '  ·  CRIT ' + Math.round(heroStats.criticalChance * 100) + '%',
+      9, '#9fe2d9', 209);
+    this.text(342, 327, '›', 23, '#8ce3f1', true);
 
-    const weaponCard = this.plate(195, 463, 328, 92, 0x172c3f, COLOR.accent, 12);
-    weaponCard.setInteractive(new Phaser.Geom.Rectangle(0, 0, 328, 92),
-      Phaser.Geom.Rectangle.Contains);
-    weaponCard.on('pointerdown', () => this.openEquipmentList('weapon'));
-    this.add.circle(77, 463, 31, weapon.color, .15).setStrokeStyle(2, weapon.color);
-    this.text(77, 462, weapon.attackMode === 'melee' ? '⚔' : '➶', 28, COLOR.white, true, true);
-    this.text(122, 429, 'WAPEN', 10, '#89dbe8', false, true);
-    this.fittedText(122, 450, weapon.name.toUpperCase(), 14, COLOR.white, 187, true);
     const weaponStats = getWeaponStats(weaponId, profile.weaponLevels[weaponId]);
-    this.fittedText(122, 475,
-      'LV.' + profile.weaponLevels[weaponId] + '  ·  DMG ' + weaponStats.damage.toFixed(1),
-      11, COLOR.secondary, 190);
-    this.text(317, 462, '›', 26, '#8ce3f1', true, true);
+    const weaponCard = this.plate(195, 470, 328, 112, 0x172c3f, COLOR.accent, 12);
+    weaponCard.setInteractive(new Phaser.Geom.Rectangle(0, 0, 328, 112),
+      Phaser.Geom.Rectangle.Contains);
+    let weaponPressed = false;
+    weaponCard.on('pointerdown', () => { weaponPressed = true; });
+    weaponCard.on('pointerout', () => { weaponPressed = false; });
+    weaponCard.on('pointerup', () => {
+      if (!weaponPressed) return;
+      weaponPressed = false;
+      this.openEquipmentList('weapon');
+    });
+    this.add.circle(77, 470, 30, weapon.color, .15).setStrokeStyle(2, weapon.color);
+    this.text(77, 470, weapon.attackMode === 'melee' ? '⚔' : '➶', 28, COLOR.white, true, true);
+    this.fittedText(118, 428, 'WAPEN  ·  LEVEL ' + profile.weaponLevels[weaponId], 10,
+      '#89dbe8', 202, true);
+    this.fittedText(118, 451, weapon.name.toUpperCase(), 14, COLOR.white, 196, true);
+    this.fittedText(118, 476, 'SCHADE ' + weaponStats.damage.toFixed(1) +
+      '  ·  ' + (1000 / weaponBaseAttackIntervalMs(weaponStats)).toFixed(2) + ' AANV./S',
+      10, COLOR.secondary, 206);
+    this.fittedText(118, 498, weaponStats.attackMode === 'melee'
+      ? 'BEREIK ' + Math.round(weaponStats.meleeRange) +
+        '  ·  SLAGEN ' + weaponStats.projectileCount
+      : 'PROJECTIELEN ' + weaponStats.projectileCount +
+        '  ·  BEREIK ' + Math.round(weaponStats.projectileRange),
+      10, '#9fe2d9', 206);
+    this.text(342, 451, '›', 23, '#8ce3f1', true);
 
     ARMOR_SLOTS.forEach((slot, index) => {
       const item = profile.armorInventory.find(piece => piece.id === armor[slot]);
       const rarity = item ? RARITY_CONFIG[item.rarity] : undefined;
       const d = item ? armorDefinition(item) : undefined;
       const center = 81 + index * 114;
-      const card = this.plate(center, 588, 105, 102, item ? 0x1b3344 : COLOR.card,
+      const card = this.plate(center, 595, 105, 106, item ? 0x1b3344 : COLOR.card,
         rarity?.color ?? COLOR.border, 12);
-      card.setInteractive(new Phaser.Geom.Rectangle(0, 0, 105, 102),
+      card.setInteractive(new Phaser.Geom.Rectangle(0, 0, 105, 106),
         Phaser.Geom.Rectangle.Contains);
-      card.on('pointerdown', () => this.openEquipmentList(slot));
-      this.text(center, 555, labels[slot], 10, COLOR.secondary, true, true);
-      this.text(center, 585, d?.symbol ?? '+', 26,
+      let armorPressed = false;
+      card.on('pointerdown', () => { armorPressed = true; });
+      card.on('pointerout', () => { armorPressed = false; });
+      card.on('pointerup', () => {
+        if (!armorPressed) return;
+        armorPressed = false;
+        this.openEquipmentList(slot);
+      });
+      this.text(center, 562, labels[slot], 10, COLOR.secondary, true, true);
+      this.text(center, 593, d?.symbol ?? '+', 27,
         rarity ? '#' + rarity.color.toString(16).padStart(6, '0') : '#8ca9bf', true, true);
-      this.fittedText(center - 45, 614,
+      // Origin is centered on the slot itself, not center - 45.
+      this.fittedText(center, 623,
         item ? 'LV.' + item.level + '  ' + '★'.repeat(item.stars) : 'LEEG · KIES',
-        10, item ? '#f8d77b' : COLOR.faint, 90, true).setOrigin(.5);
+        10, item ? '#f8d77b' : COLOR.faint, 93, true).setOrigin(.5);
     });
     const bonus = armorBonuses(profile.armorInventory, armor, heroId);
-    this.fittedText(37, 663,
+    this.fittedText(37, 679,
       'HP +' + (bonus.hp * 100).toFixed(1) + '%  ·  DEF +' +
       (bonus.defense * 100).toFixed(1) + '%  ·  DMG +' +
       (bonus.weaponDamage * 100).toFixed(1) + '%', 10, '#86efac', 308);
-    this.fittedText(37, 681,
+    this.fittedText(37, 699,
       'AANVAL +' + (bonus.attackSpeed * 100).toFixed(1) + '%  ·  SNELHEID +' +
       (bonus.movementSpeed * 100).toFixed(1) + '%', 10, '#86efac', 308);
-    this.text(195, 710, 'Alles beheren vanuit deze vijf vakken',
-      10, COLOR.faint, true);
   }
 
   private openEquipmentList(slot: EquipmentSlot): void {
     this.equipmentSlot = slot;
     this.equipmentItemId = null;
+    this.inventoryTouchStart = null;
+    this.inventoryPressedRowId = null;
     this.inventoryOffset = 0;
     this.equipmentView = 'list';
     this.scene.restart();
@@ -485,11 +521,17 @@ export class MainMenuScene extends Phaser.Scene {
           active ? 0x1b3e49 : COLOR.card, color, 10);
         panel.setInteractive(new Phaser.Geom.Rectangle(0, 0, 300, 76),
           Phaser.Geom.Rectangle.Contains);
-        // Select on release rather than down so a finger can drag to scroll.
+        // Detail view requires a new press on this exact row in this list.
+        // Releasing the tap that opened the list must never open a detail.
+        panel.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+          this.inventoryPressedRowId = id;
+          this.inventoryTouchStart = { x: pointer.worldX, y: pointer.worldY };
+        });
         panel.on('pointerup', (pointer: Phaser.Input.Pointer) => {
-          const first = this.inventoryTouchStart;
-          if (!first || Math.abs(pointer.worldY - first.y) > 14 ||
-            Math.abs(pointer.worldX - first.x) > 14) return;
+          if (!isInventoryRowTap(this.inventoryPressedRowId, id,
+            this.inventoryTouchStart, { x: pointer.worldX, y: pointer.worldY })) return;
+          this.inventoryPressedRowId = null;
+          this.inventoryTouchStart = null;
           this.equipmentItemId = id;
           this.equipmentView = 'detail';
           this.scene.restart();
@@ -536,6 +578,7 @@ export class MainMenuScene extends Phaser.Scene {
   private scrollEquipment(delta: number): void {
     const next = moveInventoryOffset(this.inventoryOffset, delta, this.equipmentInventoryIds().length);
     if (next !== this.inventoryOffset) {
+      this.inventoryPressedRowId = null;
       this.inventoryOffset = next;
       this.scene.restart();
     }
@@ -563,6 +606,7 @@ export class MainMenuScene extends Phaser.Scene {
   private readonly handleInventoryTouchEnd = (pointer: Phaser.Input.Pointer): void => {
     const first = this.inventoryTouchStart;
     this.inventoryTouchStart = null;
+    this.inventoryPressedRowId = null;
     if (!first || this.equipmentView !== 'list') return;
     const distance = first.y - pointer.worldY;
     if (Math.abs(distance) >= 24 && Math.abs(pointer.worldX - first.x) < 130)
