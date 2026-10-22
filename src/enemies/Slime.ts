@@ -127,6 +127,8 @@ export class Slime extends Phaser.Physics.Arcade.Sprite implements Damageable {
     this.drawHealthBar();
   }
 
+  /** Expose this mob's stun deadline to its own attack scheduler only. */
+  public get stunEndsAt(): number { return this.stunnedUntil; }
   public isStunned(now: number): boolean { return this.aiState === 'chasing' && now < this.stunnedUntil; }
 
   public applyStun(now: number, durationMs: number): void {
