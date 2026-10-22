@@ -314,7 +314,7 @@ export class MainMenuScene extends Phaser.Scene {
   /** Three readable hero cards per page; each has a full-width selection button. */
   private drawHeroes(): void {
     this.section('KIES JE HELD', '');
-    this.button(311, 330, 86, 30, '‹ TERUG', () => {
+    this.button(311, 322, 86, 24, '‹ TERUG', () => {
       this.equipmentView = 'overview'; this.scene.restart();
     }, 'quiet', false, 10);
     const profile = progressStore.current;
