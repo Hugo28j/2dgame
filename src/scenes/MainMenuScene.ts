@@ -3,6 +3,7 @@ import { GAME_SCENE_KEY, GAME_WIDTH, MENU_SCENE_KEY } from '../config/constants'
 import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
 import { isWorldUnlocked, getWorld } from '../worlds/worldConfig';
 import { ensureWorldDiorama } from '../worlds/worldMapArt';
+import { ensureArmorIcon } from '../ui/armorIconArt';
 import { worldAtlasEntries, type WorldAtlasEntry } from '../worlds/worldAtlas';
 import {
   HERO_IDS, HEROES, getHeroStats, MAX_HERO_LEVEL, type HeroId,
@@ -443,7 +444,6 @@ export class MainMenuScene extends Phaser.Scene {
     ARMOR_SLOTS.forEach((slot, index) => {
       const item = profile.armorInventory.find(piece => piece.id === armor[slot]);
       const rarity = item ? RARITY_CONFIG[item.rarity] : undefined;
-      const d = item ? armorDefinition(item) : undefined;
       const center = 81 + index * 114;
       const card = this.plate(center, 595, 105, 106, item ? 0x1b3344 : COLOR.card,
         rarity?.color ?? COLOR.border, 12);
@@ -458,8 +458,11 @@ export class MainMenuScene extends Phaser.Scene {
         this.openEquipmentList(slot);
       });
       this.text(center, 562, labels[slot], 10, COLOR.secondary, true, true);
-      this.text(center, 593, d?.symbol ?? '+', 27,
-        rarity ? '#' + rarity.color.toString(16).padStart(6, '0') : '#8ca9bf', true, true);
+      if (item) {
+        this.add.image(center, 594, ensureArmorIcon(this, item)).setDisplaySize(54, 54);
+      } else {
+        this.text(center, 593, '+', 27, '#8ca9bf', true, true);
+      }
       // Origin is centered on the slot itself, not center - 45.
       this.fittedText(center, 623,
         item ? 'LV.' + item.level + '  ' + '★'.repeat(item.stars) : 'LEEG · KIES',
@@ -550,8 +553,10 @@ export class MainMenuScene extends Phaser.Scene {
           this.scene.restart();
         });
         this.add.circle(68, cy, 25, color, .18).setStrokeStyle(1.5, color);
-        this.text(68, cy, weapon ? (weapon.attackMode === 'melee' ? '⚔' : '➶') :
-          d?.symbol ?? '◆', 24, COLOR.white, true, true);
+        if (piece)
+          this.add.image(68, cy, ensureArmorIcon(this, piece)).setDisplaySize(56, 56);
+        else this.text(68, cy, weapon?.attackMode === 'melee' ? '⚔' : '➶',
+          24, COLOR.white, true, true);
         this.fittedText(106, cy - 22, weapon?.name ?? d?.name ?? '', 13,
           COLOR.white, 195, true);
         this.fittedText(106, cy, piece
@@ -656,9 +661,11 @@ export class MainMenuScene extends Phaser.Scene {
     this.fittedText(48, 381, weapon?.name.toUpperCase() ?? d?.name.toUpperCase() ?? '',
       15, COLOR.white, 294, true);
     this.add.circle(195, 427, 34, accent, .20).setStrokeStyle(2, accent);
-    this.text(195, 427, weapon
-      ? (weapon.attackMode === 'melee' ? '⚔' : '➶') : d?.symbol ?? '◆',
-    34, COLOR.white, true, true);
+    if (piece)
+      this.add.image(195, 427, ensureArmorIcon(this, piece)).setDisplaySize(80, 80);
+    else
+      this.text(195, 427, weapon?.attackMode === 'melee' ? '⚔' : '➶',
+        34, COLOR.white, true, true);
     const previewing = piece
       ? this.isConfirmingUpgrade({ type: 'upgradeArmor', id: piece.id }, piece.level)
       : weaponId ? this.isConfirmingUpgrade({ type: 'upgradeWeapon', id: weaponId },
