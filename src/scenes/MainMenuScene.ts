@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { GAME_SCENE_KEY, GAME_WIDTH, MENU_SCENE_KEY } from '../config/constants';
 import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
-import { WORLDS, isWorldUnlocked, getWorld } from '../worlds/worldConfig';
+import { isWorldUnlocked, getWorld } from '../worlds/worldConfig';
+import { ensureWorldDiorama } from '../worlds/worldMapArt';
+import { worldAtlasEntries, type WorldAtlasEntry } from '../worlds/worldAtlas';
 import {
   HERO_IDS, HEROES, getHeroStats, MAX_HERO_LEVEL, type HeroId,
 } from '../heroes/heroConfig';
@@ -37,6 +39,8 @@ const COLOR = {
 
 export class MainMenuScene extends Phaser.Scene {
   private tab: MenuTab = 'worlds';
+  private worldView: 'showcase' | 'atlas' = 'showcase';
+  private worldMessage = '';
   private heroPage = 0;
   private upgradeCategory: 'weapons' | 'abilities' | 'armor' = 'armor';
   private equipmentCategory: 'weapons' | 'armor' = 'armor';
@@ -148,6 +152,10 @@ export class MainMenuScene extends Phaser.Scene {
     if (tab === 'heroes') this.heroPage = Math.floor(
       Math.max(0, HERO_IDS.indexOf(progressStore.current.selectedHero)) / 4);
     if (tab !== 'settings') this.settingsView = 'general';
+    if (tab !== 'worlds') {
+      this.worldView = 'showcase';
+      this.worldMessage = '';
+    }
     this.resetRequested = false;
     this.awaitingKey = undefined;
     this.notice = '';
@@ -160,39 +168,131 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   private drawWorlds(): void {
-    this.section('KIES JE WERELD', 'Voltooi kamer 30 om de volgende wereld te openen');
     const profile = progressStore.current;
-    WORLDS.forEach(world => {
-      const y = 346 + (world.id - 1) * 75;
-      const unlocked = isWorldUnlocked(world.id, profile.completedWorlds);
-      const selected = world.id === profile.selectedWorld;
-      const best = profile.worldBestRooms[world.id - 1] ?? 1;
-      this.plate(195, y, 328, 70, selected ? 0x1a3944 : COLOR.card,
-        selected ? world.accent : COLOR.border, 11);
-      this.add.circle(52, y - 15, 13, world.accent, unlocked ? 0.95 : 0.23);
-      this.text(52, y - 15, String(world.id), 12,
-        unlocked ? '#07131f' : COLOR.faint, true, true);
-      this.fittedText(75, y - 20, world.name.toUpperCase(), 13,
-        unlocked ? COLOR.white : COLOR.faint, 194, true);
-      this.fittedText(75, y - 2, world.subtitle, 10,
-        unlocked ? COLOR.secondary : COLOR.faint, 193);
-      if (unlocked) {
-        this.text(75, y + 17, (best >= CHAPTER_ROOM_COUNT ? 'VOLTOOID' :
-          'BESTE KAMER ' + best + '/' + CHAPTER_ROOM_COUNT), 9,
-        best >= CHAPTER_ROOM_COUNT ? '#86efac' : COLOR.secondary);
-        this.add.rectangle(161, y + 29, 173, 4, 0x304459);
-        this.add.rectangle(74, y + 29, 173 * Math.min(1, best / CHAPTER_ROOM_COUNT), 4,
-          world.accent).setOrigin(0, 0.5);
-      } else {
-        this.text(75, y + 18, 'EERST VORIGE WERELD VOLTOOIEN', 9, COLOR.faint);
+    const entries=worldAtlasEntries(profile.selectedWorld,profile.completedWorlds,
+      profile.worldBestRooms);
+    if (this.worldView === 'atlas') {
+      this.drawWorldAtlas(entries);
+      return;
+    }
+    this.section('JOUW WERELD', 'Tik op het landschap om naar een ander rijk te reizen');
+    const entry=entries[profile.selectedWorld-1]!;
+    const world=entry.world;
+    // Deep, painted foreground and distant 2.5D landscape: no external
+    // downloads, no WebGL-only effects, sharp even on high-DPI mobile devices.
+    this.plate(195,482,338,327,0x0c1b28,world.accent,17);
+    const key=ensureWorldDiorama(this,world.id);
+    const painting=this.add.image(195,479,key).setDisplaySize(326,314);
+    painting.setAlpha(1);
+    // Deliberate layered interface vignette over the illustration, without
+    // darkening the main painting or hiding its boss/mountain silhouette.
+    for(let i=0;i<6;i++)
+      this.add.rectangle(195,553+i*11,325,12,0x06121b,0.08+i*.085);
+    this.add.rectangle(195,352,325,59,0x071622,.70);
+    this.add.rectangle(195,532,325,1,world.accent,.5);
+    this.add.circle(329,351,17,world.accent,.88);
+    this.text(329,351,String(world.id),14,'#07131f',true,true);
+    this.fittedText(52,339,world.name.toUpperCase(),20,'#fffdf4',251,true)
+      .setStroke('#05131f',3);
+    this.fittedText(52,364,world.subtitle,10,'#d7e6eb',253);
+    if (entry.complete)
+      this.text(49,558,'✦  WERELD VOLTOOID',11,'#dcfce7',false,true);
+    else
+      this.text(49,558,'✦  ONTDEK HET RIJK',11,'#d8e9f4',false,true);
+    this.text(49,584,'BESTE KAMER',10,'#b2d1da',false,true);
+    this.text(341,584,entry.bestRoom+' / '+CHAPTER_ROOM_COUNT,
+      12,'#fff8e4',false,true).setOrigin(1,.5);
+    this.add.rectangle(195,609,293,9,0x081926,.85);
+    this.add.rectangle(49,609,292*entry.progress,8,world.accent,1)
+      .setOrigin(0,.5);
+    this.add.rectangle(49,613,292*entry.progress,2,0xffffff,.34)
+      .setOrigin(0,.5);
+    this.add.rectangle(195,644,312,13,world.accent,.12);
+    this.text(195,644,'✧  VERKEN DE WERELDKAART  ✧',10,'#dceef5',true,true);
+    // GameObjects.Zone (not the texture) owns a mobile-sized true clickable
+    // hitbox, positioned exactly over the full displayed world artwork.
+    const hit=this.add.zone(195,479,326,314).setInteractive({useHandCursor:true});
+    hit.on('pointerdown',()=>this.openWorldAtlas());
+    this.button(195,689,322,37,'✦   BEKIJK ALLE 5 WERELDEN   ›',
+      ()=>this.openWorldAtlas(),'selected',false,11);
+    this.text(195,718,'EEN GROOT RIJK • VIJF UNIEKE AVONTUREN',9,COLOR.secondary,true);
+  }
+
+  private openWorldAtlas(): void {
+    this.worldView='atlas';
+    this.worldMessage='';
+    this.scene.restart();
+  }
+
+  /** Mario-inspired route board: illustrated realms connected as destinations.
+   * A locked node is informative but never dispatches selectWorld. */
+  private drawWorldAtlas(entries:readonly WorldAtlasEntry[]):void {
+    this.section('DE WERELDKAART','Reis tussen ontgrendelde rijken via het kronkelpad');
+    this.text(40,325,'✦  KIES JE BESTEMMING',11,'#f4dca7',false,true);
+    this.text(349,325,'5 RIJKEN',10,COLOR.secondary)
+      .setOrigin(1,.5);
+    const map=this.add.graphics();
+    const route: Array<[number,number]>=entries.map((_,i)=>[
+      43+(i%2?5:0),378+i*62]);
+    map.lineStyle(5,0x253e52,.95);
+    map.beginPath();map.moveTo(route[0]![0],route[0]![1]);
+    for(const [x,y] of route.slice(1))map.lineTo(x,y);
+    map.strokePath();
+    map.lineStyle(2,0xb6c8bd,.58);
+    for(let i=0;i<route.length-1;i++){
+      const a=route[i]!,b=route[i+1]!;
+      for(let t=.07;t<.94;t+=.18){
+        const x=a[0]+(b[0]-a[0])*t;
+        const y=a[1]+(b[1]-a[1])*t;
+        map.lineBetween(x,y,x+1.7,y+7);
       }
-      this.button(317, y + 5, 70, 36, selected ? 'ACTIEF' : unlocked ? 'KIES' : 'SLOT',
-        () => this.runAction({ type: 'selectWorld', id: world.id }),
-        selected ? 'selected' : 'normal', selected || !unlocked, 10);
+    }
+    entries.forEach((entry,index)=>{
+      const world=entry.world;
+      const y=378+index*62;
+      const bg=entry.selected?0x223f49:0x132738;
+      this.plate(195,y,326,57,bg,entry.selected?world.accent:0x365166,10);
+      const texture=ensureWorldDiorama(this,world.id);
+      const thumbnail=this.add.image(98,y,texture).setDisplaySize(91,49);
+      thumbnail.setAlpha(entry.unlocked?1:.31);
+      this.add.rectangle(98,y,92,50,0x07121c,entry.unlocked?0:.35)
+        .setStrokeStyle(1,entry.unlocked?world.accent:0x536274,.74);
+      this.add.circle(42,y,13,entry.unlocked?world.accent:0x304151,1)
+        .setStrokeStyle(2,entry.unlocked?0xd9eff5:0x637383,.7);
+      this.text(42,y,entry.unlocked?String(world.id):'×',11,
+        entry.unlocked?'#0b1c28':'#c1ccd5',true,true);
+      this.fittedText(151,y-15,world.name.toUpperCase(),12,
+        entry.unlocked?COLOR.white:COLOR.faint,151,true);
+      this.fittedText(151,y+1,entry.unlocked?
+        (entry.complete?'VOLTOOID':'KAMER '+entry.bestRoom+'/'+CHAPTER_ROOM_COUNT):
+        entry.requirement.toUpperCase(),9,
+        entry.complete?'#b2faaf':entry.unlocked?COLOR.secondary:COLOR.faint,158);
+      this.add.rectangle(219,y+19,135,4,0x0c1929);
+      if(entry.unlocked)
+        this.add.rectangle(151,y+19,136*entry.progress,4,world.accent)
+          .setOrigin(0,.5);
+      this.fittedText(342,y-12,entry.selected?'ACTIEF':entry.unlocked?'KIES':'SLOT',
+        10,entry.selected?'#bffef2':entry.unlocked?'#fff7ca':'#8a9dae',40,true)
+        .setOrigin(1,.5);
+      const spot=this.add.zone(195,y,324,57).setInteractive({useHandCursor:true});
+      spot.on('pointerdown',()=>{
+        if(!entry.unlocked){
+          this.worldMessage=entry.requirement+' om dit rijk te openen';
+          this.scene.restart();
+          return;
+        }
+        this.worldMessage='';
+        this.worldView='showcase';
+        if(!entry.selected) this.runAction({type:'selectWorld',id:world.id});
+        else this.scene.restart();
+      });
     });
-    this.text(195, 705, 'TOTAAL VERDIEND  ·  ' +
-      profile.totalGoldEarned.toLocaleString('nl-BE') + ' G',
-      11, '#fcd34d', true, true);
+    this.fittedText(195,688,this.worldMessage ||
+      'Ontgrendel het volgende rijk na kamer 30',10,
+      this.worldMessage?'#fcb98c':COLOR.secondary,310).setOrigin(.5,.5);
+    this.button(195,712,322,27,'‹   TERUG NAAR MIJN WERELD',
+      ()=>{this.worldView='showcase';this.worldMessage='';this.scene.restart();},
+      'quiet',false,10);
   }
 
   private drawHeroes(): void {
