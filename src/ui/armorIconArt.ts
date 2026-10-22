@@ -59,7 +59,7 @@ export function armorIconLook(item: Pick<ArmorItem, 'kind' | 'heroId' | 'rarity'
 
 type Ctx = CanvasRenderingContext2D;
 type Point = [number, number];
-function poly(ctx: Ctx, points: Point[], fill: string, stroke = '#0c1725', width = 2.5): void {
+function poly(ctx: Ctx, points: Point[], fill: string | CanvasGradient | CanvasPattern, stroke = '#0c1725', width = 2.5): void {
   ctx.beginPath();
   points.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
   ctx.closePath();
@@ -269,7 +269,7 @@ export function ensureArmorIcon(scene: Phaser.Scene, item: ArmorItem): string {
   ctx.shadowBlur=0;
   drawHeroMark(ctx,look.heroId,48,look.slot==='helm'&&look.variant===2?49:
     look.slot==='boots'?48:look.slot==='body'?53:48,
-    look.slot==='boots'?.78:.73,look.light);
+    look.slot === 'boots' ? 0.78 : 0.73, look.light);
   ctx.restore();
 
   drawRarity(ctx,look);
