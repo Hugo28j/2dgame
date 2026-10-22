@@ -71,8 +71,7 @@ function heroShape(g: Phaser.GameObjects.Graphics, id: HeroId, color: number): v
       body(g, color, 0x581c87, 0xc4a0b5);
       g.fillStyle(0x160c2e); g.fillRoundedRect(39, 21, 20, 25, 9);
       g.fillStyle(0xf5d0fe); g.fillCircle(54, 31, 4);
-      g.lineStyle(4, 0xe9d5ff); g.beginPath(); g.arc(51, 34, 18, -1.2, 1.25); g.strokePath();
-      g.lineStyle(3, 0x7e22ce); g.lineBetween(39, 53, 61, 13); // scythe
+      // The Shadow Scythe's crescent and shaft are animated independently.
       break;
   }
 }
