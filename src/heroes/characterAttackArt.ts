@@ -468,7 +468,7 @@ export class CharacterAttackArt {
     t: number, sway: number): void {
     const angle=active ? -1.45 + (1-Math.cos(Math.PI*Math.min(1,t)))*1.23
       : -.45+sway*.015;
-    const dx=Math.cos(angle),dy=Math.sin(angle),px=-dy,py=dx;
+    const dx=Math.cos(angle),dy=Math.sin(angle);
     const hx=19,hy=0+sway*.17, tipX=hx+dx*56,tipY=hy+dy*56;
     for(const side of [-1,1]){
       g.lineStyle(9,0x4b1d74);
