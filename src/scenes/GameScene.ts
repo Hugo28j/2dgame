@@ -1066,7 +1066,8 @@ export class GameScene extends Phaser.Scene {
 
   private readonly fireEnemyProjectiles = (enemy: AdvancedEnemy, pattern: BulletPattern,
     volley = 0, speedFactor = 1): void => {
-    if (!this.player || !this.enemyProjectiles || this.gameOver || this.transitioning) return;
+    if (!this.player || !this.enemyProjectiles || this.gameOver || this.transitioning ||
+      !enemy.active || enemy.aiState === 'defeated' || enemy.isStunned(this.time.now)) return;
     const angle = Math.atan2(this.player.y - enemy.y, this.player.x - enemy.x);
     // The two split Void Sentinels fire in opposite directions and rotate
     // twice as quickly as the original spiral. Keep other bosses unchanged.
