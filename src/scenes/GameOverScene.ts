@@ -4,7 +4,8 @@ import {
 } from '../config/constants';
 import type { RunReport } from '../progression/RunLedger';
 import { progressStore } from '../progression/ProgressStore';
-import type { ArmorItem } from '../progression/armor';
+import { validArmorItem, type ArmorItem } from '../progression/armor';
+import { ensureArmorIcon } from '../ui/armorIconArt';
 import { armorRunRewards } from '../ui/armorRunRewards';
 import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
 import { getWorld } from '../worlds/worldConfig';
@@ -42,7 +43,8 @@ export class GameOverScene extends Phaser.Scene {
     const { report } = this.dataForRun;
     const world = getWorld(report.worldId);
     const profile = progressStore.current;
-    const rewards = armorRunRewards(this.dataForRun.collectedArmor ?? []);
+    const gatheredArmor = (this.dataForRun.collectedArmor ?? []).filter(validArmorItem);
+    const rewards = armorRunRewards(gatheredArmor);
     const win = report.victory;
     const accent = win ? 0x5de2c0 : 0xff8190;
     const accentHex = win ? '#75f6d5' : '#ff9aaa';
@@ -147,10 +149,11 @@ export class GameOverScene extends Phaser.Scene {
       fontFamily: font, fontSize: '11px', color: '#b5cddd',
     }).setOrigin(0.5);
 
-    this.createEndScreenControls(rewards, panelWidth);
+    this.createEndScreenControls(rewards, panelWidth, gatheredArmor);
   }
 
-  private createEndScreenControls(rewards: ReturnType<typeof armorRunRewards>, panelWidth: number): void {
+  private createEndScreenControls(rewards: ReturnType<typeof armorRunRewards>, panelWidth: number,
+    gatheredArmor: readonly ArmorItem[]): void {
     const bounds = homeButtonLayout(GAME_WIDTH);
     const lootBounds = { x: GAME_WIDTH / 2, y: 638, width: panelWidth - 68, height: 77 };
     const button = document.createElement('button');
@@ -221,7 +224,8 @@ export class GameOverScene extends Phaser.Scene {
       });
       lootList.appendChild(empty);
     } else {
-      for (const item of rewards) {
+      const imageCache = new Map<string, string>();
+      for (const [index, item] of rewards.entries()) {
         const row = document.createElement('div');
         row.setAttribute('role', 'listitem');
         row.setAttribute('aria-label', item.name + ', ' + item.rarity);
@@ -231,11 +235,30 @@ export class GameOverScene extends Phaser.Scene {
           padding: '4px 8px', borderLeft: '3px solid ' + item.color,
           borderRadius: '5px', background: '#25475e',
         });
-        const symbol = document.createElement('span');
-        symbol.textContent = item.symbol;
-        Object.assign(symbol.style, {
-          fontSize: '19px', color: item.color, flexShrink: '0',
-        });
+        // Use the exact same rendered icon shown on the ground and in inventory.
+        const armorItem = gatheredArmor[index]!;
+        const key = ensureArmorIcon(this, armorItem);
+        let dataUrl = imageCache.get(key);
+        if (!dataUrl) {
+          const source = this.textures.get(key).getSourceImage();
+          if (source instanceof HTMLCanvasElement) {
+            dataUrl = source.toDataURL('image/png');
+            imageCache.set(key, dataUrl);
+          }
+        }
+        const symbol = dataUrl ? document.createElement('img') : document.createElement('span');
+        if (symbol instanceof HTMLImageElement) {
+          symbol.src = dataUrl!;
+          symbol.alt = '';
+          Object.assign(symbol.style, {
+            width: '30px', height: '30px', objectFit: 'contain', flexShrink: '0',
+          });
+        } else {
+          symbol.textContent = item.symbol;
+          Object.assign(symbol.style, {
+            fontSize: '19px', color: item.color, flexShrink: '0',
+          });
+        }
         const name = document.createElement('span');
         name.textContent = item.name;
         Object.assign(name.style, {
