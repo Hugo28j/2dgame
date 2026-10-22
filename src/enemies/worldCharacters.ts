@@ -16,7 +16,7 @@ export interface CharacterLook {
 
 const names: Readonly<Record<WorldId, Readonly<Record<MinionKind, string>>>> = {
   1: {
-    slime: 'Mossling', archer: 'Briar Hunter', charger: 'Horned Beetle',
+    slime: 'Goblin Scout', archer: 'Briar Hunter', charger: 'Horned Beetle',
     mage: 'Willow Wisp', tank: 'Ancient Treant', bomber: 'Sporecap',
   },
   2: {

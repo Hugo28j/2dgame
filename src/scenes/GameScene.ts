@@ -22,6 +22,7 @@ import { coverIsClose, firstShieldOnPath, type ShieldPoint } from '../enemies/tr
 import { ICE_WALL, HOMING_ORB, wallGapCenter, wallHitsCircle, wallXAt } from '../enemies/frozenBossAttacks';
 import { FROZEN_EARLY, canSummonFrostMinions } from '../enemies/frozenEarlyGame';
 import { contactHitReady, nextContactHitAt } from '../combat/enemyContactDamage';
+import { goblinKnifeCanHit, GOBLIN_KNIFE_IMPACT_MS } from '../enemies/goblinKnife';
 import { FROZEN_BALANCE } from '../enemies/frozenBalance';
 import { shouldSplitFrozenGiant } from '../enemies/frozenSplit';
 import { withinRadius } from '../enemies/enemyMovement';
@@ -2373,9 +2374,31 @@ export class GameScene extends Phaser.Scene {
 
     if (enemyObject.aiState === 'defeated' || this.gameOver) return;
     const now = this.time.now;
-    if (!contactHitReady(now, this.nextContactHit.get(enemyObject) ?? 0)) return;
-    // Avoid damage every physics frame from ONE touching enemy, while other
-    // enemies, bullets and hazards are never blocked by this enemy's timer.
+    // A stunned enemy cannot land a melee attack; other enemies retain their
+    // own independent cooldown and can strike even while this one is stunned.
+    if (enemyObject.isStunned(now) ||
+        !contactHitReady(now, this.nextContactHit.get(enemyObject) ?? 0)) return;
+
+    if (enemyObject.isKnifeGoblin) {
+      // Start the visible knife windup first, rather than applying contact
+      // damage while the blade is still resting at the goblin's hip.
+      const attackToken = enemyObject.beginKnifeAttack(now);
+      if (attackToken === null) return;
+      this.nextContactHit.set(enemyObject,
+        nextContactHitAt(now, enemyObject.attackIntervalMs));
+      this.time.delayedCall(GOBLIN_KNIFE_IMPACT_MS, () => {
+        if (!this.player || !this.player.active || this.gameOver ||
+            !enemyObject.knifeAttackIsValid(attackToken, this.time.now)) return;
+        // A retreat or mid-windup stun dodges the slash; nothing hits from
+        // several rooms away, and the blade can damage at most once per swing.
+        const distance = Phaser.Math.Distance.Between(
+          enemyObject.x, enemyObject.y, this.player.x, this.player.y);
+        if (goblinKnifeCanHit(distance)) this.damagePlayer(enemyObject.contactAttack);
+      });
+      return;
+    }
+
+    // Original independent melee timing remains for every other enemy.
     this.nextContactHit.set(enemyObject, nextContactHitAt(now, enemyObject.attackIntervalMs));
     this.damagePlayer(enemyObject.contactAttack);
   };
