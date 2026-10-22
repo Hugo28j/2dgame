@@ -4,6 +4,7 @@ import Phaser from 'phaser';
 import { getEnemyStatsForRoom, type EnemyKind, type SlimeRuntimeStats } from './enemyConfig';
 import { bossPhase, rangedVelocity } from './enemyMovement';
 import { Slime } from './Slime';
+import { delayEnemyAttackForStun, initialEnemyShotDelay } from './enemyAttackTiming';
 import { getChaseVelocity, getObstacleAvoidanceVelocity } from './slimeMovement';
 import { coverIsClose, rangedCoverSpot, shieldEndpoints, shouldBreakTreantShield, type ShieldSurface } from './treantShield';
 import { getBossPlan, getBossProfile } from './bossProfiles';
@@ -96,12 +97,27 @@ export class AdvancedEnemy extends Slime {
     if (worldId === 1 && kind === 'tank') {
       this.shieldGraphic = scene.add.graphics().setDepth(13);
     }
-    this.nextShotAt = scene.time.now + stats.attackIntervalMs;
+    this.nextShotAt = scene.time.now + initialEnemyShotDelay(id, stats.attackIntervalMs);
     this.nextJadeBranchesAt = scene.time.now + JADE_BRANCH.intervalMs / 2;
-    this.nextSpecialAt = scene.time.now + 1500;
+    this.nextSpecialAt = scene.time.now + initialEnemyShotDelay(id + '-special', 1500);
     this.summonerType = getSummonerType(worldId, kind, roomNumber, bossSlot);
     this.nextSummonAt = firstSummonTime(scene.time.now, this.summonerType);
     if (this.isFrostWitch) this.witchHat = scene.add.graphics().setDepth(14);
+  }
+
+  /** Only THIS enemy's attack and summon clocks pause while it is stunned.
+   * The extra delay preserves its stagger relative to unstunned neighbours. */
+  public override applyStun(now: number, durationMs: number): void {
+    const before = this.stunEndsAt;
+    super.applyStun(now, durationMs);
+    if (this.aiState === 'defeated' || this.stunEndsAt <= Math.max(now, before)) return;
+    const pause = (deadline: number) =>
+      delayEnemyAttackForStun(deadline, now, before, this.stunEndsAt);
+    this.nextShotAt = pause(this.nextShotAt);
+    this.nextSpecialAt = pause(this.nextSpecialAt);
+    if (this.nextSnowfallAt > 0) this.nextSnowfallAt = pause(this.nextSnowfallAt);
+    this.nextJadeBranchesAt = pause(this.nextJadeBranchesAt);
+    if (Number.isFinite(this.nextSummonAt)) this.nextSummonAt = pause(this.nextSummonAt);
   }
 
   public get isBoss(): boolean { return this.kind === 'boss'; }
@@ -154,13 +170,11 @@ export class AdvancedEnemy extends Slime {
     frozenSpecial?: (enemy: AdvancedEnemy, effect: 'boulder' | 'snow' | 'golems', count: number) => void,
     jadeBranches?: EnemyJadeBranches, emberBoss?: EnemyEmberBoss): void {
     if (this.aiState === 'defeated') return;
-    // Living summoners call their first wave ~350 ms after appearing. Do this
-    // before stun / knockback returns, otherwise a newly spawned summoner can
-    // unintentionally wait longer than one second. Once attempted, the full
-    // original cooldown starts from this moment, not from construction.
-    this.updateTimedSummons(now, summon, frozenSpecial);
     super.chase(targetX, targetY);
+    // A stunned enemy cannot shoot, summon or trigger scripted special attacks.
+    // Its own cooldowns were deferred in applyStun; no global shoot clock.
     if (this.isStunned(now)) return;
+    this.updateTimedSummons(now, summon, frozenSpecial);
     if (this.isFrostWitch) this.drawWitchHat(now);
     if (this.isTreantShield) {
       const dx = targetX - this.x, dy = targetY - this.y;
