@@ -28,10 +28,12 @@ import {
 import { abilityMenuSummary } from '../ui/menuPresentation';
 import { displayedHp } from '../ui/displayValues';
 import { canFuseArmor, EQUIPMENT_VISIBLE_ROWS, inventoryMaxOffset, isInventoryRowTap, moveInventoryOffset } from '../ui/equipmentInventory';
+import { advanceUpgradeIntent, sameUpgradeIntent, type UpgradeIntent } from '../ui/upgradeConfirmation';
 
 type MenuTab = 'worlds' | 'weapons' | 'upgrades' | 'settings';
 type EquipmentView = 'overview' | 'heroes' | 'list' | 'detail';
 type EquipmentSlot = ArmorSlot | 'weapon';
+type UpgradeProfileAction = Extract<ProfileAction, { type: 'upgradeArmor' | 'upgradeWeapon' | 'upgradeAbility' }>;
 type ButtonStyle = 'normal' | 'selected' | 'primary' | 'danger' | 'quiet';
 const FONT = 'system-ui, sans-serif';
 const COLOR = {
@@ -49,6 +51,7 @@ export class MainMenuScene extends Phaser.Scene {
   private equipmentView: EquipmentView = 'overview';
   private equipmentSlot: EquipmentSlot = 'weapon';
   private equipmentItemId: string | null = null;
+  private pendingUpgrade: UpgradeIntent | null = null;
   private inventoryOffset = 0;
   private inventoryTouchStart: { x: number; y: number } | null = null;
   private inventoryPressedRowId: string | null = null;
@@ -165,6 +168,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.equipmentView = 'overview';
     this.inventoryOffset = 0;
     this.equipmentItemId = null;
+    this.pendingUpgrade = null;
     if (tab !== 'settings') this.settingsView = 'general';
     if (tab !== 'worlds') {
       this.worldView = 'showcase';
@@ -179,6 +183,18 @@ export class MainMenuScene extends Phaser.Scene {
   private runAction(action: ProfileAction): void {
     progressStore.dispatch(action);
     this.scene.restart();
+  }
+
+  private isConfirmingUpgrade(action: UpgradeProfileAction, level: number): boolean {
+    return sameUpgradeIntent(this.pendingUpgrade, action, level);
+  }
+
+  /** First click only arms the upgrade preview. Second identical click pays gold. */
+  private requestUpgrade(action: UpgradeProfileAction, level: number): void {
+    const next = advanceUpgradeIntent(this.pendingUpgrade, action, level);
+    this.pendingUpgrade = next.pending;
+    if (next.shouldApply) this.runAction(action);
+    else this.scene.restart();
   }
 
   private drawWorlds(): void {
@@ -233,13 +249,10 @@ export class MainMenuScene extends Phaser.Scene {
   /** Mario-inspired route board: illustrated realms connected as destinations.
    * A locked node is informative but never dispatches selectWorld. */
   private drawWorldAtlas(entries:readonly WorldAtlasEntry[]):void {
-    this.section('DE WERELDKAART','Reis tussen ontgrendelde rijken via het kronkelpad');
-    this.text(40,325,'✦  KIES JE BESTEMMING',11,'#f4dca7',false,true);
-    this.text(349,325,'5 RIJKEN',10,COLOR.secondary)
-      .setOrigin(1,.5);
+    // The world thumbnails are the destination selector: no redundant title or instructions.
     const map=this.add.graphics();
     const route: Array<[number,number]>=entries.map((_,i)=>[
-      43+(i%2?5:0),378+i*62]);
+      43+(i%2?5:0),312+i*74]);
     map.lineStyle(5,0x253e52,.95);
     map.beginPath();map.moveTo(route[0]![0],route[0]![1]);
     for(const [x,y] of route.slice(1))map.lineTo(x,y);
@@ -255,7 +268,7 @@ export class MainMenuScene extends Phaser.Scene {
     }
     entries.forEach((entry,index)=>{
       const world=entry.world;
-      const y=378+index*62;
+      const y=312+index*74;
       const bg=entry.selected?0x223f49:0x132738;
       this.plate(195,y,326,57,bg,entry.selected?world.accent:0x365166,10);
       const texture=ensureWorldDiorama(this,world.id);
@@ -293,9 +306,8 @@ export class MainMenuScene extends Phaser.Scene {
         else this.scene.restart();
       });
     });
-    this.fittedText(195,688,this.worldMessage ||
-      'Ontgrendel het volgende rijk na kamer 30',10,
-      this.worldMessage?'#fcb98c':COLOR.secondary,310).setOrigin(.5,.5);
+    if(this.worldMessage)
+      this.fittedText(195,681,this.worldMessage,10,'#fcb98c',310).setOrigin(.5,.5);
     this.button(195,712,322,27,'‹   TERUG NAAR MIJN WERELD',
       ()=>{this.worldView='showcase';this.worldMessage='';this.scene.restart();},
       'quiet',false,10);
@@ -466,6 +478,7 @@ export class MainMenuScene extends Phaser.Scene {
   private openEquipmentList(slot: EquipmentSlot): void {
     this.equipmentSlot = slot;
     this.equipmentItemId = null;
+    this.pendingUpgrade = null;
     this.inventoryTouchStart = null;
     this.inventoryPressedRowId = null;
     this.inventoryOffset = 0;
@@ -634,6 +647,7 @@ export class MainMenuScene extends Phaser.Scene {
       : profile.selectedWeapons[this.armorHero] === weaponId;
     this.section('ITEM DETAILS', 'Bekijk stats en beheer je gekozen uitrusting');
     this.button(87, 337, 109, 36, '‹ LIJST', () => {
+      this.pendingUpgrade = null;
       this.equipmentView = 'list'; this.scene.restart();
     }, 'quiet', false, 11);
     this.fittedText(162, 337, HEROES[this.armorHero].name.toUpperCase(), 11,
@@ -645,43 +659,58 @@ export class MainMenuScene extends Phaser.Scene {
     this.text(195, 427, weapon
       ? (weapon.attackMode === 'melee' ? '⚔' : '➶') : d?.symbol ?? '◆',
     34, COLOR.white, true, true);
-    this.text(195, 468, piece
-      ? rarity!.label.toUpperCase() + '  ·  LV.' + piece.level + '/' + ARMOR_MAX_LEVEL
-      : 'WAPEN  ·  LV.' + profile.weaponLevels[weaponId!] + '/' + MAX_WEAPON_LEVEL,
-    11, COLOR.secondary, true, true);
+    const previewing = piece
+      ? this.isConfirmingUpgrade({ type: 'upgradeArmor', id: piece.id }, piece.level)
+      : weaponId ? this.isConfirmingUpgrade({ type: 'upgradeWeapon', id: weaponId },
+        profile.weaponLevels[weaponId]) : false;
+    const currentLevel = piece?.level ?? profile.weaponLevels[weaponId!];
+    const maxLevel = piece ? ARMOR_MAX_LEVEL : MAX_WEAPON_LEVEL;
+    this.text(195, 468, (piece ? rarity!.label.toUpperCase() : 'WAPEN') +
+      '  ·  LV.' + currentLevel + '/' + maxLevel +
+      (previewing && currentLevel < maxLevel ? '  →  ' + (currentLevel + 1) + '/' + maxLevel : ''),
+      11, COLOR.secondary, true, true);
     this.text(195, 489, piece ? '★'.repeat(piece.stars) + '☆'.repeat(ARMOR_MAX_STARS - piece.stars)
       : 'SCHADE & AANVAL', 14, '#fbd36b', true, true);
 
     if (piece) {
-      const bonus = armorBonuses([piece], {
+      const slotEquipped = {
         helm: d!.slot === 'helm' ? piece.id : null,
         body: d!.slot === 'body' ? piece.id : null,
         boots: d!.slot === 'boots' ? piece.id : null,
-      }, piece.heroId);
-      const stats: Array<[string, number]> = [
-        ['HP', bonus.hp], ['DEFENSE', bonus.defense], ['WAPENSCHADE', bonus.weaponDamage],
-        ['AANVALSSNELHEID', bonus.attackSpeed], ['LOOPSNELHEID', bonus.movementSpeed],
+      };
+      const bonus = armorBonuses([piece], slotEquipped, piece.heroId);
+      const nextBonus = armorBonuses([{ ...piece, level: Math.min(ARMOR_MAX_LEVEL, piece.level + 1) }],
+        slotEquipped, piece.heroId);
+      const stats: Array<[string, number, number]> = [
+        ['HP', bonus.hp, nextBonus.hp], ['DEFENSE', bonus.defense, nextBonus.defense],
+        ['WAPENSCHADE', bonus.weaponDamage, nextBonus.weaponDamage],
+        ['AANVALSSNELHEID', bonus.attackSpeed, nextBonus.attackSpeed],
+        ['LOOPSNELHEID', bonus.movementSpeed, nextBonus.movementSpeed],
       ];
-      stats.filter(([, value]) => value > 0).forEach(([name, value], i) => {
-        this.text(65, 514 + i * 22, name, 11, COLOR.secondary);
-        this.text(314, 514 + i * 22, '+' + (value * 100).toFixed(1) + '%',
-          12, '#86efac').setOrigin(1, .5);
+      stats.filter(([, value]) => value > 0).forEach(([name, value, next], i) => {
+        this.text(64, 514 + i * 22, name, 10, COLOR.secondary);
+        this.text(321, 514 + i * 22, '+' + (value * 100).toFixed(2) + '%' +
+          (previewing ? '  →  +' + (next * 100).toFixed(2) + '%' : ''),
+          previewing ? 10 : 12, previewing ? '#fcd34d' : '#86efac').setOrigin(1, .5);
       });
       const canFuse = canFuseArmor(piece, profile.armorInventory, ARMOR_MAX_STARS);
       const cost = armorUpgradeCost(piece);
-      this.fittedText(42, 598, canFuse
-        ? 'FUSION: 1 dubbel item wordt verbruikt voor +1 ★'
+      this.fittedText(42, 598, previewing
+        ? 'BEVESTIG UPGRADE  ·  KOST ' + cost + ' G'
+        : canFuse ? 'FUSION: 1 dubbel item wordt verbruikt voor +1 ★'
         : piece.stars === ARMOR_MAX_STARS ? 'Maximum aantal sterren bereikt'
           : 'Fusion vereist 2 gelijke items met dezelfde sterren',
-        10, canFuse ? '#fbd36b' : COLOR.faint, 309);
+        10, previewing || canFuse ? '#fbd36b' : COLOR.faint, 309);
       this.button(110, 642, 153, 43, worn ? 'UITDOEN' : 'SELECTEREN', () => this.runAction(
         worn ? { type: 'unequipArmor', heroId: this.armorHero, slot: d!.slot }
           : { type: 'equipArmor', id: piece.id }), worn ? 'quiet' : 'selected', false, 11);
       this.button(280, 642, 153, 43,
-        piece.level >= ARMOR_MAX_LEVEL ? 'MAX LEVEL' : 'UPGRADE ' + cost + ' G',
-        () => this.runAction({ type: 'upgradeArmor', id: piece.id }),
-        'normal', piece.level >= ARMOR_MAX_LEVEL || profile.gold < cost, 10);
+        piece.level >= ARMOR_MAX_LEVEL ? 'MAX LEVEL' : previewing ? 'CONFIRM' : 'UPGRADE ' + cost + ' G',
+        () => this.requestUpgrade({ type: 'upgradeArmor', id: piece.id }, piece.level),
+        previewing ? 'selected' : 'normal',
+        piece.level >= ARMOR_MAX_LEVEL || profile.gold < cost, 10);
       this.button(110, 694, 153, 43, '‹ TERUG', () => {
+        this.pendingUpgrade = null;
         this.equipmentView = 'list'; this.scene.restart();
       }, 'quiet', false, 11);
       this.button(280, 694, 153, 43, 'FUSION +1 ★', () =>
@@ -689,16 +718,24 @@ export class MainMenuScene extends Phaser.Scene {
     } else if (weapon && weaponId) {
       const level = profile.weaponLevels[weaponId];
       const stats = getWeaponStats(weaponId, level);
-      this.text(65, 518, 'SCHADE', 11, COLOR.secondary);
-      this.text(314, 518, stats.damage.toFixed(1), 12, '#86efac').setOrigin(1, .5);
-      this.text(65, 540, 'AANVALLEN PER SEC', 11, COLOR.secondary);
-      this.text(314, 540, (1000 / weaponBaseAttackIntervalMs(stats)).toFixed(2),
-        12, '#86efac').setOrigin(1, .5);
-      this.text(65, 562, stats.attackMode === 'melee' ? 'BEREIK' : 'PROJECTIELEN',
-        11, COLOR.secondary);
-      this.text(314, 562, (stats.attackMode === 'melee' ? stats.meleeRange :
-        stats.projectileCount).toString(), 12, '#86efac').setOrigin(1, .5);
-      this.fittedText(42, 596, weapon.description, 10, COLOR.faint, 309);
+      const next = getWeaponStats(weaponId, Math.min(MAX_WEAPON_LEVEL, level + 1));
+      const rows: Array<[string, string, string]> = [
+        ['SCHADE', stats.damage.toFixed(1), next.damage.toFixed(1)],
+        ['AANVALLEN PER SEC', (1000 / weaponBaseAttackIntervalMs(stats)).toFixed(2),
+          (1000 / weaponBaseAttackIntervalMs(next)).toFixed(2)],
+        [stats.attackMode === 'melee' ? 'BEREIK' : 'PROJECTIELEN',
+          String(stats.attackMode === 'melee' ? stats.meleeRange : stats.projectileCount),
+          String(next.attackMode === 'melee' ? next.meleeRange : next.projectileCount)],
+      ];
+      rows.forEach(([name, current, future], i) => {
+        const y = 518 + i * 22;
+        this.text(65, y, name, 10, COLOR.secondary);
+        this.text(321, y, current + (previewing ? '  →  ' + future : ''),
+          previewing ? 11 : 12, previewing ? '#fcd34d' : '#86efac').setOrigin(1, .5);
+      });
+      this.fittedText(42, 596, previewing
+        ? 'BEVESTIG UPGRADE  ·  KOST ' + weaponUpgradeCost(level) + ' G'
+        : weapon.description, 10, previewing ? '#fcd34d' : COLOR.faint, 309);
       const unlocked = profile.unlockedWeapons.includes(weaponId);
       const cost = weaponUpgradeCost(level);
       this.button(110, 642, 153, 43, worn ? 'ACTIEF' : unlocked ? 'SELECTEREN' : 'SLOT',
@@ -708,10 +745,12 @@ export class MainMenuScene extends Phaser.Scene {
           this.runAction({ type: 'selectWeapon', id: weaponId });
         }, worn ? 'selected' : 'normal', worn || !unlocked, 11);
       this.button(280, 642, 153, 43,
-        level >= MAX_WEAPON_LEVEL ? 'MAX LEVEL' : 'UPGRADE ' + cost + ' G',
-        () => this.runAction({ type: 'upgradeWeapon', id: weaponId }),
-        'normal', !unlocked || level >= MAX_WEAPON_LEVEL || profile.gold < cost, 10);
+        level >= MAX_WEAPON_LEVEL ? 'MAX LEVEL' : previewing ? 'CONFIRM' : 'UPGRADE ' + cost + ' G',
+        () => this.requestUpgrade({ type: 'upgradeWeapon', id: weaponId }, level),
+        previewing ? 'selected' : 'normal',
+        !unlocked || level >= MAX_WEAPON_LEVEL || profile.gold < cost, 10);
       this.button(110, 694, 153, 43, '‹ TERUG', () => {
+        this.pendingUpgrade = null;
         this.equipmentView = 'list'; this.scene.restart();
       }, 'quiet', false, 11);
       this.button(280, 694, 153, 43, 'GEEN WAPENFUSION', () => {},
@@ -999,11 +1038,11 @@ export class MainMenuScene extends Phaser.Scene {
     this.scene.restart();
   };
 
-  private section(title: string, subtitle: string): void {
-    this.add.rectangle(39, 273, 3, 23, COLOR.accent, 0.9);
-    this.fittedText(52, 267, title, 16, COLOR.white, 285, true);
-    this.fittedText(43, 292, subtitle, 10, COLOR.secondary, 305);
-    this.add.rectangle(195, 306, 306, 1, COLOR.border, 0.7);
+  private section(title: string, _subtitle: string): void {
+    // Section titles remain, but repetitive instructional subtitles are removed.
+    this.add.rectangle(39, 278, 3, 23, COLOR.accent, 0.9);
+    this.fittedText(52, 278, title, 16, COLOR.white, 285, true);
+    this.add.rectangle(195, 307, 306, 1, COLOR.border, 0.7);
   }
 
   /** Keep all card labels inside their own available width on small screens. */
