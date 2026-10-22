@@ -3,31 +3,12 @@ import type { Player } from '../entities/Player';
 import type { WeaponId } from '../weapons/weaponConfig';
 import { hasAnimatedHero } from './heroEquipmentArt';
 
-export type AttackPose = 'sword' | 'hammer' | 'bow' | 'crossbow' | 'shotgun' |
-  'staff' | 'spellbook' | 'ice-dagger' | 'ice-wave';
-export const poseForWeapon = (weapon: WeaponId): AttackPose | null =>
-  weapon === 'sunblade' ? 'sword' : weapon === 'warhammer' ? 'hammer'
-    : weapon === 'bow' ? 'bow' : weapon === 'crossbow' ? 'crossbow'
-      : weapon === 'staff' ? 'staff' : weapon === 'spellbook' ? 'spellbook'
-        : weapon === 'daggers' ? 'ice-dagger' : weapon === 'iceblade' ? 'ice-wave' : null;
-
-export function poseLengthMs(pose: AttackPose, attackIntervalMs: number): number {
-  const base = pose === 'hammer' ? 440 : pose === 'sword' ? 200 :
-    pose === 'staff' ? 285 : pose === 'spellbook' ? 250 : pose === 'ice-wave' ? 380 :
-      pose === 'ice-dagger' ? 165 : pose === 'crossbow' ? 175 :
-        pose === 'shotgun' ? 210 : 145;
-  return pose === 'hammer' ? Math.max(220, Math.min(base, attackIntervalMs * .78))
-    : Math.max(75, Math.min(base, attackIntervalMs * .78));
-}
+import {
+  attackPoseProgress, poseForWeapon, poseLengthMs, type AttackPose,
+} from './characterAttackPose';
 
 /** Fixed 135ms hammer anticipation: impact and actual hitbox occur together. */
 export const HAMMER_IMPACT_DELAY_MS = 135;
-
-/** Pure timed pose for exact, repeatable animations at any frame-rate. */
-export function attackPoseProgress(now: number, started: number, duration: number): number {
-  if (!(duration > 0) || !Number.isFinite(now)) return 1;
-  return Phaser.Math.Clamp((now - started) / duration, 0, 1);
-}
 
 export class CharacterAttackArt {
   private readonly graphics: Phaser.GameObjects.Graphics;
