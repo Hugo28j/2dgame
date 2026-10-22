@@ -6,10 +6,10 @@ import { RunUpgradeDeck } from '../src/progression/runUpgrades';
 function checkpoint(): RunCheckpoint {
   const ledger = new RunLedger('resume-test-123', 2);
   ledger.enterRoom(1);
-  ledger.defeatEnemy('mob-1', 'normal');
+  ledger.defeatEnemy('mob-1', 'slime');
   ledger.clearRoom(1);
   ledger.enterRoom(2);
-  ledger.defeatEnemy('mob-2', 'normal');
+  ledger.defeatEnemy('mob-2', 'slime');
   ledger.clearRoom(2);
   ledger.collectGold(135);
   ledger.enterRoom(3);
@@ -51,7 +51,7 @@ describe('persistent unfinished-run checkpoints', () => {
     expect(ledger.report(false).reachedRoom).toBe(3);
     expect(ledger.report(false).roomsCleared).toBe(2);
     expect(ledger.clearRoom(2)).toBe(false);
-    expect(ledger.defeatEnemy('mob-2', 'normal')).toBe(false);
+    expect(ledger.defeatEnemy('mob-2', 'slime')).toBe(false);
     expect(ledger.clearRoom(3)).toBe(true);
     expect(ledger.report(false).earnedGold).toBe(135);
     expect(ledger.report(false).roomsCleared).toBe(3);
