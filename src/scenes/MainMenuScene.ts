@@ -775,6 +775,7 @@ export class MainMenuScene extends Phaser.Scene {
 
   private setUpgradeCategory(category: 'weapons' | 'abilities' | 'armor'): void {
     this.upgradeCategory = category;
+    this.pendingUpgrade = null;
     this.armorPage = 0;
     this.scene.restart();
   }
@@ -786,31 +787,39 @@ export class MainMenuScene extends Phaser.Scene {
     this.plate(195, 394, 328, 47, COLOR.card, COLOR.border, 10);
     this.button(60, 394, 45, 35, '‹', () => {
       this.armorHero = heroes[(index + heroes.length - 1) % heroes.length]!;
+      this.pendingUpgrade = null;
       this.armorPage = 0; this.scene.restart();
     }, 'quiet', heroes.length <= 1, 15);
     this.fittedText(195, 394, HEROES[this.armorHero].name.toUpperCase() +
       ' · LV.' + profile.heroLevels[this.armorHero], 12, COLOR.white, 195, true).setOrigin(.5);
     this.button(330, 394, 45, 35, '›', () => {
       this.armorHero = heroes[(index + 1) % heroes.length]!;
+      this.pendingUpgrade = null;
       this.armorPage = 0; this.scene.restart();
     }, 'quiet', heroes.length <= 1, 15);
   }
 
   private drawUpgradeRows(rows: Array<{
-    label: string; description: string; level: number; max: number;
-    cost: number; unlocked: boolean; action: ProfileAction;
+    label: string; description: string; nextDescription: string;
+    level: number; max: number; cost: number; unlocked: boolean;
+    action: UpgradeProfileAction;
   }>): void {
     rows.forEach((row, index) => {
       const y = 477 + index * 104;
-      this.plate(195, y, 328, 95, COLOR.card, COLOR.border, 10);
+      const confirming = this.isConfirmingUpgrade(row.action, row.level);
+      this.plate(195, y, 328, 95, COLOR.card, confirming ? COLOR.gold : COLOR.border, 10);
       this.fittedText(44, y - 31, row.label.toUpperCase(), 13, COLOR.white, 283, true);
-      this.fittedText(44, y - 12, row.description, 10, COLOR.secondary, 290);
-      this.text(44, y + 19, 'LEVEL ' + row.level + '/' + row.max, 10, COLOR.faint);
+      this.fittedText(44, y - 12, row.description, 10, COLOR.secondary, 293);
+      if (confirming)
+        this.fittedText(44, y + 5, '→ ' + row.nextDescription, 9, '#fcd34d', 277);
+      this.text(44, y + 24, 'LV.' + row.level + (confirming ? ' → ' + (row.level + 1) : '') +
+        '/' + row.max + ' · ' + row.cost + ' G', 10, COLOR.faint);
       const allowed = row.unlocked && row.level < row.max && progressStore.current.gold >= row.cost;
-      this.button(305, y + 25, 92, 32,
-        !row.unlocked ? 'SLOT' : row.level >= row.max ? 'MAX' :
+      this.button(305, y + 25, 92, 32, !row.unlocked ? 'SLOT' :
+        row.level >= row.max ? 'MAX' : confirming ? 'CONFIRM' :
           row.cost.toLocaleString('nl-BE') + ' G',
-        () => this.runAction(row.action), allowed ? 'normal' : 'quiet', !allowed, 10);
+        () => this.requestUpgrade(row.action, row.level),
+        confirming ? 'selected' : 'normal', !allowed, 10);
     });
   }
 
@@ -823,35 +832,37 @@ export class MainMenuScene extends Phaser.Scene {
         description: unlocked
           ? abilityMenuSummary(getAbilityStats(id, profile.abilityLevels[id]))
           : 'Vrij bij hero level ' + skill.unlockLevel,
+        nextDescription: abilityMenuSummary(getAbilityStats(id,
+          Math.min(MAX_ABILITY_LEVEL, profile.abilityLevels[id] + 1))),
         level: profile.abilityLevels[id], max: MAX_ABILITY_LEVEL,
         cost: abilityUpgradeCost(profile.abilityLevels[id]),
-        unlocked, action: { type: 'upgradeAbility', id } as ProfileAction };
+        unlocked, action: { type: 'upgradeAbility', id } as UpgradeProfileAction };
     });
     this.drawUpgradeRows(rows);
+  }
+
+  private weaponUpgradeSummary(id: WeaponId, level: number): string {
+    const stats = getWeaponStats(id, level);
+    if (id === 'fireorbs') return 'VLAM ' + stats.damage.toFixed(1) +
+      ' DMG/SEC · BRAND 1/SEC · RANGE ' + stats.meleeRange.toFixed(0);
+    return 'DMG ' + stats.damage.toFixed(1) +
+      ' · ' + (weaponBaseAttackIntervalMs(stats) / 1000).toFixed(2) + ' SEC/AANVAL' +
+      (stats.attackMode === 'melee' ? ' · RANGE ' + stats.meleeRange.toFixed(0)
+        : ' · ' + stats.projectileCount + ' SCHOTEN');
   }
 
   private drawWeaponUpgrades(): void {
     const profile = progressStore.current;
     this.drawUpgradeRows(HERO_WEAPONS[this.armorHero].map(id => ({
       label: WEAPONS[id].name,
-      description: (() => {
-        const stats = getWeaponStats(id, profile.weaponLevels[id]);
-        if (id === 'fireorbs') return 'VLAM ' + stats.damage.toFixed(1) +
-          ' DMG/SEC · BRAND 1/SEC · RANGE ' + stats.meleeRange.toFixed(0);
-        const secondsPerAttack = weaponBaseAttackIntervalMs(stats) / 1000;
-        return 'DMG ' + stats.damage.toFixed(1) +
-          ' · ' + secondsPerAttack.toFixed(2) + ' SEC/AANVAL' +
-          (id === 'sunblade' ? ' · RANGE ' + stats.meleeRange.toFixed(0) :
-            ' · ' + stats.projectileCount +
-            (stats.attackMode === 'melee' ? ' SLAG' : ' SCHOTEN'));
-      })(),
+      description: this.weaponUpgradeSummary(id, profile.weaponLevels[id]),
+      nextDescription: this.weaponUpgradeSummary(id,
+        Math.min(MAX_WEAPON_LEVEL, profile.weaponLevels[id] + 1)),
       level: profile.weaponLevels[id], max: MAX_WEAPON_LEVEL,
       cost: weaponUpgradeCost(profile.weaponLevels[id]),
       unlocked: profile.unlockedWeapons.includes(id),
-      action: { type: 'upgradeWeapon', id } as ProfileAction,
+      action: { type: 'upgradeWeapon', id } as UpgradeProfileAction,
     })));
-    this.text(195, 706, 'Wapen kiezen? Ga naar UITRUSTING.',
-      10, COLOR.secondary, true);
   }
 
   private drawArmorUpgrades(): void {
@@ -859,7 +870,8 @@ export class MainMenuScene extends Phaser.Scene {
     const heroId = this.armorHero;
     const slots: Record<ArmorSlot, string> = { helm: 'HELM', body: 'BODY', boots: 'BOOTS' };
     ARMOR_SLOTS.forEach((slot, i) => this.button(81 + i * 114, 453, 106, 37,
-      slots[slot], () => { this.armorSlot = slot; this.armorPage = 0; this.scene.restart(); },
+      slots[slot], () => { this.armorSlot = slot; this.armorPage = 0;
+        this.pendingUpgrade = null; this.scene.restart(); },
       this.armorSlot === slot ? 'selected' : 'quiet', false, 10));
     const items = profile.armorInventory.filter(item =>
       item.heroId === heroId && armorDefinition(item).slot === this.armorSlot);
@@ -870,30 +882,40 @@ export class MainMenuScene extends Phaser.Scene {
     }
     items.slice(this.armorPage * 2, this.armorPage * 2 + 2).forEach((item, i) => {
       const rarity = RARITY_CONFIG[item.rarity];
-      const y = 526 + i * 87;
-      this.plate(195, y, 328, 81, COLOR.card, rarity.color, 9);
-      this.fittedText(43, y - 29, armorDefinition(item).name.toUpperCase(),
+      const confirming = this.isConfirmingUpgrade({ type: 'upgradeArmor', id: item.id }, item.level);
+      const y = 528 + i * 100;
+      this.plate(195, y, 328, 95, COLOR.card, confirming ? COLOR.gold : rarity.color, 9);
+      this.fittedText(43, y - 35, armorDefinition(item).name.toUpperCase(),
         12, '#' + rarity.color.toString(16).padStart(6, '0'), 294, true);
-      this.fittedText(43, y - 12, rarity.label + ' · LV.' + item.level + '/' + ARMOR_MAX_LEVEL +
+      this.fittedText(43, y - 19, rarity.label + ' · LV.' + item.level +
+        (confirming ? ' → ' + (item.level + 1) : '') + '/' + ARMOR_MAX_LEVEL +
         ' · ' + '★'.repeat(item.stars), 10, COLOR.secondary, 290);
-      this.fittedText(43, y + 5, armorStatText(item), 9, '#86efac', 296);
+      this.fittedText(43, y - 4, armorStatText(item), 9, '#86efac', 297);
+      if (confirming)
+        this.fittedText(43, y + 9, '→ ' + armorStatText({ ...item,
+          level: Math.min(ARMOR_MAX_LEVEL, item.level + 1) }),
+          9, '#fcd34d', 294);
       const cost = armorUpgradeCost(item);
       const fuse = item.stars < ARMOR_MAX_STARS && items.some(other =>
         other.id !== item.id && other.kind === item.kind &&
         other.rarity === item.rarity && other.stars === item.stars);
-      this.button(99, y + 29, 113, 27, item.level >= ARMOR_MAX_LEVEL ? 'MAX' : cost + ' G · LV+',
-        () => this.runAction({ type: 'upgradeArmor', id: item.id }),
-        'normal', item.level >= ARMOR_MAX_LEVEL || profile.gold < cost, 9);
-      this.button(216, y + 29, 101, 27, 'FUSION ★', () =>
+      this.button(99, y + 31, 113, 27, item.level >= ARMOR_MAX_LEVEL ? 'MAX' :
+        confirming ? 'CONFIRM' : cost + ' G · LV+',
+        () => this.requestUpgrade({ type: 'upgradeArmor', id: item.id }, item.level),
+        confirming ? 'selected' : 'normal',
+        item.level >= ARMOR_MAX_LEVEL || profile.gold < cost, 9);
+      this.button(216, y + 31, 101, 27, 'FUSION ★', () =>
         this.runAction({ type: 'fuseArmor', id: item.id }), 'quiet', !fuse, 9);
-      this.button(321, y + 29, 67, 27, 'VERKOOP', () =>
+      this.button(321, y + 31, 67, 27, 'VERKOOP', () =>
         this.runAction({ type: 'sellArmor', id: item.id }), 'quiet', false, 9);
     });
     this.button(92, 716, 95, 30, '‹ VORIGE', () => {
+      this.pendingUpgrade = null;
       this.armorPage--; this.scene.restart();
     }, 'quiet', this.armorPage === 0, 9);
     this.text(195, 716, this.armorPage + 1 + '/' + pages, 10, COLOR.secondary, true);
     this.button(298, 716, 95, 30, 'VOLGENDE ›', () => {
+      this.pendingUpgrade = null;
       this.armorPage++; this.scene.restart();
     }, 'quiet', this.armorPage >= pages - 1, 9);
   }
