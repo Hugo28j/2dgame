@@ -4,6 +4,7 @@ import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
 import { isWorldUnlocked, getWorld } from '../worlds/worldConfig';
 import { ensureWorldDiorama } from '../worlds/worldMapArt';
 import { ensureArmorIcon } from '../ui/armorIconArt';
+import { ensureDressedHeroTexture } from '../heroes/heroEquipmentArt';
 import { worldAtlasEntries, type WorldAtlasEntry } from '../worlds/worldAtlas';
 import {
   HERO_IDS, HEROES, getHeroStats, MAX_HERO_LEVEL, type HeroId,
@@ -131,7 +132,8 @@ export class MainMenuScene extends Phaser.Scene {
     const hero = HEROES[profile.selectedHero];
     this.plate(195, 150, 354, 74, 0x152638, 0x30485b, 13);
     this.add.circle(55, 147, 23, hero.color, 0.18).setStrokeStyle(2, hero.color, 0.9);
-    this.add.image(55, 147, hero.textureKey).setDisplaySize(45, 45);
+    this.add.image(55, 147, ensureDressedHeroTexture(this, profile.selectedHero,
+      profile.equippedArmor[profile.selectedHero], profile.armorInventory)).setDisplaySize(45, 45);
     this.text(90, 129, 'JOUW HELD  ·  LV.' + profile.heroLevels[profile.selectedHero],
       10, COLOR.faint);
     this.fittedText(90, 150, hero.name.toUpperCase(), 15, COLOR.white, 134, true);
@@ -333,7 +335,8 @@ export class MainMenuScene extends Phaser.Scene {
       this.plate(195, y, 328, 85,
         selected ? 0x1b3844 : COLOR.card, selected ? hero.color : COLOR.border, 11);
       this.add.circle(61, y - 15, 24, hero.color, 0.15);
-      this.add.image(61, y - 15, hero.textureKey).setDisplaySize(47, 47);
+      this.add.image(61, y - 15, ensureDressedHeroTexture(this, id,
+        profile.equippedArmor[id], profile.armorInventory)).setDisplaySize(47, 47);
       this.fittedText(93, y - 29, hero.name.toUpperCase(), 13, COLOR.white, 169, true);
       this.fittedText(93, y - 10, 'LV.' + profile.heroLevels[id] +
         ' · XP ' + profile.heroXp[id] + '/' + (profile.heroLevels[id] >= MAX_HERO_LEVEL
@@ -400,7 +403,8 @@ export class MainMenuScene extends Phaser.Scene {
       this.scene.restart();
     });
     this.add.circle(77, 345, 30, hero.color, .20).setStrokeStyle(2, hero.color);
-    this.add.image(77, 345, hero.textureKey).setDisplaySize(57, 57);
+    this.add.image(77, 345, ensureDressedHeroTexture(this, heroId,
+      profile.equippedArmor[heroId], profile.armorInventory)).setDisplaySize(57, 57);
     this.fittedText(118, 309, hero.name.toUpperCase(), 16, COLOR.white, 195, true);
     this.fittedText(118, 330, 'HELD  ·  LEVEL ' + profile.heroLevels[heroId], 10,
       '#9de4f3', 194);
