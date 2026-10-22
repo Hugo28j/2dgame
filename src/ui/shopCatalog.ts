@@ -46,7 +46,7 @@ export function chestRarity(chest: ShopChest, roll: number): ArmorRarity | null 
     remaining -= chest.odds[rarity];
     if (remaining < 0) return rarity;
   }
-  return ARMOR_RARITIES[ARMOR_RARITIES.length - 1];
+  return ARMOR_RARITIES[ARMOR_RARITIES.length - 1]!;
 }
 
 /** Chests drop only hero-specific armor for heroes ALREADY unlocked.
