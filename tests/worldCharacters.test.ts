@@ -45,6 +45,14 @@ describe('themed world enemies and bosses', () => {
     }
     expect(getWorldCharacter(5, 'boss', 30).name).toBe('Sovereign of Nothing');
   });
+
+  it('keeps the World-1 rolling golem family at distinct boss and mob sizes', () => {
+    const roller = getWorldCharacter(1, 'charger');
+    const golem = getWorldCharacter(1, 'boss', 5);
+    expect(roller.textureKey).toBe('world-1-charger');
+    expect(golem.textureKey).toBe('world-1-boss-1');
+    expect(roller.textureKey).not.toBe(golem.textureKey);
+  });
 });
 
 describe('four world-specific playable heroes', () => {

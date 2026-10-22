@@ -53,7 +53,9 @@ export class AdvancedEnemy extends Slime {
   private readonly summonerType: SummonerType | undefined;
   private witchHat?: Phaser.GameObjects.Graphics;
   private windupEndsAt = 0;
+  private windupStartedAt = 0;
   private dashEndsAt = 0;
+  private dashStartedAt = 0;
   private dashX = 0;
   private dashY = 0;
   private warning?: Phaser.GameObjects.Graphics;
@@ -161,6 +163,17 @@ export class AdvancedEnemy extends Slime {
   }
   public get isMossWarden(): boolean {
     return this.isBoss && this.worldId === 1 && this.roomNumber === 5;
+  }
+  /** World-1's small roller and room-5 boss share the same curl/roll language. */
+  private get isForestRoller(): boolean {
+    return this.isMossWarden || (this.worldId === 1 && this.kind === 'charger');
+  }
+  private get forestRollScale(): number { return this.isBoss ? 1.75 : 1; }
+  private get forestRollTexture(): string {
+    return this.isMossWarden ? 'world-1-boss-1-roll' : 'world-1-charger-roll';
+  }
+  private get forestIdleTexture(): string {
+    return getWorldCharacter(this.worldId, this.kind, this.roomNumber, this.bossSlot).textureKey;
   }
 
   public updateAI(targetX: number, targetY: number, now: number,
@@ -364,6 +377,43 @@ export class AdvancedEnemy extends Slime {
         break;
       }
     }
+  }
+
+  public override preUpdate(time: number, delta: number): void {
+    super.preUpdate(time, delta);
+    if (!this.isForestRoller || !this.active || this.aiState === 'defeated') return;
+    const now = this.scene.time.now;
+    if (this.windupEndsAt > 0) {
+      const duration = Math.max(1, this.windupEndsAt - this.windupStartedAt);
+      const progress = Phaser.Math.Clamp((now - this.windupStartedAt) / duration, 0, 1);
+      if (progress < .68) {
+        const curl = progress / .68;
+        if (this.texture.key !== this.forestIdleTexture) this.setTexture(this.forestIdleTexture);
+        this.setScale(this.forestRollScale * (1 + curl * .14),
+          this.forestRollScale * (1 - curl * .38));
+        this.setAngle(Math.sin(curl * Math.PI) * (this.flipX ? 9 : -9));
+      } else {
+        const close = (progress - .68) / .32;
+        if (this.texture.key !== this.forestRollTexture) this.setTexture(this.forestRollTexture);
+        const scale = this.forestRollScale * (.72 + close * .28);
+        this.setScale(scale);
+        this.setAngle((this.flipX ? -1 : 1) * close * 35);
+      }
+      return;
+    }
+    if (this.dashEndsAt > 0) {
+      if (this.texture.key !== this.forestRollTexture) this.setTexture(this.forestRollTexture);
+      this.setScale(this.forestRollScale);
+      const direction = this.dashX < 0 ? -1 : 1;
+      this.setAngle(direction * (now - this.dashStartedAt) * .86);
+    }
+  }
+
+  private resetForestRollVisual(): void {
+    if (!this.isForestRoller || !this.active) return;
+    this.setTexture(this.forestIdleTexture);
+    this.setScale(this.forestRollScale);
+    this.setAngle(0);
   }
 
   /** Shared initial and repeat-cast scheduling. Death-triggered splits are
@@ -612,15 +662,18 @@ export class AdvancedEnemy extends Slime {
         return;
       }
       this.dashEndsAt = 0;
+      this.dashStartedAt = 0;
       this.setVelocity(0, 0);
+      this.resetForestRollVisual();
       this.nextSpecialAt = now + rechargeMs;
       return;
     }
     if (this.windupEndsAt > 0) {
       this.setVelocity(0, 0);
-      this.drawWarning(70, 0xef4444);
+      if (!this.isForestRoller) this.drawWarning(70, 0xef4444);
       if (now >= this.windupEndsAt) {
         this.clearWarning();
+        this.dashStartedAt = now;
         this.dashEndsAt = now + (this.isMossWarden ?
           (bossPhase(this.healthRatio) === 1 ? MOSS_DASH.phaseOneDurationMs : MOSS_DASH.phaseTwoDurationMs) :
           this.kind === 'charger' ? CHARGER_DASH.durationMs *
@@ -632,10 +685,11 @@ export class AdvancedEnemy extends Slime {
       const direction = new Phaser.Math.Vector2(targetX - this.x, targetY - this.y).normalize();
       this.dashX = direction.x;
       this.dashY = direction.y;
+      this.windupStartedAt = now;
       this.windupEndsAt = now + (this.isMossWarden ? MOSS_DASH.warningMs : this.isBoss ? 770 :
         CHARGER_DASH.telegraphMs);
       this.setVelocity(0, 0);
-      this.drawWarning(70, 0xef4444);
+      if (!this.isForestRoller) this.drawWarning(70, 0xef4444);
     }
   }
 
@@ -673,6 +727,7 @@ export class AdvancedEnemy extends Slime {
   }
   private clearWarning(): void {
     this.windupEndsAt = 0;
+    this.windupStartedAt = 0;
     this.warning?.destroy();
     this.warning = undefined;
   }
@@ -680,6 +735,7 @@ export class AdvancedEnemy extends Slime {
     this.witchHat?.clear();
     this.shieldGraphic?.clear();
     this.clearWarning();
+    this.resetForestRollVisual();
     super.playDefeat();
   }
   public override destroy(fromScene?: boolean): void {

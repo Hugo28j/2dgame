@@ -68,6 +68,10 @@ function drawMinion(g: Phaser.GameObjects.Graphics, look: CharacterLook): void {
       worldMark(g, look.worldId, 0xf8fafc, 24, 12);
       break;
     case 'charger':
+      if (look.worldId === 1) {
+        drawForestRollerGolem(g, false);
+        break;
+      }
       // Long low creature: horns, armored back, four claws.
       g.fillStyle(look.primary); g.fillEllipse(23, 29, 37, 23);
       g.fillStyle(look.secondary); g.fillTriangle(8, 23, 3, 4, 19, 17);
@@ -107,6 +111,76 @@ function drawMinion(g: Phaser.GameObjects.Graphics, look: CharacterLook): void {
       break;
     default: break;
   }
+}
+
+/** The World-1 charger and first boss are one readable creature family:
+ * stacked forest stones, moss seams and heavy folding limbs. The boss is
+ * deliberately more detailed; runtime scale makes it substantially larger. */
+function drawForestRollerGolem(g: Phaser.GameObjects.Graphics, boss: boolean): void {
+  const stone = boss ? 0x66705f : 0x727969;
+  const lightStone = boss ? 0x929b82 : 0x969d86;
+  const shadow = 0x343b33;
+  const moss = boss ? 0x4f7a32 : 0x5f843b;
+  const eye = boss ? 0xd9ff72 : 0xc8f36a;
+
+  g.fillStyle(0x07130b, .62); g.fillEllipse(24, 44, boss ? 43 : 36, 7);
+  // Heavy feet, fists and separated arms keep the idle silhouette humanoid.
+  g.fillStyle(shadow);
+  g.fillRoundedRect(boss ? 4 : 7, 31, boss ? 13 : 11, 12, 4);
+  g.fillRoundedRect(boss ? 31 : 30, 31, boss ? 13 : 11, 12, 4);
+  g.fillRoundedRect(boss ? 1 : 4, 21, boss ? 13 : 11, 17, 5);
+  g.fillRoundedRect(boss ? 34 : 33, 21, boss ? 13 : 11, 17, 5);
+  g.fillStyle(stone);
+  g.fillRoundedRect(boss ? 7 : 10, boss ? 14 : 16, boss ? 34 : 28, boss ? 27 : 25, 8);
+  g.fillStyle(lightStone);
+  g.fillRoundedRect(boss ? 10 : 13, boss ? 8 : 11, boss ? 28 : 22, boss ? 20 : 17, 7);
+  // Brow, recessed face and bright magical eyes remain readable on phones.
+  g.fillStyle(shadow); g.fillRoundedRect(boss ? 12 : 15, boss ? 16 : 18,
+    boss ? 24 : 18, boss ? 11 : 9, 3);
+  g.fillStyle(eye); g.fillRoundedRect(boss ? 15 : 17, boss ? 19 : 20, 6, 3, 1);
+  g.fillRoundedRect(boss ? 27 : 26, boss ? 19 : 20, 6, 3, 1);
+  // Cracks show that the limbs can fold together into the rolling boulder.
+  g.lineStyle(boss ? 2.4 : 1.8, 0x252b25, .92);
+  g.lineBetween(13, 29, 20, 34); g.lineBetween(20, 34, 17, 41);
+  g.lineBetween(35, 28, 28, 33); g.lineBetween(28, 33, 32, 40);
+  g.lineBetween(18, 11, 22, 16); g.lineBetween(31, 10, 27, 16);
+  // Moss grows over the shoulder plates; the boss also carries small stones.
+  g.fillStyle(moss);
+  g.fillEllipse(boss ? 11 : 14, boss ? 16 : 18, boss ? 17 : 13, 7);
+  g.fillEllipse(boss ? 35 : 33, boss ? 14 : 17, boss ? 15 : 12, 6);
+  g.fillTriangle(18, 12, 22, 3, 25, 13);
+  if (boss) {
+    g.fillStyle(0x7e8876); g.fillTriangle(6, 20, 9, 5, 16, 18);
+    g.fillTriangle(33, 17, 40, 4, 43, 21);
+    g.fillStyle(0xb6c89b); g.fillCircle(8, 26, 3); g.fillCircle(41, 27, 3);
+  }
+}
+
+/** Dedicated curled pose used after the visible crouch. It is intentionally a
+ * near-perfect circle, so rotation reads as rolling instead of a sliding dash. */
+function drawForestRollerBall(g: Phaser.GameObjects.Graphics, boss: boolean): void {
+  const radius = boss ? 21 : 18;
+  const stone = boss ? 0x626c5b : 0x747b6b;
+  const lightStone = boss ? 0x919b82 : 0x9ba28b;
+  const moss = boss ? 0x4e7a31 : 0x5d843a;
+  g.fillStyle(0x07130b, .55); g.fillEllipse(24, 44, boss ? 43 : 36, 6);
+  g.fillStyle(0x30372f); g.fillCircle(24, 25, radius + 1);
+  g.fillStyle(stone); g.fillCircle(24, 24, radius);
+  // Interlocking plates make the rotation obvious even at high dash speed.
+  g.fillStyle(lightStone); g.fillTriangle(24, 4, 34, 17, 22, 20);
+  g.fillTriangle(43, 24, 31, 34, 29, 21);
+  g.fillStyle(0x454e42); g.fillTriangle(24, 44, 14, 33, 26, 29);
+  g.fillTriangle(5, 24, 17, 14, 20, 27);
+  g.lineStyle(boss ? 2.6 : 2, 0x272e27, .95);
+  g.strokeCircle(24, 24, radius - 1);
+  g.lineBetween(24, 5, 22, 20); g.lineBetween(42, 24, 29, 21);
+  g.lineBetween(24, 43, 26, 29); g.lineBetween(6, 24, 20, 27);
+  g.fillStyle(moss); g.fillEllipse(14, 12, boss ? 13 : 10, 5);
+  g.fillEllipse(36, 31, boss ? 12 : 9, 5);
+  // A brief glimpse of the tucked-in glowing face sells the transformation.
+  g.fillStyle(0x252b25); g.fillRoundedRect(16, 20, 16, 8, 3);
+  g.fillStyle(boss ? 0xd9ff72 : 0xc8f36a);
+  g.fillRect(18, 22, 4, 2); g.fillRect(27, 22, 4, 2);
 }
 
 /** 48x48 forest goblin: pointed ears, green face, snarling teeth,
@@ -222,6 +296,10 @@ function drawBoss(g: Phaser.GameObjects.Graphics, look: CharacterLook, tier: num
     drawEmberBoss(g, tier);
     return;
   }
+  if (look.worldId === 1 && tier === 1) {
+    drawForestRollerGolem(g, true);
+    return;
+  }
   // Distinct silhouettes for the six encounters, including both room-15 bosses.
   g.fillStyle(0x020617, 0.7); g.fillEllipse(24, 44, 40, 7);
   g.fillStyle(look.secondary); g.fillRoundedRect(6, 16, 36, 28, 8);
@@ -327,5 +405,16 @@ export function createWorldCharacterTextures(scene: Phaser.Scene): void {
       g.generateTexture(look.textureKey, 48, 48);
       g.destroy();
     }
+  }
+  const rollerTextures = [
+    { key: 'world-1-charger-roll', boss: false },
+    { key: 'world-1-boss-1-roll', boss: true },
+  ] as const;
+  for (const roller of rollerTextures) {
+    if (scene.textures.exists(roller.key)) continue;
+    const g = scene.make.graphics({ x: 0, y: 0 }, false);
+    drawForestRollerBall(g, roller.boss);
+    g.generateTexture(roller.key, 48, 48);
+    g.destroy();
   }
 }
