@@ -79,7 +79,8 @@ describe('chest economy and published drop rates', () => {
     const dup=applyProfileAction({...existing,gold:1000}, {...request,chestId:'small'});
     expect(dup.gold).toBe(1000);
     expect(dup.armorInventory).toHaveLength(1);
-    const full=applyProfileAction({...profile,armorInventory:Array(250).fill(existing.armorInventory[0])},
+    const filled = Array.from({length:250}, (_,i) => ({...existing.armorInventory[0]!,id:'armor-full-'+i}));
+    const full=applyProfileAction({...profile,armorInventory:filled},
       {...request,chestId:'small'});
     expect(full.armorInventory).toHaveLength(250);
     expect(full.gold).toBe(profile.gold);
