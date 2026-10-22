@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ARMOR_DEFINITIONS, ARMOR_RARITIES, RARITY_CONFIG, armorBonuses,
-  armorUpgradeCost, rollEnemyArmor } from '../src/progression/armor';
+  armorUpgradeCost, chooseArmorDropHero, rollEnemyArmor } from '../src/progression/armor';
 import { applyProfileAction, defaultProfile } from '../src/progression/ProgressStore';
 
 const report = (runId: string, victory: boolean) => ({
@@ -18,6 +18,39 @@ describe('armor equipment progression', () => {
     expect(ARMOR_DEFINITIONS).toHaveLength(63);
     expect(ARMOR_RARITIES).toHaveLength(5);
   });
+  it('chooses equally from owned heroes, never from heroes that are locked', () => {
+    const owned = ['guardian', 'ranger', 'mage'] as const;
+    const results = Array.from({ length: 300 }, (_, i) =>
+      chooseArmorDropHero(owned, (i + 0.5) / 300));
+    expect(results.filter(id => id === 'guardian')).toHaveLength(100);
+    expect(results.filter(id => id === 'ranger')).toHaveLength(100);
+    expect(results.filter(id => id === 'mage')).toHaveLength(100);
+    expect(new Set(results)).toEqual(new Set(owned));
+    expect(chooseArmorDropHero(['guardian'], .999999)).toBe('guardian');
+    expect(chooseArmorDropHero(['guardian', 'ranger'], 0)).toBe('guardian');
+    expect(chooseArmorDropHero(['guardian', 'ranger'], .5)).toBe('ranger');
+    expect(chooseArmorDropHero([], .5)).toBeUndefined();
+    expect(chooseArmorDropHero(owned, Number.NaN)).toBeUndefined();
+    expect(chooseArmorDropHero(owned, 1)).toBeUndefined();
+    expect(chooseArmorDropHero(['ranger', 'ranger'], .75)).toBe('ranger');
+  });
+
+  it('keeps dropped gear bound to the randomly selected owned hero', () => {
+    const profile = { ...defaultProfile(), unlockedHeroes: ['guardian', 'ranger'] as
+      ReturnType<typeof defaultProfile>['unlockedHeroes'] };
+    const selectedOwner = chooseArmorDropHero(profile.unlockedHeroes, .75)!;
+    expect(profile.selectedHero).toBe('guardian');
+    expect(selectedOwner).toBe('ranger');
+    const item = rollEnemyArmor('normal', 0, .3, .8, 'run', 'enemy', selectedOwner)!;
+    expect(item.heroId).toBe('ranger');
+    expect(item.kind.startsWith('ranger-')).toBe(true);
+    const collected = applyProfileAction(profile, { type: 'collectArmor', item });
+    expect(collected.armorInventory).toContainEqual(item);
+    const equipped = applyProfileAction(collected, { type: 'equipArmor', id: item.id });
+    expect(Object.values(equipped.equippedArmor.ranger)).toContain(item.id);
+    expect(Object.values(equipped.equippedArmor.guardian)).not.toContain(item.id);
+  });
+
   it('gains armor only when collecting ground loot, never when winning or dying', () => {
     const initial = defaultProfile();
     const item = rollEnemyArmor('boss', 0, .999, 0, 'run', 'enemy', 'guardian')!;

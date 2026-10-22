@@ -64,6 +64,15 @@ export function validArmorItem(raw: unknown): raw is ArmorItem {
     Number.isInteger(item.stars) && item.stars! >= 0 && item.stars! <= ARMOR_MAX_STARS;
 }
 
+/** Choose uniformly from heroes already owned, independently of the active hero.
+ * HERO_IDS order removes duplicate IDs and keeps the selection deterministic in tests. */
+export function chooseArmorDropHero(ownedHeroes: readonly HeroId[], heroRoll: number): HeroId | undefined {
+  if (!Number.isFinite(heroRoll) || heroRoll < 0 || heroRoll >= 1) return undefined;
+  const eligible = HERO_IDS.filter(id => ownedHeroes.includes(id));
+  if (eligible.length === 0) return undefined;
+  return eligible[Math.floor(heroRoll * eligible.length)];
+}
+
 /** Roll once for each unique defeated enemy. Armor is only gained on pickup. */
 export function rollEnemyArmor(kind: 'boss' | 'normal', chance: number,
   rarityRoll: number, kindRoll: number, runId: string, enemyId: string,
