@@ -15,6 +15,8 @@ import {
 import { targetsInRadius } from './areaTargets';
 import { DashState } from './DashState';
 import { inForwardRectangle, normalizedDirection } from './directedGeometry';
+import { GUARDIAN_PULL_HALF_WIDTH, GUARDIAN_PULL_DURATION_MS,
+  guardianPullSpeed, guardianPullStunMs } from './guardianPull';
 import { FROST_TIMEWARP, WHITEOUT_WAVE, whiteoutWaveRadius, whiteoutReaches } from './phase9Balance';
 import { findTeleportDestination, safeBombBlastDistance } from './teleportDestination';
 import type { RoomLayout } from '../rooms/roomConfig';
@@ -438,7 +440,7 @@ export class AbilityController {
         this.spawnCompanion(stats, now);
         break;
       case 'wind':
-        if (id === 'guardian-slam') this.castGuardianPull(stats, now);
+        if (id === 'guardian-slam') this.castGuardianPull(stats, now, direction);
         else this.castWind(stats, now, direction);
         break;
       case 'shotgun':
@@ -534,22 +536,74 @@ export class AbilityController {
     this.pulse(this.player.x, this.player.y, stats.radius, stats.color, stats.durationMs);
   }
 
-  private castGuardianPull(stats: Readonly<AbilityStats>, now: number): void {
+  /** Guardian ability 2: a forward rectangular gravity corridor, not a circle.
+   * Only enemies inside the visible corridor are struck, pulled and stunned.
+   * The knockback velocity points *toward* the Guardian; stun blocks attacks
+   * immediately while the initial displacement resolves. */
+  private castGuardianPull(stats: Readonly<AbilityStats>, now: number,
+    direction: Readonly<Vector2Value>): void {
     const x = this.player.x, y = this.player.y;
-    const victims = targetsInRadius(x, y, stats.radius, this.liveEnemies());
+    const halfWidth = GUARDIAN_PULL_HALF_WIDTH;
     const struck = new Set<string>();
-    for (const enemy of victims) {
+    const pulled: Slime[] = [];
+    const stunMs = guardianPullStunMs(stats.upgradeLevel);
+    for (const enemy of this.liveEnemies()) {
+      if (!inForwardRectangle(x, y, direction, enemy.x, enemy.y,
+        stats.radius, halfWidth)) continue;
       const receiver = this.hitEnemy(enemy, stats, 1, this.player, struck);
       if (!receiver || receiver.aiState === 'defeated') continue;
       const dx = x - receiver.x, dy = y - receiver.y;
       const distance = Math.hypot(dx, dy);
-      if (distance > 1) receiver.applyKnockback(now, 330, dx / distance, dy / distance, 420);
-      receiver.applyStun(now, 1000);
+      // Every affected enemy loses its shooting ability independently.
+      receiver.applyStun(now, stunMs);
+      if (distance > 37) {
+        const speed = guardianPullSpeed(distance);
+        if (speed > 0) receiver.applyKnockback(now, GUARDIAN_PULL_DURATION_MS,
+          dx / distance, dy / distance, speed);
+      }
+      pulled.push(receiver);
     }
-    const ring = this.scene.add.circle(x, y, stats.radius, stats.color, 0.06)
-      .setStrokeStyle(5, stats.color, 0.9).setDepth(27).setScale(1.1);
-    this.scene.tweens.add({ targets: ring, scaleX: 0.15, scaleY: 0.15, alpha: 0,
-      duration: 340, ease: 'Cubic.easeIn', onComplete: () => ring.destroy() });
+
+    const nx = -direction.y * halfWidth, ny = direction.x * halfWidth;
+    const farX = x + direction.x * stats.radius;
+    const farY = y + direction.y * stats.radius;
+    const corners = [
+      new Phaser.Math.Vector2(x + nx, y + ny),
+      new Phaser.Math.Vector2(farX + nx, farY + ny),
+      new Phaser.Math.Vector2(farX - nx, farY - ny),
+      new Phaser.Math.Vector2(x - nx, y - ny),
+    ];
+    const beam = this.scene.add.graphics().setDepth(27);
+    beam.fillStyle(stats.color, .23);
+    beam.fillPoints(corners, true);
+    beam.lineStyle(4, 0xffe7a3, .95);
+    beam.strokePoints(corners, true);
+    beam.lineStyle(2, 0xffffff, .55);
+    for (const spread of [-.6, 0, .6]) {
+      const offsetX = nx * spread, offsetY = ny * spread;
+      beam.lineBetween(x + offsetX, y + offsetY,
+        farX + offsetX, farY + offsetY);
+    }
+    const core = this.scene.add.graphics().setDepth(28);
+    core.lineStyle(6, stats.color, .9);
+    core.lineBetween(farX, farY, x, y);
+    core.lineStyle(2, 0xffffff, .9);
+    core.lineBetween(farX, farY, x, y);
+    this.scene.tweens.add({ targets: beam, alpha: 0, duration: 410,
+      ease: 'Cubic.easeIn', onComplete: () => beam.destroy() });
+    this.scene.tweens.add({ targets: core, alpha: 0, duration: 330,
+      ease: 'Cubic.easeOut', onComplete: () => core.destroy() });
+
+    // A brief inward streak on each grabbed enemy makes the direction
+    // immediately readable even when several mobs are pulled at once.
+    for (const enemy of pulled) {
+      const streak = this.scene.add.graphics().setDepth(28);
+      streak.lineStyle(3, 0xffedb0, .88);
+      streak.lineBetween(enemy.x, enemy.y,
+        enemy.x + (x - enemy.x) * .38, enemy.y + (y - enemy.y) * .38);
+      this.scene.tweens.add({ targets: streak, alpha: 0, duration: 300,
+        onComplete: () => streak.destroy() });
+    }
   }
 
   private castGuardianShockwave(stats: Readonly<AbilityStats>, now: number): void {
