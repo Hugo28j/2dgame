@@ -57,7 +57,6 @@ import { progressStore } from '../progression/ProgressStore';
 import { armorBonuses } from '../progression/armor';
 import { RunLedger } from '../progression/RunLedger';
 import { runCheckpointStore, type RunCheckpoint } from '../progression/RunCheckpoint';
-import { MENU_SCENE_KEY } from '../config/constants';
 import { coinDropsForEnemy } from '../progression/coinRewards';
 import { roomClearHealing } from '../progression/roomHealing';
 import { RunUpgradeDeck, type RunUpgradeId } from '../progression/runUpgrades';
@@ -174,7 +173,8 @@ export class GameScene extends Phaser.Scene {
   private upgrades = new RunUpgradeDeck();
   private resumeRequested = false;
   private pausedByPlayer = false;
-  private pausePanel?: Phaser.GameObjects.Container;
+  private pausePanel?: HTMLDivElement;
+  private pauseCleanup?: () => void;
   private readonly damageSystem = new DamageSystem();
   private readonly roomProgress = new RoomProgress(CHAPTER_ROOM_COUNT);
 
@@ -3259,6 +3259,9 @@ export class GameScene extends Phaser.Scene {
     button.on('pointerdown', () => this.openPausePanel());
   }
 
+  /** Native buttons over the canvas: independent from Phaser's paused timers,
+   * scene input hit tests, nested container transforms and touch-joystick zones.
+   * This fixes the unclickable in-pause home button on both mobile and desktop. */
   private openPausePanel(): void {
     if (!this.player || this.pausedByPlayer || this.gameOver || this.chapterComplete ||
         this.transitioning || this.choosingUpgrade || this.brambleStage !== 'idle') return;
@@ -3268,38 +3271,106 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.pause();
     this.time.paused = true;
     this.tweens.pauseAll();
-    const overlay = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT / 2)
-      .setScrollFactor(0).setDepth(200);
-    const shade = this.add.rectangle(0, 0, GAME_WIDTH + 20, GAME_HEIGHT + 20, 0x020617, .82);
-    shade.setInteractive();
-    const plate = this.add.rectangle(0, 0, 344, 276, 0x13283b, .99)
-      .setStrokeStyle(3, 0x58d4eb, 1);
-    const title = this.add.text(0, -102, 'AVONTUUR GEPAUZEERD', {
-      fontFamily: 'system-ui, sans-serif', color: '#f8fafc',
-      fontStyle: 'bold', fontSize: '19px',
-    }).setOrigin(.5);
-    const desc = this.add.text(0, -54,
-      'WERELD ' + this.worldId + '  ·  KAMER ' + this.roomProgress.roomNumber +
-      '\nDoorgaan start deze kamer opnieuw.\nVorige kamers en beloningen blijven bewaard.', {
-        fontFamily: 'system-ui, sans-serif', color: '#b6cce0', fontSize: '12px',
-        align: 'center', lineSpacing: 6,
-      }).setOrigin(.5);
-    const continueBg = this.add.rectangle(0, 35, 292, 50, 0x0788a4)
-      .setStrokeStyle(2, 0x67e8f9).setInteractive({ useHandCursor: true });
-    const continueText = this.add.text(0, 35, '▶  VERDER SPELEN', {
-      fontFamily: 'system-ui, sans-serif', color: '#f8fafc',
-      fontStyle: 'bold', fontSize: '15px',
-    }).setOrigin(.5);
-    const saveBg = this.add.rectangle(0, 100, 292, 48, 0x284057)
-      .setStrokeStyle(2, 0x8babc5).setInteractive({ useHandCursor: true });
-    const saveText = this.add.text(0, 100, 'OPSLAAN & HOOFDMENU', {
-      fontFamily: 'system-ui, sans-serif', color: '#f8fafc',
-      fontStyle: 'bold', fontSize: '14px',
-    }).setOrigin(.5);
-    overlay.add([shade,plate,title,desc,continueBg,continueText,saveBg,saveText]);
+
+    // Use a real DOM overlay (same approach as the reliable Game Over HOME).
+    // It also captures taps so nothing behind it can fire or move.
+    const overlay = document.createElement('div');
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'Avontuur gepauzeerd');
+    Object.assign(overlay.style, {
+      position: 'fixed', zIndex: '2147483647',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(2,6,23,0.88)', boxSizing: 'border-box',
+      touchAction: 'none', overscrollBehavior: 'contain',
+      pointerEvents: 'auto',
+    });
+
+    const panel = document.createElement('div');
+    Object.assign(panel.style, {
+      boxSizing: 'border-box', width: '100%', maxWidth: '344px',
+      padding: '24px 17px', display: 'flex', flexDirection: 'column',
+      alignItems: 'stretch', gap: '14px',
+      borderRadius: '16px', border: '2px solid #58d4eb',
+      background: '#13283b', boxShadow: '0 18px 54px rgba(0,0,0,.55)',
+      color: '#f8fafc', fontFamily: 'system-ui, sans-serif',
+      textAlign: 'center',
+    });
+
+    const title = document.createElement('div');
+    title.textContent = 'AVONTUUR GEPAUZEERD';
+    Object.assign(title.style, {
+      fontSize: '18px', fontWeight: '800', letterSpacing: '.5px',
+    });
+
+    const description = document.createElement('div');
+    description.textContent = 'WERELD ' + this.worldId +
+      '  ·  KAMER ' + this.roomProgress.roomNumber +
+      '\nBij hervatten begint deze kamer opnieuw.' +
+      '\nVorige kamers en beloningen blijven bewaard.';
+    Object.assign(description.style, {
+      whiteSpace: 'pre-line', lineHeight: '1.6',
+      fontSize: '12px', color: '#b6cce0',
+    });
+
+    const makeButton = (label: string, background: string, border: string): HTMLButtonElement => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = label;
+      Object.assign(button.style, {
+        appearance: 'none', WebkitAppearance: 'none', boxSizing: 'border-box',
+        border: '2px solid ' + border, borderRadius: '11px',
+        minHeight: '52px', width: '100%',
+        background, color: '#ffffff', fontSize: '14px',
+        fontFamily: 'system-ui, sans-serif', fontWeight: '800',
+        cursor: 'pointer', touchAction: 'manipulation',
+        userSelect: 'none', WebkitUserSelect: 'none',
+        pointerEvents: 'auto',
+      });
+      return button;
+    };
+
+    const continueButton = makeButton('▶  VERDER SPELEN', '#0788a4', '#67e8f9');
+    const homeButton = makeButton('⌂  OPSLAAN & HOOFDMENU', '#284057', '#8babc5');
+    panel.append(title, description, continueButton, homeButton);
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
     this.pausePanel = overlay;
-    continueBg.on('pointerdown', () => {
-      overlay.destroy(true);
+
+    const syncPosition = (): void => {
+      const rect = this.game.canvas.getBoundingClientRect();
+      overlay.style.left = rect.left + 'px';
+      overlay.style.top = rect.top + 'px';
+      overlay.style.width = rect.width + 'px';
+      overlay.style.height = rect.height + 'px';
+      panel.style.maxWidth = Math.max(232, Math.min(344,
+        rect.width - 24)) + 'px';
+    };
+    syncPosition();
+    window.addEventListener('resize', syncPosition);
+    window.addEventListener('orientationchange', syncPosition);
+    window.visualViewport?.addEventListener('resize', syncPosition);
+    const onEscape = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        continueButton.click();
+      }
+    };
+    window.addEventListener('keydown', onEscape);
+    this.pauseCleanup = () => {
+      window.removeEventListener('resize', syncPosition);
+      window.removeEventListener('orientationchange', syncPosition);
+      window.visualViewport?.removeEventListener('resize', syncPosition);
+      window.removeEventListener('keydown', onEscape);
+    };
+
+    let leaving = false;
+    continueButton.addEventListener('click', () => {
+      if (leaving) return;
+      leaving = true;
+      this.pauseCleanup?.();
+      this.pauseCleanup = undefined;
+      overlay.remove();
       this.pausePanel = undefined;
       this.pausedByPlayer = false;
       this.time.paused = false;
@@ -3307,11 +3378,15 @@ export class GameScene extends Phaser.Scene {
       this.physics.world.resume();
       this.controls?.setEnabled(true);
     });
-    saveBg.on('pointerdown', () => {
-      // The checkpoint was already written at room start. Never settle
-      // unfinished run-gold and never overwrite it with partial-room kills.
-      this.scene.start(MENU_SCENE_KEY);
+    homeButton.addEventListener('click', () => {
+      if (leaving) return;
+      leaving = true;
+      // A checkpoint was saved on room entry. Reloading re-enters Boot/Menu
+      // without settling unfinished run gold; native click works even while
+      // the Phaser clock and game-loop are paused.
+      window.location.reload();
     });
+    continueButton.focus({ preventScroll: true });
   }
 
   private finishChapterRooms(): void { this.completeRun(true); }
@@ -3322,7 +3397,9 @@ export class GameScene extends Phaser.Scene {
     this.pausedByPlayer = false;
     this.time.paused = false;
     this.tweens.resumeAll();
-    this.pausePanel?.destroy(true);
+    this.pauseCleanup?.();
+    this.pauseCleanup = undefined;
+    this.pausePanel?.remove();
     this.pausePanel = undefined;
     this.clearBrambleCutscene();
     this.physics.world.resume();
