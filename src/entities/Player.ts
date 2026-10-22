@@ -3,7 +3,7 @@ import Phaser from 'phaser';
 import type { Damageable } from '../combat/damage';
 import { InvulnerabilityWindow } from '../combat/InvulnerabilityWindow';
 import { SHIELD_MAX_HP } from '../abilities/ShieldHealth';
-import { applyProtectedPlayerHit } from '../combat/playerHitProtection';
+import { applyPlayerHit } from '../combat/playerHitProtection';
 import { FROZEN_EARLY, frostMovementFactor } from '../enemies/frozenEarlyGame';
 import { HEROES, getHeroStats, type HeroId } from '../heroes/heroConfig';
 import type { Vector2Value } from '../input/vectorMath';
@@ -168,9 +168,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   public restoreShield(): void { this.shieldHp = this.maxShieldHp; }
 
   public receiveDamage(amount: number): boolean {
-    // Begin hit immunity at the exact moment HP/shield is changed, even when
-    // another gameplay system calls Player.receiveDamage directly.
-    const result = applyProtectedPlayerHit(this.scene.time.now,
+    // Every hit is applied independently; only explicit skill immunity can block it.
+    const result = applyPlayerHit(this.scene.time.now,
       this.currentHp, this.shieldHp, amount, this.invulnerability);
     if (result.accepted) {
       this.currentHp = result.health;
