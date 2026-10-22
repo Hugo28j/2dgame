@@ -50,7 +50,6 @@ export class MainMenuScene extends Phaser.Scene {
   private worldView: 'showcase' | 'atlas' = 'showcase';
   private worldMessage = '';
   private heroPage = 0;
-  private upgradeCategory: 'weapons' | 'abilities' | 'armor' = 'armor';
   private equipmentView: EquipmentView = 'overview';
   private equipmentSlot: EquipmentSlot = 'weapon';
   private equipmentItemId: string | null = null;
@@ -58,8 +57,6 @@ export class MainMenuScene extends Phaser.Scene {
   private inventoryOffset = 0;
   private inventoryTouchStart: { x: number; y: number } | null = null;
   private inventoryPressedRowId: string | null = null;
-  private armorPage = 0;
-  private armorSlot: ArmorSlot = 'helm';
   private armorHero: HeroId = 'guardian';
   private settingsView: 'general' | 'controls' = 'general';
   private resetRequested = false;
@@ -165,10 +162,7 @@ export class MainMenuScene extends Phaser.Scene {
 
   private chooseTab(tab: MenuTab): void {
     this.tab = tab;
-    if (tab === 'weapons') {
-      this.armorHero = progressStore.current.selectedHero;
-      this.armorPage = 0;
-    }
+    if (tab === 'weapons') this.armorHero = progressStore.current.selectedHero;
     this.equipmentView = 'overview';
     this.inventoryOffset = 0;
     this.equipmentItemId = null;
@@ -828,23 +822,20 @@ export class MainMenuScene extends Phaser.Scene {
         : weapon.description, 10, previewing ? '#fcd34d' : COLOR.faint, 309);
       const unlocked = profile.unlockedWeapons.includes(weaponId);
       const cost = weaponUpgradeCost(level);
-      this.button(110, 642, 153, 43, worn ? 'ACTIEF' : unlocked ? 'SELECTEREN' : 'SLOT',
+      // Full-width selection first; upgrading requires its original two-step confirmation.
+      // Return navigation is still at the top left via ‹ LIJST.
+      this.button(195, 642, 326, 43, worn ? 'GESELECTEERD' :
+        unlocked ? 'SELECTEREN' : 'VERGRENDELD',
         () => {
           if (profile.selectedHero !== this.armorHero)
             progressStore.dispatch({ type: 'selectHero', id: this.armorHero });
           this.runAction({ type: 'selectWeapon', id: weaponId });
-        }, worn ? 'selected' : 'normal', worn || !unlocked, 11);
-      this.button(280, 642, 153, 43,
+        }, worn ? 'selected' : 'normal', worn || !unlocked, 12);
+      this.button(195, 694, 326, 43,
         level >= MAX_WEAPON_LEVEL ? 'MAX LEVEL' : previewing ? 'CONFIRM' : 'UPGRADE ' + cost + ' G',
         () => this.requestUpgrade({ type: 'upgradeWeapon', id: weaponId }, level),
         previewing ? 'selected' : 'normal',
-        !unlocked || level >= MAX_WEAPON_LEVEL || profile.gold < cost, 10);
-      this.button(110, 694, 153, 43, '‹ TERUG', () => {
-        this.pendingUpgrade = null;
-        this.equipmentView = 'list'; this.scene.restart();
-      }, 'quiet', false, 11);
-      this.button(280, 694, 153, 43, 'GEEN WAPENFUSION', () => {},
-        'quiet', true, 9);
+        !unlocked || level >= MAX_WEAPON_LEVEL || profile.gold < cost, 11);
     }
   }
 
