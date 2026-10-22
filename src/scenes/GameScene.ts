@@ -55,6 +55,8 @@ import { WEAPONS } from '../weapons/weaponConfig';
 import { progressStore } from '../progression/ProgressStore';
 import { armorBonuses } from '../progression/armor';
 import { RunLedger } from '../progression/RunLedger';
+import { runCheckpointStore, type RunCheckpoint } from '../progression/RunCheckpoint';
+import { MENU_SCENE_KEY } from '../config/constants';
 import { coinDropsForEnemy } from '../progression/coinRewards';
 import { roomClearHealing } from '../progression/roomHealing';
 import { RunUpgradeDeck, type RunUpgradeId } from '../progression/runUpgrades';
@@ -169,6 +171,9 @@ export class GameScene extends Phaser.Scene {
   private run = new RunLedger();
   private upgradeReady = false;
   private upgrades = new RunUpgradeDeck();
+  private resumeRequested = false;
+  private pausedByPlayer = false;
+  private pausePanel?: Phaser.GameObjects.Container;
   private readonly damageSystem = new DamageSystem();
   private readonly roomProgress = new RoomProgress(CHAPTER_ROOM_COUNT);
 
@@ -176,8 +181,23 @@ export class GameScene extends Phaser.Scene {
     super(GAME_SCENE_KEY);
   }
 
+  public init(data?: { resume?: boolean }): void {
+    this.resumeRequested = data?.resume === true;
+  }
+
   public create(): void {
-    this.worldId = progressStore.current.selectedWorld;
+    const resume = this.resumeRequested ? runCheckpointStore.load() : null;
+    if (resume && !progressStore.current.settledRunIds.includes(resume.ledger.runId) &&
+      progressStore.current.unlockedHeroes.includes(resume.heroId)) {
+      progressStore.dispatch({ type: 'selectWorld', id: resume.worldId });
+      progressStore.dispatch({ type: 'selectHero', id: resume.heroId });
+      progressStore.dispatch({ type: 'selectWeapon', id: resume.weaponId });
+    }
+    const saved = resume && progressStore.current.selectedHero === resume.heroId &&
+      progressStore.current.selectedWorld === resume.worldId &&
+      progressStore.current.selectedWeapon === resume.weaponId &&
+      !progressStore.current.settledRunIds.includes(resume.ledger.runId) ? resume : null;
+    this.worldId = saved?.worldId ?? progressStore.current.selectedWorld;
     this.collectedRunArmor = [];
     this.roomProgress.reset();
     this.clearCoins();
@@ -186,15 +206,20 @@ export class GameScene extends Phaser.Scene {
     this.transitioning = false;
     this.chapterComplete = false;
     this.choosingUpgrade = false;
+    this.pausedByPlayer = false;
+    this.pausePanel = undefined;
     this.brambleStage = 'idle';
     this.brambleCutsceneUsed = false;
     this.brambleSequence++;
-    this.run = new RunLedger(undefined, this.worldId);
+    this.run = new RunLedger(saved?.ledger.runId, this.worldId);
+    if (saved) this.run.restore(saved.ledger);
     this.upgrades = new RunUpgradeDeck();
+    if (saved) this.upgrades.restore(saved.upgrades);
     this.drawBackdrop();
     if (this.worldId === 2) this.iceTrailGraphics = this.add.graphics().setDepth(3);
 
-    const firstRoom = getRoomDefinition(1, this.worldId);
+    const firstRoom = getRoomDefinition(saved?.room ?? 1, this.worldId);
+    this.roomProgress.roomNumber = firstRoom.number;
     const profile = progressStore.current;
     const gear = armorBonuses(profile.armorInventory, profile.equippedArmor[profile.selectedHero], profile.selectedHero);
     this.player = new Player(
@@ -208,6 +233,14 @@ export class GameScene extends Phaser.Scene {
     // Equipment now changes the real gameplay sprite, not just an inventory icon.
     this.player.setTexture(ensureDressedHeroTexture(this, profile.selectedHero,
       profile.equippedArmor[profile.selectedHero], profile.armorInventory));
+    if (saved) {
+      for (const id of saved.upgrades) {
+        if (id !== 'healing' && id !== 'projectile' && id !== 'piercing' &&
+          id !== 'meleeRange' && id !== 'meleeStun') this.player.applyRunBonus(id);
+      }
+      this.player.currentHp = Math.min(this.player.maxHp, Math.max(1, saved.health));
+      this.player.shieldHp = Math.min(this.player.maxShieldHp, saved.shield);
+    }
     this.controls = new InputController(this);
     this.projectiles = this.physics.add.group({ allowGravity: false });
     this.enemies = this.physics.add.group({ allowGravity: false, collideWorldBounds: true });
@@ -221,6 +254,12 @@ export class GameScene extends Phaser.Scene {
       this.handleMeleeHit,
       1 + gear.weaponDamage,
     );
+    if (saved) for (const id of saved.upgrades) {
+      if (id === 'projectile') this.weapon.extraProjectiles += 1;
+      if (id === 'piercing') this.weapon.extraPiercing += 1;
+      if (id === 'meleeRange') this.weapon.extraMeleeRange += 0.2;
+      if (id === 'meleeStun') this.weapon.meleeStunMs = 500;
+    }
     this.enemySpawner = new EnemySpawner(this, this.enemies);
 
     this.events.on(ENEMY_SPAWNED_EVENT, this.handleEnemySpawned);
@@ -241,6 +280,10 @@ export class GameScene extends Phaser.Scene {
       (now, damage, durationMs) => this.weapon?.activateShotgunBuff(now,damage,durationMs) ?? false,
     );
 
+    this.createPauseButton();
+    // A resumed fight restarts at the previous room-entry checkpoint.
+    // Do not overwrite it with any kills or loot from an unfinished room.
+    this.captureRoomCheckpoint();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
 
@@ -255,7 +298,8 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    if (this.gameOver || this.transitioning || this.chapterComplete || this.choosingUpgrade || this.brambleStage !== 'idle') {
+    if (this.pausedByPlayer || this.gameOver || this.transitioning || this.chapterComplete ||
+        this.choosingUpgrade || this.brambleStage !== 'idle') {
       this.player.setVelocity(0, 0);
       return;
     }
@@ -699,6 +743,9 @@ export class GameScene extends Phaser.Scene {
     this.updateRoomHud(room);
     this.updateBossHud();
     this.updateEnemyCount();
+    // Persist at the room boundary; resuming never claims the current fight
+    // was cleared or awards coins for enemies that must be fought again.
+    if (this.abilities) this.captureRoomCheckpoint();
 
     if (showBanner) {
       this.showRoomBanner(room);
@@ -3150,6 +3197,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.pause();
     this.pendingSpawnIndices = [];
     const report = this.run.report(victory);
+    runCheckpointStore.clear();
     progressStore.dispatch({ type: 'settleRun', report, heroId: this.player?.heroId });
     this.scene.launch(GAME_OVER_SCENE_KEY, {
       report, chosenUpgrades: this.upgrades.chosen(),
@@ -3158,11 +3206,101 @@ export class GameScene extends Phaser.Scene {
     this.scene.sleep();
   }
 
+  /** Save only at the start of a room, before any drops or damage within it. */
+  private captureRoomCheckpoint(): void {
+    if (!this.player || !this.currentRoom || this.gameOver || this.chapterComplete) return;
+    const profile = progressStore.current;
+    const checkpoint: RunCheckpoint = {
+      version: 1, savedAt: Date.now(), worldId: this.worldId,
+      room: this.roomProgress.roomNumber,
+      heroId: this.player.heroId,
+      weaponId: profile.selectedWeapon,
+      health: this.player.currentHp,
+      shield: this.player.shieldHp,
+      upgrades: this.upgrades.snapshot(),
+      ledger: this.run.snapshot(),
+    };
+    runCheckpointStore.save(checkpoint);
+  }
+
+  private createPauseButton(): void {
+    // A fixed-camera hit area works on both mobile and desktop.
+    const button = this.add.rectangle(GAME_WIDTH - 56, 93, 94, 32, 0x1a384d, .96)
+      .setStrokeStyle(2, 0x67e8f9, .9)
+      .setScrollFactor(0).setDepth(180)
+      .setInteractive({ useHandCursor: true });
+    this.add.text(GAME_WIDTH - 56, 93, 'Ⅱ  PAUZE', {
+      fontFamily: 'system-ui, sans-serif', fontSize: '11px',
+      fontStyle: 'bold', color: '#e0f2fe',
+    }).setOrigin(.5).setScrollFactor(0).setDepth(181);
+    button.on('pointerdown', () => this.openPausePanel());
+  }
+
+  private openPausePanel(): void {
+    if (!this.player || this.pausedByPlayer || this.gameOver || this.chapterComplete ||
+        this.transitioning || this.choosingUpgrade || this.brambleStage !== 'idle') return;
+    this.pausedByPlayer = true;
+    this.player.setVelocity(0, 0);
+    this.controls?.setEnabled(false);
+    this.physics.world.pause();
+    this.time.paused = true;
+    this.tweens.pauseAll();
+    const overlay = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT / 2)
+      .setScrollFactor(0).setDepth(200);
+    const shade = this.add.rectangle(0, 0, GAME_WIDTH + 20, GAME_HEIGHT + 20, 0x020617, .82);
+    shade.setInteractive();
+    const plate = this.add.rectangle(0, 0, 344, 276, 0x13283b, .99)
+      .setStrokeStyle(3, 0x58d4eb, 1);
+    const title = this.add.text(0, -102, 'AVONTUUR GEPAUZEERD', {
+      fontFamily: 'system-ui, sans-serif', color: '#f8fafc',
+      fontStyle: 'bold', fontSize: '19px',
+    }).setOrigin(.5);
+    const desc = this.add.text(0, -54,
+      'WERELD ' + this.worldId + '  ·  KAMER ' + this.roomProgress.roomNumber +
+      '\nDoorgaan start deze kamer opnieuw.\nVorige kamers en beloningen blijven bewaard.', {
+        fontFamily: 'system-ui, sans-serif', color: '#b6cce0', fontSize: '12px',
+        align: 'center', lineSpacing: 6,
+      }).setOrigin(.5);
+    const continueBg = this.add.rectangle(0, 35, 292, 50, 0x0788a4)
+      .setStrokeStyle(2, 0x67e8f9).setInteractive({ useHandCursor: true });
+    const continueText = this.add.text(0, 35, '▶  VERDER SPELEN', {
+      fontFamily: 'system-ui, sans-serif', color: '#f8fafc',
+      fontStyle: 'bold', fontSize: '15px',
+    }).setOrigin(.5);
+    const saveBg = this.add.rectangle(0, 100, 292, 48, 0x284057)
+      .setStrokeStyle(2, 0x8babc5).setInteractive({ useHandCursor: true });
+    const saveText = this.add.text(0, 100, 'OPSLAAN & HOOFDMENU', {
+      fontFamily: 'system-ui, sans-serif', color: '#f8fafc',
+      fontStyle: 'bold', fontSize: '14px',
+    }).setOrigin(.5);
+    overlay.add([shade,plate,title,desc,continueBg,continueText,saveBg,saveText]);
+    this.pausePanel = overlay;
+    continueBg.on('pointerdown', () => {
+      overlay.destroy(true);
+      this.pausePanel = undefined;
+      this.pausedByPlayer = false;
+      this.time.paused = false;
+      this.tweens.resumeAll();
+      this.physics.world.resume();
+      this.controls?.setEnabled(true);
+    });
+    saveBg.on('pointerdown', () => {
+      // The checkpoint was already written at room start. Never settle
+      // unfinished run-gold and never overwrite it with partial-room kills.
+      this.scene.start(MENU_SCENE_KEY);
+    });
+  }
+
   private finishChapterRooms(): void { this.completeRun(true); }
 
   private endRun(): void { this.completeRun(false); }
 
   private shutdown(): void {
+    this.pausedByPlayer = false;
+    this.time.paused = false;
+    this.tweens.resumeAll();
+    this.pausePanel?.destroy(true);
+    this.pausePanel = undefined;
     this.clearBrambleCutscene();
     this.physics.world.resume();
     this.clearCoins();
