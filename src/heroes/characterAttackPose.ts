@@ -10,13 +10,20 @@ export const poseForWeapon = (weapon: WeaponId): AttackPose | null =>
   weapon === 'sunblade' ? 'sword' : weapon === 'warhammer' ? 'hammer'
     : weapon === 'bow' ? 'bow' : weapon === 'crossbow' ? 'crossbow'
       : weapon === 'staff' ? 'staff' : weapon === 'spellbook' ? 'spellbook'
-        : weapon === 'daggers' ? 'ice-dagger' : weapon === 'iceblade' ? 'ice-wave' : null;
+        : weapon === 'daggers' ? 'ice-dagger' : weapon === 'iceblade' ? 'ice-wave'
+          : weapon === 'emberstaff' ? 'ember-staff' : weapon === 'fireorbs' ? 'flamethrower'
+            : weapon === 'lightning' ? 'storm-wand' : weapon === 'stormlance' ? 'storm-lance'
+              : weapon === 'voidorb' ? 'abyss-orb' : weapon === 'shadowscythe' ? 'shadow-scythe'
+                : null;
 
 export function poseLengthMs(pose: AttackPose, attackIntervalMs: number): number {
   const base = pose === 'hammer' ? 440 : pose === 'sword' ? 200 :
     pose === 'staff' ? 285 : pose === 'spellbook' ? 250 : pose === 'ice-wave' ? 380 :
-      pose === 'ice-dagger' ? 165 : pose === 'crossbow' ? 175 :
-        pose === 'shotgun' ? 210 : 145;
+      pose === 'ember-staff' ? 330 : pose === 'flamethrower' ? 240 :
+        pose === 'storm-wand' ? 220 : pose === 'storm-lance' ? 310 :
+          pose === 'abyss-orb' ? 360 : pose === 'shadow-scythe' ? 460 :
+            pose === 'ice-dagger' ? 165 : pose === 'crossbow' ? 175 :
+              pose === 'shotgun' ? 210 : 145;
   return pose === 'hammer' ? Math.max(220, Math.min(base, attackIntervalMs * .78))
     : Math.max(75, Math.min(base, attackIntervalMs * .78));
 }
