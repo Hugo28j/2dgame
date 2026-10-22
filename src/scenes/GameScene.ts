@@ -3243,6 +3243,8 @@ export class GameScene extends Phaser.Scene {
     this.player.setVelocity(0, 0);
     this.controls?.setEnabled(false);
     this.physics.world.pause();
+    this.time.paused = true;
+    this.tweens.pauseAll();
     const overlay = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT / 2)
       .setScrollFactor(0).setDepth(200);
     const shade = this.add.rectangle(0, 0, GAME_WIDTH + 20, GAME_HEIGHT + 20, 0x020617, .82);
@@ -3277,6 +3279,8 @@ export class GameScene extends Phaser.Scene {
       overlay.destroy(true);
       this.pausePanel = undefined;
       this.pausedByPlayer = false;
+      this.time.paused = false;
+      this.tweens.resumeAll();
       this.physics.world.resume();
       this.controls?.setEnabled(true);
     });
@@ -3292,6 +3296,9 @@ export class GameScene extends Phaser.Scene {
   private endRun(): void { this.completeRun(false); }
 
   private shutdown(): void {
+    this.pausedByPlayer = false;
+    this.time.paused = false;
+    this.tweens.resumeAll();
     this.pausePanel?.destroy(true);
     this.pausePanel = undefined;
     this.clearBrambleCutscene();
