@@ -12,7 +12,7 @@ import { SPORE_POISON, poisonActive, poisonCovers, poisonTickDue } from '../enem
 import { selectPoisonLocations, type PoisonCircle } from '../enemies/poisonPlacement';
 import { attachedRootLine, predictLeafLanding, rootArmPoint, rootTipHits } from '../enemies/rootGrowth';
 import { JADE_BRANCH, HEART_TREE, jadeBranchLanes, groveBranchTip,
-  groveBranchHits, groveTreeHits, type GroveBranchLane } from '../enemies/groveAttacks';
+  groveBranchHits, groveTreeHits, selectJadeLane, type GroveBranchLane } from '../enemies/groveAttacks';
 import { AdvancedEnemy, type BulletPattern } from '../enemies/AdvancedEnemy';
 import { EnemyProjectile, type EnemyProjectileEffect } from '../enemies/EnemyProjectile';
 import { ricochetAxis } from '../enemies/enemyRicochet';
@@ -1981,13 +1981,20 @@ export class GameScene extends Phaser.Scene {
   /** Existing Jade projectiles stay untouched. Every independent cycle adds
    * exactly two warning corridors and living branches crossing the arena. */
   private jadeHorizontalNext = true;
+  private readonly jadeLaneReservations = new Set<{lane: GroveBranchLane; until: number}>();
   private readonly performJadeBranches = (enemy: AdvancedEnemy): void => {
     if (this.worldId !== 1 || !enemy.isJadeMatriarch || !this.currentRoom ||
         this.gameOver || this.transitioning || this.roomProgress.doorOpen ||
         this.choosingUpgrade) return;
     const axis = this.jadeHorizontalNext ? 'horizontal' : 'vertical';
     this.jadeHorizontalNext = !this.jadeHorizontalNext;
-    const lanes = jadeBranchLanes(this.currentRoom.layout.bounds, Math.random, axis).slice(0, 1);
+    for (const entry of this.jadeLaneReservations) if (entry.until <= this.time.now) this.jadeLaneReservations.delete(entry);
+    const lane = selectJadeLane(this.currentRoom.layout.bounds, axis,
+      [...this.jadeLaneReservations].map(entry => entry.lane), Math.random);
+    if (!lane) return; // Never reuse an occupied region.
+    const reservation = {lane, until: this.time.now + JADE_BRANCH.activeMs + JADE_BRANCH.warningMs};
+    this.jadeLaneReservations.add(reservation);
+    const lanes = [lane];
     const warningMs = enemy.healthRatio <= 0.5 ? JADE_BRANCH.phaseTwoWarningMs : JADE_BRANCH.warningMs;
     for (const lane of lanes) {
       const telegraph = this.add.graphics().setDepth(24);
@@ -2160,6 +2167,7 @@ export class GameScene extends Phaser.Scene {
       if(branch.graphic.active)branch.graphic.destroy();
     }
     this.jadeBranches.clear();
+    this.jadeLaneReservations.clear();
     for(const zone of this.groveTreeZones) {
       this.tweens.killTweensOf(zone.graphic);
       if(zone.graphic.active)zone.graphic.destroy();
