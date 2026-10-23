@@ -4,7 +4,7 @@ import { getWorldBossName } from '../src/worlds/worldConfig';
 import { getWorldCharacter, getWorldBossArtRoster } from '../src/enemies/worldCharacters';
 import { getEnemyStatsForRoom } from '../src/enemies/enemyConfig';
 import { selectPoisonLocations, poisonZonesOverlap } from '../src/enemies/poisonPlacement';
-import { rootWavePoint, rootTipHits } from '../src/enemies/rootGrowth';
+import { attachedRootLine, rootWavePoint, rootTipHits } from '../src/enemies/rootGrowth';
 import { sporePatrolVelocity } from '../src/enemies/sporeMovement';
 import { ROOT_BRANCH, rootBurstAngles, SPORE_THROW_INTERVAL_MS } from '../src/enemies/worldOneBossBalance';
 import { SPORE_POISON } from '../src/enemies/poisonHazard';
@@ -59,6 +59,15 @@ describe('Root Tyrant wave and triple eight-way burst', () => {
     expect(Math.abs(rootWavePoint(a,b,.3).y)).toBeGreaterThan(1);
     expect(rootTipHits({x:200,y:1},{x:205,y:3},{x:204,y:5},12)).toBe(true);
     expect(rootTipHits({x:200,y:1},{x:205,y:3},{x:350,y:0},12)).toBe(false);
+  });
+  it('keeps every attack branch attached when the Root Tyrant moves', () => {
+    const bounds={x:0,y:0,width:1000,height:800};
+    const before=attachedRootLine({x:300,y:300},0.4,350,bounds);
+    const after=attachedRootLine({x:325,y:318},0.4,350,bounds);
+    expect(after.start.x-before.start.x).toBeCloseTo(25);
+    expect(after.start.y-before.start.y).toBeCloseTo(18);
+    expect(after.end.x-before.end.x).toBeCloseTo(25);
+    expect(after.end.y-before.end.y).toBeCloseTo(18);
   });
 });
 describe('Spore Alchemist safe poison and arena mobility', () => {

@@ -58,6 +58,10 @@ function drawMinion(g: Phaser.GameObjects.Graphics, look: CharacterLook): void {
       worldMark(g, look.worldId, 0xeaffce, 24, 15);
       break;
     case 'archer':
+      if (look.worldId === 1) {
+        drawBriarArcher(g);
+        break;
+      }
       // A distinct masked ranger with shoulders and a bow.
       g.fillStyle(look.primary); g.fillTriangle(24, 4, 9, 27, 39, 27);
       g.fillStyle(look.secondary); g.fillRoundedRect(13, 25, 22, 15, 4);
@@ -68,6 +72,10 @@ function drawMinion(g: Phaser.GameObjects.Graphics, look: CharacterLook): void {
       worldMark(g, look.worldId, 0xf8fafc, 24, 12);
       break;
     case 'charger':
+      if (look.worldId === 1) {
+        drawForestRollerGolem(g, false);
+        break;
+      }
       // Long low creature: horns, armored back, four claws.
       g.fillStyle(look.primary); g.fillEllipse(23, 29, 37, 23);
       g.fillStyle(look.secondary); g.fillTriangle(8, 23, 3, 4, 19, 17);
@@ -86,6 +94,10 @@ function drawMinion(g: Phaser.GameObjects.Graphics, look: CharacterLook): void {
       worldMark(g, look.worldId, 0xffffff, 24, 33);
       break;
     case 'tank':
+      if (look.worldId === 1) {
+        drawAncientTreantGuardian(g);
+        break;
+      }
       // Oversized shoulders, helmet and iron fists.
       g.fillStyle(look.primary); g.fillRoundedRect(9, 12, 30, 31, 6);
       g.fillStyle(look.secondary); g.fillRoundedRect(2, 20, 14, 20, 4);
@@ -107,6 +119,142 @@ function drawMinion(g: Phaser.GameObjects.Graphics, look: CharacterLook): void {
       break;
     default: break;
   }
+}
+
+/** Bark-armoured shield bearer. Its shield is a live overlay because it must
+ * face the hero and share the exact collision surface used by gameplay. */
+function drawAncientTreantGuardian(g: Phaser.GameObjects.Graphics): void {
+  g.fillStyle(0x07130b, .62); g.fillEllipse(24, 44, 40, 7);
+  // Root feet and a tapered trunk rather than the old square tank body.
+  g.fillStyle(0x3b2918);
+  g.fillTriangle(18, 34, 5, 44, 22, 42);
+  g.fillTriangle(29, 34, 43, 44, 26, 42);
+  g.fillStyle(0x624424); g.fillRoundedRect(12, 15, 25, 28, 8);
+  g.fillStyle(0x79562c); g.fillTriangle(14, 18, 24, 8, 34, 18);
+  g.fillStyle(0x4d351f); g.fillRoundedRect(16, 20, 18, 14, 5);
+  // Deep wooden face with amber eyes and a low bark brow.
+  g.fillStyle(0x201b13); g.fillRoundedRect(16, 19, 18, 10, 3);
+  g.fillStyle(0xf2cf63); g.fillRoundedRect(18, 22, 5, 3, 1);
+  g.fillRoundedRect(28, 22, 5, 3, 1);
+  g.lineStyle(3, 0x2e2418); g.lineBetween(15, 19, 24, 21);
+  g.lineBetween(27, 21, 35, 18);
+  // Crown branches, moss mantle and the unshielded claw arm.
+  g.lineStyle(5, 0x51361e); g.lineBetween(17, 17, 9, 4);
+  g.lineBetween(9, 7, 4, 2); g.lineBetween(10, 8, 14, 1);
+  g.lineBetween(32, 16, 40, 3); g.lineBetween(39, 7, 46, 2);
+  g.lineBetween(39, 8, 35, 1);
+  g.fillStyle(0x567a35); g.fillEllipse(14, 15, 18, 8);
+  g.fillEllipse(34, 14, 17, 8); g.fillCircle(24, 10, 5);
+  g.lineStyle(8, 0x604326); g.lineBetween(35, 29, 45, 36);
+  g.fillStyle(0x806039); g.fillCircle(45, 36, 5);
+  g.lineStyle(2, 0xb79155); g.lineBetween(43, 34, 48, 31);
+  g.lineBetween(45, 36, 49, 36); g.lineBetween(43, 38, 47, 42);
+  // Bark grooves make the character readable as living wood at phone size.
+  g.lineStyle(1.7, 0xa27a42, .75);
+  g.lineBetween(20, 31, 18, 39); g.lineBetween(28, 31, 31, 40);
+  g.lineBetween(24, 14, 22, 18); g.lineBetween(29, 15, 31, 18);
+}
+
+/** Forest archer body. The bow, arrow and drawing arms are intentionally not
+ * baked into this texture: AdvancedEnemy renders and animates those parts. */
+function drawBriarArcher(g: Phaser.GameObjects.Graphics): void {
+  // Boots, slim legs and a split leather tunic make this a humanoid archer.
+  g.fillStyle(0x2d2118); g.fillRoundedRect(13, 35, 8, 10, 2);
+  g.fillRoundedRect(28, 35, 8, 10, 2);
+  g.fillStyle(0x69452a); g.fillRoundedRect(11, 41, 12, 4, 2);
+  g.fillRoundedRect(27, 41, 12, 4, 2);
+  g.fillStyle(0x38562b); g.fillRoundedRect(13, 20, 23, 21, 5);
+  g.fillStyle(0x6e8f3d); g.fillTriangle(14, 31, 24, 42, 25, 29);
+  g.fillTriangle(35, 31, 25, 42, 24, 29);
+  g.fillStyle(0x493322); g.fillRoundedRect(12, 30, 25, 5, 2);
+  g.fillStyle(0xc7a45c); g.fillRoundedRect(22, 30, 6, 5, 1);
+  // Quiver and visible arrow feathers behind the shoulder.
+  g.fillStyle(0x4b2f1f); g.fillRoundedRect(8, 14, 7, 24, 3);
+  g.lineStyle(2, 0xb9874b); g.lineBetween(10, 20, 6, 3);
+  g.lineBetween(13, 20, 12, 2);
+  g.fillStyle(0xd7e6b0); g.fillTriangle(4, 3, 8, 3, 6, 8);
+  g.fillTriangle(10, 2, 14, 2, 12, 7);
+  // Pointed hood, face opening, alert eyes and leaf clasp.
+  g.fillStyle(0x274426); g.fillTriangle(24, 3, 8, 25, 41, 25);
+  g.fillStyle(0x416d32); g.fillRoundedRect(11, 12, 28, 18, 8);
+  g.fillStyle(0x162318); g.fillEllipse(25, 21, 19, 14);
+  g.fillStyle(0xd9ef9a); g.fillRoundedRect(16, 19, 7, 3, 1);
+  g.fillRoundedRect(28, 19, 7, 3, 1);
+  g.fillStyle(0x233319); g.fillRect(20, 19, 2, 3); g.fillRect(29, 19, 2, 3);
+  g.fillStyle(0x86b94c); g.fillTriangle(23, 11, 30, 7, 28, 15);
+  g.fillStyle(0xcfe986); g.fillCircle(24, 27, 3);
+  // Shoulders stop short of the hands so the animated arms stay readable.
+  g.fillStyle(0x587f37); g.fillCircle(13, 26, 5); g.fillCircle(37, 26, 5);
+}
+
+/** The World-1 charger and first boss are one readable creature family:
+ * stacked forest stones, moss seams and heavy folding limbs. The boss is
+ * deliberately more detailed; runtime scale makes it substantially larger. */
+function drawForestRollerGolem(g: Phaser.GameObjects.Graphics, boss: boolean): void {
+  const stone = boss ? 0x66705f : 0x727969;
+  const lightStone = boss ? 0x929b82 : 0x969d86;
+  const shadow = 0x343b33;
+  const moss = boss ? 0x4f7a32 : 0x5f843b;
+  const eye = boss ? 0xd9ff72 : 0xc8f36a;
+
+  g.fillStyle(0x07130b, .62); g.fillEllipse(24, 44, boss ? 43 : 36, 7);
+  // Heavy feet, fists and separated arms keep the idle silhouette humanoid.
+  g.fillStyle(shadow);
+  g.fillRoundedRect(boss ? 4 : 7, 31, boss ? 13 : 11, 12, 4);
+  g.fillRoundedRect(boss ? 31 : 30, 31, boss ? 13 : 11, 12, 4);
+  g.fillRoundedRect(boss ? 1 : 4, 21, boss ? 13 : 11, 17, 5);
+  g.fillRoundedRect(boss ? 34 : 33, 21, boss ? 13 : 11, 17, 5);
+  g.fillStyle(stone);
+  g.fillRoundedRect(boss ? 7 : 10, boss ? 14 : 16, boss ? 34 : 28, boss ? 27 : 25, 8);
+  g.fillStyle(lightStone);
+  g.fillRoundedRect(boss ? 10 : 13, boss ? 8 : 11, boss ? 28 : 22, boss ? 20 : 17, 7);
+  // Brow, recessed face and bright magical eyes remain readable on phones.
+  g.fillStyle(shadow); g.fillRoundedRect(boss ? 12 : 15, boss ? 16 : 18,
+    boss ? 24 : 18, boss ? 11 : 9, 3);
+  g.fillStyle(eye); g.fillRoundedRect(boss ? 15 : 17, boss ? 19 : 20, 6, 3, 1);
+  g.fillRoundedRect(boss ? 27 : 26, boss ? 19 : 20, 6, 3, 1);
+  // Cracks show that the limbs can fold together into the rolling boulder.
+  g.lineStyle(boss ? 2.4 : 1.8, 0x252b25, .92);
+  g.lineBetween(13, 29, 20, 34); g.lineBetween(20, 34, 17, 41);
+  g.lineBetween(35, 28, 28, 33); g.lineBetween(28, 33, 32, 40);
+  g.lineBetween(18, 11, 22, 16); g.lineBetween(31, 10, 27, 16);
+  // Moss grows over the shoulder plates; the boss also carries small stones.
+  g.fillStyle(moss);
+  g.fillEllipse(boss ? 11 : 14, boss ? 16 : 18, boss ? 17 : 13, 7);
+  g.fillEllipse(boss ? 35 : 33, boss ? 14 : 17, boss ? 15 : 12, 6);
+  g.fillTriangle(18, 12, 22, 3, 25, 13);
+  if (boss) {
+    g.fillStyle(0x7e8876); g.fillTriangle(6, 20, 9, 5, 16, 18);
+    g.fillTriangle(33, 17, 40, 4, 43, 21);
+    g.fillStyle(0xb6c89b); g.fillCircle(8, 26, 3); g.fillCircle(41, 27, 3);
+  }
+}
+
+/** Dedicated curled pose used after the visible crouch. It is intentionally a
+ * near-perfect circle, so rotation reads as rolling instead of a sliding dash. */
+function drawForestRollerBall(g: Phaser.GameObjects.Graphics, boss: boolean): void {
+  const radius = boss ? 21 : 18;
+  const stone = boss ? 0x626c5b : 0x747b6b;
+  const lightStone = boss ? 0x919b82 : 0x9ba28b;
+  const moss = boss ? 0x4e7a31 : 0x5d843a;
+  g.fillStyle(0x07130b, .55); g.fillEllipse(24, 44, boss ? 43 : 36, 6);
+  g.fillStyle(0x30372f); g.fillCircle(24, 25, radius + 1);
+  g.fillStyle(stone); g.fillCircle(24, 24, radius);
+  // Interlocking plates make the rotation obvious even at high dash speed.
+  g.fillStyle(lightStone); g.fillTriangle(24, 4, 34, 17, 22, 20);
+  g.fillTriangle(43, 24, 31, 34, 29, 21);
+  g.fillStyle(0x454e42); g.fillTriangle(24, 44, 14, 33, 26, 29);
+  g.fillTriangle(5, 24, 17, 14, 20, 27);
+  g.lineStyle(boss ? 2.6 : 2, 0x272e27, .95);
+  g.strokeCircle(24, 24, radius - 1);
+  g.lineBetween(24, 5, 22, 20); g.lineBetween(42, 24, 29, 21);
+  g.lineBetween(24, 43, 26, 29); g.lineBetween(6, 24, 20, 27);
+  g.fillStyle(moss); g.fillEllipse(14, 12, boss ? 13 : 10, 5);
+  g.fillEllipse(36, 31, boss ? 12 : 9, 5);
+  // A brief glimpse of the tucked-in glowing face sells the transformation.
+  g.fillStyle(0x252b25); g.fillRoundedRect(16, 20, 16, 8, 3);
+  g.fillStyle(boss ? 0xd9ff72 : 0xc8f36a);
+  g.fillRect(18, 22, 4, 2); g.fillRect(27, 22, 4, 2);
 }
 
 /** 48x48 forest goblin: pointed ears, green face, snarling teeth,
@@ -222,6 +370,14 @@ function drawBoss(g: Phaser.GameObjects.Graphics, look: CharacterLook, tier: num
     drawEmberBoss(g, tier);
     return;
   }
+  if (look.worldId === 1 && tier === 1) {
+    drawForestRollerGolem(g, true);
+    return;
+  }
+  if (look.worldId === 1 && tier === 3) {
+    drawRootTyrant(g);
+    return;
+  }
   // Distinct silhouettes for the six encounters, including both room-15 bosses.
   g.fillStyle(0x020617, 0.7); g.fillEllipse(24, 44, 40, 7);
   g.fillStyle(look.secondary); g.fillRoundedRect(6, 16, 36, 28, 8);
@@ -248,6 +404,38 @@ function drawBoss(g: Phaser.GameObjects.Graphics, look: CharacterLook, tier: num
     g.lineBetween(44, 32, 36, 40);
   }
   worldMark(g, look.worldId, 0xf8fafc, 24, 38);
+}
+
+/** World-1 boss two: a walking ancient tree whose own branch arms become the
+ * phase-one lash and phase-two radial branch attacks at runtime. */
+function drawRootTyrant(g: Phaser.GameObjects.Graphics): void {
+  g.fillStyle(0x061109, .68); g.fillEllipse(24, 45, 45, 7);
+  g.fillStyle(0x342315);
+  g.fillTriangle(18, 31, 2, 45, 23, 42);
+  g.fillTriangle(31, 31, 47, 45, 26, 42);
+  g.fillStyle(0x5a3d21); g.fillRoundedRect(10, 9, 29, 35, 10);
+  g.fillStyle(0x75532d); g.fillRoundedRect(14, 12, 21, 25, 7);
+  // Existing arm stumps visually continue into every attached attack branch.
+  g.lineStyle(9, 0x50351d); g.lineBetween(13, 23, 1, 29);
+  g.lineBetween(36, 22, 47, 28);
+  g.fillStyle(0x392718); g.fillCircle(3, 29, 5); g.fillCircle(45, 28, 5);
+  // Hollow face and luminous sap eyes.
+  g.fillStyle(0x17160f); g.fillRoundedRect(15, 18, 20, 13, 4);
+  g.fillStyle(0xcdf56a); g.fillTriangle(17, 22, 23, 21, 21, 25);
+  g.fillTriangle(28, 21, 34, 22, 30, 25);
+  g.fillStyle(0x271c13); g.fillTriangle(22, 28, 28, 28, 25, 32);
+  // Crown and foliage make the silhouette unmistakably tree-like.
+  g.lineStyle(5, 0x4a301c); g.lineBetween(16, 13, 7, 1);
+  g.lineBetween(9, 5, 2, 4); g.lineBetween(10, 6, 14, -1);
+  g.lineBetween(31, 12, 40, 0); g.lineBetween(38, 4, 46, 3);
+  g.lineBetween(38, 5, 34, -1);
+  g.fillStyle(0x426b2a); g.fillCircle(10, 8, 7); g.fillCircle(19, 6, 8);
+  g.fillCircle(31, 6, 8); g.fillCircle(40, 9, 7);
+  g.fillStyle(0x6e9a3c); g.fillCircle(24, 4, 7);
+  // Bark cracks follow the branch direction into the torso.
+  g.lineStyle(2, 0xaa7c3e, .75);
+  g.lineBetween(8, 27, 19, 25); g.lineBetween(19, 25, 23, 35);
+  g.lineBetween(41, 27, 31, 25); g.lineBetween(31, 25, 27, 37);
 }
 
 /** Unique World-3 boss silhouettes keyed by their retained archetype texture index. */
@@ -327,5 +515,16 @@ export function createWorldCharacterTextures(scene: Phaser.Scene): void {
       g.generateTexture(look.textureKey, 48, 48);
       g.destroy();
     }
+  }
+  const rollerTextures = [
+    { key: 'world-1-charger-roll', boss: false },
+    { key: 'world-1-boss-1-roll', boss: true },
+  ] as const;
+  for (const roller of rollerTextures) {
+    if (scene.textures.exists(roller.key)) continue;
+    const g = scene.make.graphics({ x: 0, y: 0 }, false);
+    drawForestRollerBall(g, roller.boss);
+    g.generateTexture(roller.key, 48, 48);
+    g.destroy();
   }
 }

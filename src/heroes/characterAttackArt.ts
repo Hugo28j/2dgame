@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { Player } from '../entities/Player';
 import type { WeaponId } from '../weapons/weaponConfig';
 import { hasAnimatedHero } from './heroEquipmentArt';
+import { HERO_WEAPON_PROPORTIONS } from './heroWeaponProportions';
 
 import {
   attackPoseProgress, poseForWeapon, poseLengthMs, type AttackPose,
@@ -78,22 +79,25 @@ export class CharacterAttackArt {
     const angle = attacking
       ? -1.05 + (1 - Math.cos(Math.PI * Math.min(1,t*1.28))) * 1.11
       : -.55 + sway*.025;
-    const cx=17,cy=-12+sway*.2;
+    const size=HERO_WEAPON_PROPORTIONS.sword;
+    const cx=size.handX,cy=-11+sway*.2;
     const dx=Math.cos(angle),dy=Math.sin(angle);
     const px=-dy,py=dx;
     g.lineStyle(7,0x916d47,1);g.lineBetween(8,-7,cx,cy);
     g.fillStyle(0xe6bd86);g.fillCircle(cx,cy,4.8);
-    const sx=cx+dx*9,sy=cy+dy*9,tx=cx+dx*37,ty=cy+dy*37;
+    const sx=cx+dx*size.guardOffset,sy=cy+dy*size.guardOffset;
+    const tx=sx+dx*size.bladeLength,ty=sy+dy*size.bladeLength;
     g.lineStyle(5,0x5b6676,1);g.lineBetween(cx,cy,sx,sy);
     g.lineStyle(3,0xffe49c,1);g.lineBetween(cx+px*7,cy+py*7,cx-px*7,cy-py*7);
     g.lineStyle(8,0x8b5314,1);g.lineBetween(sx,sy,tx,ty);
     g.lineStyle(5,0xffe3a5,1);g.lineBetween(sx,sy,tx,ty);
     g.fillStyle(0xfff5c6,1);
-    g.fillTriangle(tx+dx*10,ty+dy*10,tx+px*4,ty+py*4,tx-px*4,ty-py*4);
+    g.fillTriangle(tx+dx*size.tipLength,ty+dy*size.tipLength,
+      tx+px*3.5,ty+py*3.5,tx-px*3.5,ty-py*3.5);
     if(attacking && t>.22 && t<.78){
       g.lineStyle(2.5,0xffea80,Math.sin(Math.PI*(t-.22)/.56)*.8);
       g.beginPath();
-      g.arc(cx,cy,50,angle-.27,angle+.15,false);
+      g.arc(cx,cy,39,angle-.27,angle+.15,false);
       g.strokePath();
     }
   }
@@ -107,11 +111,12 @@ export class CharacterAttackArt {
       else if(t<impactRatio)angle=-1.17+(t-impactRatio*.47)/(impactRatio*.53)*2.10; // downstroke
       else angle=.93-Math.min(1,(t-impactRatio)/(.95-impactRatio))*.77; // recoil
     }
-    const handX=16,handY=-11+sway*.22;
+    const size=HERO_WEAPON_PROPORTIONS.hammer;
+    const handX=size.handX,handY=-10+sway*.22;
     const dx=Math.cos(angle),dy=Math.sin(angle),px=-dy,py=dx;
     g.lineStyle(8,0x785536,1);g.lineBetween(8,-8,handX,handY);
     g.fillStyle(0xecc18e,1);g.fillCircle(handX,handY,5);
-    const headX=handX+dx*38,headY=handY+dy*38;
+    const headX=handX+dx*size.shaftLength,headY=handY+dy*size.shaftLength;
     // Actual iron shaft, leather grip and oversized forged hammer head.
     g.lineStyle(6,0x372f2a,1);g.lineBetween(handX,handY,headX,headY);
     g.lineStyle(3,0xc5a46b,1);g.lineBetween(handX+dx*6,handY+dy*6,headX,headY);
@@ -122,17 +127,21 @@ export class CharacterAttackArt {
         handX+dx*(u+2)-px*3,handY+dy*(u+2)-py*3);
     }
     const corners=[
-      {x:headX+px*18+dx*9,y:headY+py*18+dy*9},
-      {x:headX-px*18+dx*9,y:headY-py*18+dy*9},
-      {x:headX-px*18-dx*9,y:headY-py*18-dy*9},
-      {x:headX+px*18-dx*9,y:headY+py*18-dy*9},
+      {x:headX+px*size.headHalfSpan+dx*size.headHalfDepth,
+        y:headY+py*size.headHalfSpan+dy*size.headHalfDepth},
+      {x:headX-px*size.headHalfSpan+dx*size.headHalfDepth,
+        y:headY-py*size.headHalfSpan+dy*size.headHalfDepth},
+      {x:headX-px*size.headHalfSpan-dx*size.headHalfDepth,
+        y:headY-py*size.headHalfSpan-dy*size.headHalfDepth},
+      {x:headX+px*size.headHalfSpan-dx*size.headHalfDepth,
+        y:headY+py*size.headHalfSpan-dy*size.headHalfDepth},
     ];
     const hammerHead = corners.map(p => new Phaser.Math.Vector2(p.x, p.y));
     g.fillStyle(0x34485b,1);g.fillPoints(hammerHead,true);
     g.lineStyle(3,0xfde68a,1);g.strokePoints(hammerHead,true);
     g.lineStyle(3,0x9dd8e9,.88);
-    g.lineBetween(headX+px*13+dx*4,headY+py*13+dy*4,
-      headX-px*13+dx*4,headY-py*13+dy*4);
+    g.lineBetween(headX+px*9+dx*3,headY+py*9+dy*3,
+      headX-px*9+dx*3,headY-py*9+dy*3);
     g.fillStyle(0xffeeaf,1);g.fillCircle(headX,headY,5);
     if(attacking && Math.abs(t-impactRatio)<.14){
       const strength=1-Math.abs(t-impactRatio)/.14;
@@ -146,41 +155,48 @@ export class CharacterAttackArt {
 
   private drawRanged(g:Phaser.GameObjects.Graphics,pose:AttackPose,
     attacking:boolean,t:number,sway:number):void {
-    const recoil=attacking?Math.sin(Math.PI*Math.min(1,t*1.4))*6:0;
-    const gripX=22-recoil,gripY=sway*.25;
+    const bowSize=HERO_WEAPON_PROPORTIONS.bow;
+    const crossbowSize=HERO_WEAPON_PROPORTIONS.crossbow;
+    const recoil=attacking?Math.sin(Math.PI*Math.min(1,t*1.4))*4:0;
+    const gripX=(pose==='crossbow'?crossbowSize.gripX:bowSize.gripX)-recoil,gripY=sway*.25;
     g.lineStyle(5,0x9b7650);g.lineBetween(8,-5,gripX-2,gripY-1);
     g.fillStyle(0xf0c391,1);g.fillCircle(gripX-2,gripY-1,4.5);
     if(pose==='crossbow'){
-      g.lineStyle(6,0x81552d);g.lineBetween(gripX-8,gripY,gripX+28,gripY);
-      g.lineStyle(3,0xaee8d1);g.lineBetween(gripX+23,gripY-17,gripX+23,gripY+17);
-      g.lineStyle(5,0x325b54);g.lineBetween(gripX+8,gripY-18,gripX+28,gripY);
-      g.lineBetween(gripX+8,gripY+18,gripX+28,gripY);
+      g.lineStyle(6,0x81552d);g.lineBetween(gripX-crossbowSize.stockBack,gripY,
+        gripX+crossbowSize.stockForward,gripY);
+      g.lineStyle(3,0xaee8d1);g.lineBetween(gripX+19,gripY-crossbowSize.halfSpan,
+        gripX+19,gripY+crossbowSize.halfSpan);
+      g.lineStyle(5,0x325b54);g.lineBetween(gripX+7,gripY-crossbowSize.halfSpan,
+        gripX+crossbowSize.stockForward,gripY);
+      g.lineBetween(gripX+7,gripY+crossbowSize.halfSpan,
+        gripX+crossbowSize.stockForward,gripY);
       g.lineStyle(2,0xf9e1b0);
-      g.lineBetween(gripX+8,gripY-18,gripX+18,gripY);
-      g.lineBetween(gripX+8,gripY+18,gripX+18,gripY);
+      g.lineBetween(gripX+7,gripY-crossbowSize.halfSpan,gripX+15,gripY);
+      g.lineBetween(gripX+7,gripY+crossbowSize.halfSpan,gripX+15,gripY);
     } else { // longbow, drawn bowstring flexes and is released on every shot
       const pull=attacking?(1-Math.min(1,t*2.9))*10:4;
       g.lineStyle(3.8,0x42796a,1);
-      g.beginPath();g.moveTo(gripX+12,gripY-19);
-      g.lineTo(gripX+22,gripY-9);g.lineTo(gripX+25,gripY);
-      g.lineTo(gripX+22,gripY+9);g.lineTo(gripX+12,gripY+19);g.strokePath();
+      g.beginPath();g.moveTo(gripX+9,gripY-bowSize.halfHeight);
+      g.lineTo(gripX+17,gripY-10);g.lineTo(gripX+bowSize.bellyForward,gripY);
+      g.lineTo(gripX+17,gripY+10);g.lineTo(gripX+9,gripY+bowSize.halfHeight);g.strokePath();
       g.lineStyle(1.7,0xe6dfb6,1);
-      g.lineBetween(gripX+12,gripY-19,gripX+12-pull,gripY);
-      g.lineBetween(gripX+12-pull,gripY,gripX+12,gripY+19);
+      g.lineBetween(gripX+9,gripY-bowSize.halfHeight,gripX+9-pull,gripY);
+      g.lineBetween(gripX+9-pull,gripY,gripX+9,gripY+bowSize.halfHeight);
       if(!attacking||t<.22){
         g.lineStyle(2.3,0xf2e1b2,1);
-        g.lineBetween(gripX+8-pull,gripY,gripX+37,gripY);
+        g.lineBetween(gripX+6-pull,gripY,gripX+bowSize.arrowForward,gripY);
         g.fillStyle(0x9af0cf);
-        g.fillTriangle(gripX+40,gripY,gripX+33,gripY-3,gripX+33,gripY+3);
+        g.fillTriangle(gripX+bowSize.arrowForward+4,gripY,
+          gripX+bowSize.arrowForward-3,gripY-3,gripX+bowSize.arrowForward-3,gripY+3);
       }
     }
     if(attacking&&t<.45) {
       const f=1-t/.45;
       g.fillStyle(0xb7f7e5,.60*f);
-      g.fillCircle(gripX+35,gripY,3+f*4);
+      g.fillCircle(gripX+30,gripY,3+f*4);
       g.lineStyle(1.4,0xafffe0,.8*f);
-      g.lineBetween(gripX+30,gripY-8,gripX+41,gripY-8);
-      g.lineBetween(gripX+30,gripY+8,gripX+41,gripY+8);
+      g.lineBetween(gripX+26,gripY-7,gripX+36,gripY-7);
+      g.lineBetween(gripX+26,gripY+7,gripX+36,gripY+7);
     }
   }
 

@@ -22,6 +22,21 @@ export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
     scene.physics.add.existing(this);
     this.setDepth(17);
     this.setTint(color);
+    if (effect === 'briar-ricochet') {
+      const key = 'briar-arrow';
+      if (!scene.textures.exists(key)) {
+        const g = scene.add.graphics();
+        // Horizontal wooden shaft: rotation below always points its steel tip
+        // along the actual velocity, including after the wall ricochet.
+        g.lineStyle(2.4, 0x9a6735, 1); g.lineBetween(4, 8, 31, 8);
+        g.fillStyle(0xcbd5df); g.fillTriangle(37, 8, 29, 3, 29, 13);
+        g.lineStyle(1, 0xf8fafc, .8); g.lineBetween(30, 5, 36, 8);
+        g.fillStyle(0xb8d97b); g.fillTriangle(8, 8, 1, 3, 3, 8);
+        g.fillStyle(0x769c48); g.fillTriangle(8, 8, 1, 13, 3, 8);
+        g.generateTexture(key, 38, 16); g.destroy();
+      }
+      this.setTexture(key).clearTint().setScale(1.12);
+    }
     if (effect === 'frost-chill') {
       // A real small snowball, instead of the generic colored arrow/bullet.
       const key = 'frost-ranger-mini-snowball';
@@ -54,7 +69,8 @@ export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
     this.setVelocity(this.baseVelocity.x, this.baseVelocity.y);
     const body = this.body;
     if (body instanceof Phaser.Physics.Arcade.Body) {
-      body.setCircle(6, 2, 2);
+      if (effect === 'briar-ricochet') body.setSize(30, 8, true);
+      else body.setCircle(6, 2, 2);
       body.setAllowGravity(false);
     }
   }

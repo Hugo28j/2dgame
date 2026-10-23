@@ -20,6 +20,7 @@ import { EMBER_ATTACKS } from './emberWastes';
 import { EMBER_BOSS_ATTACKS, getEmberBossAttack,
   type EmberBossAttack } from './emberBosses';
 import type { BulletPattern } from './projectilePatterns';
+import { BRIAR_ARCHER_DRAW_MS, briarBowDrawAmount } from './briarArcher';
 export type { BulletPattern } from './projectilePatterns';
 
 export type EnemyFire = (enemy: AdvancedEnemy, pattern: BulletPattern, volley?: number, speed?: number) => void;
@@ -52,8 +53,14 @@ export class AdvancedEnemy extends Slime {
   private nextSummonAt = Number.POSITIVE_INFINITY;
   private readonly summonerType: SummonerType | undefined;
   private witchHat?: Phaser.GameObjects.Graphics;
+  private archerBow?: Phaser.GameObjects.Graphics;
+  private archerAimAngle = 0;
+  private archerDrawStartedAt = -100000;
+  private archerReleaseAt = 0;
   private windupEndsAt = 0;
+  private windupStartedAt = 0;
   private dashEndsAt = 0;
+  private dashStartedAt = 0;
   private dashX = 0;
   private dashY = 0;
   private warning?: Phaser.GameObjects.Graphics;
@@ -103,6 +110,7 @@ export class AdvancedEnemy extends Slime {
     this.summonerType = getSummonerType(worldId, kind, roomNumber, bossSlot);
     this.nextSummonAt = firstSummonTime(scene.time.now, this.summonerType);
     if (this.isFrostWitch) this.witchHat = scene.add.graphics().setDepth(14);
+    if (this.isBriarArcher) this.archerBow = scene.add.graphics().setDepth(14);
   }
 
   /** Only THIS enemy's attack and summon clocks pause while it is stunned.
@@ -114,6 +122,11 @@ export class AdvancedEnemy extends Slime {
     const pause = (deadline: number) =>
       delayEnemyAttackForStun(deadline, now, before, this.stunEndsAt);
     this.nextShotAt = pause(this.nextShotAt);
+    if (this.archerReleaseAt > 0) {
+      const oldRelease = this.archerReleaseAt;
+      this.archerReleaseAt = pause(this.archerReleaseAt);
+      this.archerDrawStartedAt += this.archerReleaseAt - oldRelease;
+    }
     this.nextSpecialAt = pause(this.nextSpecialAt);
     if (this.nextSnowfallAt > 0) this.nextSnowfallAt = pause(this.nextSnowfallAt);
     this.nextJadeBranchesAt = pause(this.nextJadeBranchesAt);
@@ -140,6 +153,9 @@ export class AdvancedEnemy extends Slime {
   public get isFrostWitch(): boolean {
     return this.worldId === 2 && this.kind === 'mage';
   }
+  public get isBriarArcher(): boolean {
+    return this.worldId === 1 && this.kind === 'archer';
+  }
   public get isAncientTreant(): boolean { return this.kind === 'tank' && this.worldId === 1; }
   public get isTreantShield(): boolean {
     return this.isAncientTreant && !this.treantShieldBroken;
@@ -161,6 +177,17 @@ export class AdvancedEnemy extends Slime {
   }
   public get isMossWarden(): boolean {
     return this.isBoss && this.worldId === 1 && this.roomNumber === 5;
+  }
+  /** World-1's small roller and room-5 boss share the same curl/roll language. */
+  private get isForestRoller(): boolean {
+    return this.isMossWarden || (this.worldId === 1 && this.kind === 'charger');
+  }
+  private get forestRollScale(): number { return this.isBoss ? 1.75 : 1; }
+  private get forestRollTexture(): string {
+    return this.isMossWarden ? 'world-1-boss-1-roll' : 'world-1-charger-roll';
+  }
+  private get forestIdleTexture(): string {
+    return getWorldCharacter(this.worldId, this.kind, this.roomNumber, this.bossSlot).textureKey;
   }
 
   public updateAI(targetX: number, targetY: number, now: number,
@@ -218,10 +245,26 @@ export class AdvancedEnemy extends Slime {
           ? getObstacleAvoidanceVelocity(horizontalBlock, targetX - this.x,
               targetY - this.y, speed, this.orbitSign)
           : move;
-        this.setVelocity(velocity.x, velocity.y);
-        if (now >= this.nextShotAt) {
-          fire(this, this.isFrostWitch || this.kind === 'archer' ? 'single' : 'double');
-          this.nextShotAt = now + this.stats.attackIntervalMs;
+        this.archerAimAngle = Math.atan2(targetY - this.y, targetX - this.x);
+        this.setFlipX(targetX < this.x);
+        if (this.isBriarArcher && this.archerReleaseAt > 0) {
+          // Stand firmly while drawing; release the real arrow at full tension.
+          this.setVelocity(0, 0);
+          if (now >= this.archerReleaseAt) {
+            fire(this, 'single');
+            this.archerReleaseAt = 0;
+            this.nextShotAt = now + this.stats.attackIntervalMs;
+          }
+        } else if (this.isBriarArcher && now >= this.nextShotAt) {
+          this.setVelocity(0, 0);
+          this.archerDrawStartedAt = now;
+          this.archerReleaseAt = now + BRIAR_ARCHER_DRAW_MS;
+        } else {
+          this.setVelocity(velocity.x, velocity.y);
+          if (now >= this.nextShotAt) {
+            fire(this, this.isFrostWitch || this.kind === 'archer' ? 'single' : 'double');
+            this.nextShotAt = now + this.stats.attackIntervalMs;
+          }
         }
         break;
       }
@@ -364,6 +407,81 @@ export class AdvancedEnemy extends Slime {
         break;
       }
     }
+  }
+
+  public override preUpdate(time: number, delta: number): void {
+    super.preUpdate(time, delta);
+    if (this.isBriarArcher) this.drawBriarBow(this.scene.time.now);
+    if (!this.isForestRoller || !this.active || this.aiState === 'defeated') return;
+    const now = this.scene.time.now;
+    if (this.windupEndsAt > 0) {
+      const duration = Math.max(1, this.windupEndsAt - this.windupStartedAt);
+      const progress = Phaser.Math.Clamp((now - this.windupStartedAt) / duration, 0, 1);
+      if (progress < .68) {
+        const curl = progress / .68;
+        if (this.texture.key !== this.forestIdleTexture) this.setTexture(this.forestIdleTexture);
+        this.setScale(this.forestRollScale * (1 + curl * .14),
+          this.forestRollScale * (1 - curl * .38));
+        this.setAngle(Math.sin(curl * Math.PI) * (this.flipX ? 9 : -9));
+      } else {
+        const close = (progress - .68) / .32;
+        if (this.texture.key !== this.forestRollTexture) this.setTexture(this.forestRollTexture);
+        const scale = this.forestRollScale * (.72 + close * .28);
+        this.setScale(scale);
+        this.setAngle((this.flipX ? -1 : 1) * close * 35);
+      }
+      return;
+    }
+    if (this.dashEndsAt > 0) {
+      if (this.texture.key !== this.forestRollTexture) this.setTexture(this.forestRollTexture);
+      this.setScale(this.forestRollScale);
+      const direction = this.dashX < 0 ? -1 : 1;
+      this.setAngle(direction * (now - this.dashStartedAt) * .86);
+    }
+  }
+
+  /** One cached overlay follows the moving archer. The string, nocked arrow
+   * and both hands move through draw -> full tension -> snap release. */
+  private drawBriarBow(now: number): void {
+    const g = this.archerBow;
+    if (!g || !g.active || !this.active || this.aiState === 'defeated') return;
+    g.clear();
+    g.setPosition(this.x, this.y);
+    const ux = Math.cos(this.archerAimAngle), uy = Math.sin(this.archerAimAngle);
+    const px = -uy, py = ux;
+    const draw = this.isStunned(now) ? 0 : briarBowDrawAmount(now - this.archerDrawStartedAt);
+    const gripX = ux * 12, gripY = uy * 12 + 2;
+    const topX = gripX + px * 16 + ux * 2, topY = gripY + py * 16 + uy * 2;
+    const bottomX = gripX - px * 16 + ux * 2, bottomY = gripY - py * 16 + uy * 2;
+    const bellyX = gripX + ux * 8, bellyY = gripY + uy * 8;
+    const pullX = gripX - ux * (2 + draw * 14), pullY = gripY - uy * (2 + draw * 14);
+    // Rear drawing arm and forward bow arm visibly separate during the pull.
+    g.lineStyle(7, 0x5f873a, 1);
+    g.lineBetween(-ux * 3, -uy * 3 + 3, pullX, pullY);
+    g.lineBetween(ux * 1, uy * 1 + 4, gripX, gripY);
+    g.fillStyle(0xa1c75d); g.fillCircle(pullX, pullY, 3.5); g.fillCircle(gripX, gripY, 3.5);
+    // Curved yew bow and taut string.
+    g.lineStyle(3.4, 0x7a4b25, 1);
+    g.beginPath(); g.moveTo(topX, topY); g.lineTo(bellyX, bellyY);
+    g.lineTo(bottomX, bottomY); g.strokePath();
+    g.lineStyle(1.4, 0xeee7c7, .96);
+    g.lineBetween(topX, topY, pullX, pullY); g.lineBetween(pullX, pullY, bottomX, bottomY);
+    // Nocked arrow remains aligned with the target and shoots from this pose.
+    const arrowBackX = pullX - ux * 5, arrowBackY = pullY - uy * 5;
+    const arrowTipX = gripX + ux * 27, arrowTipY = gripY + uy * 27;
+    g.lineStyle(2.3, 0x9b6a36, 1); g.lineBetween(arrowBackX, arrowBackY, arrowTipX, arrowTipY);
+    g.fillStyle(0xd8dde1); g.fillTriangle(arrowTipX + ux * 5, arrowTipY + uy * 5,
+      arrowTipX + px * 3, arrowTipY + py * 3, arrowTipX - px * 3, arrowTipY - py * 3);
+    g.fillStyle(0xdbe9b5);
+    g.fillTriangle(arrowBackX, arrowBackY, arrowBackX - ux * 6 + px * 3,
+      arrowBackY - uy * 6 + py * 3, arrowBackX - ux * 4, arrowBackY - uy * 4);
+  }
+
+  private resetForestRollVisual(): void {
+    if (!this.isForestRoller || !this.active) return;
+    this.setTexture(this.forestIdleTexture);
+    this.setScale(this.forestRollScale);
+    this.setAngle(0);
   }
 
   /** Shared initial and repeat-cast scheduling. Death-triggered splits are
@@ -563,20 +681,39 @@ export class AdvancedEnemy extends Slime {
     const centerX = (a.x + b.x) / 2;
     const centerY = (a.y + b.y) / 2;
     const nx = this.shieldFacingX, ny = this.shieldFacingY;
+    const tx = -ny, ty = nx;
     graphic.clear();
-    graphic.lineStyle(15, 0x243b24, 0.98);
+    // A bent branch arm visibly connects torso, hand and the physical shield.
+    const elbowX = this.x + nx * 12 + tx * 9;
+    const elbowY = this.y + ny * 12 + ty * 9;
+    graphic.lineStyle(11, 0x392719, 1);
+    graphic.lineBetween(this.x + tx * 8, this.y + ty * 8, elbowX, elbowY);
+    graphic.lineBetween(elbowX, elbowY, centerX - nx * 4, centerY - ny * 4);
+    graphic.lineStyle(6, 0x76532e, 1);
+    graphic.lineBetween(this.x + tx * 8, this.y + ty * 8, elbowX, elbowY);
+    graphic.lineBetween(elbowX, elbowY, centerX - nx * 4, centerY - ny * 4);
+    // Thick rim plus four individual planks reads as a held tower shield.
+    graphic.lineStyle(19, 0x263522, 1);
     graphic.lineBetween(a.x, a.y, b.x, b.y);
-    graphic.lineStyle(10, 0x826a3f, 1);
+    graphic.lineStyle(15, 0x6f4b29, 1);
     graphic.lineBetween(a.x, a.y, b.x, b.y);
-    graphic.lineStyle(6, 0xc6a86c, 0.98);
-    graphic.lineBetween(a.x + nx * 2, a.y + ny * 2, b.x + nx * 2, b.y + ny * 2);
-    graphic.lineStyle(2.8, 0xd9f99d, 0.85);
+    for (const offset of [-31, -10, 11, 32]) {
+      const px = centerX + tx * offset, py = centerY + ty * offset;
+      graphic.lineStyle(4.5, offset % 2 ? 0xa47b43 : 0x8b6335, .98);
+      graphic.lineBetween(px - nx * 7, py - ny * 7, px + nx * 8, py + ny * 8);
+    }
+    graphic.lineStyle(3, 0xc49a58, .88);
     graphic.lineBetween(a.x + nx * 7, a.y + ny * 7, b.x + nx * 7, b.y + ny * 7);
-    // A central metal boss plate and two wooden cross-braces.
+    // Iron rim pins, central boss plate, gripping hand and reinforcing brace.
+    graphic.fillStyle(0xc7a76b, 1);
+    for (const offset of [-38, -19, 19, 38])
+      graphic.fillCircle(centerX + tx * offset + nx * 5, centerY + ty * offset + ny * 5, 2.5);
     graphic.fillStyle(0x647744, 1);
     graphic.fillCircle(centerX + nx * 6, centerY + ny * 6, 9);
     graphic.lineStyle(2, 0xfef3c7, 0.9);
     graphic.strokeCircle(centerX + nx * 6, centerY + ny * 6, 9);
+    graphic.fillStyle(0x8c6638, 1);
+    graphic.fillCircle(centerX - nx * 4, centerY - ny * 4, 5);
     const integrity = this.healthRatio;
     if (integrity < 0.67) {
       const dx = b.x - a.x, dy = b.y - a.y;
@@ -612,15 +749,18 @@ export class AdvancedEnemy extends Slime {
         return;
       }
       this.dashEndsAt = 0;
+      this.dashStartedAt = 0;
       this.setVelocity(0, 0);
+      this.resetForestRollVisual();
       this.nextSpecialAt = now + rechargeMs;
       return;
     }
     if (this.windupEndsAt > 0) {
       this.setVelocity(0, 0);
-      this.drawWarning(70, 0xef4444);
+      if (!this.isForestRoller) this.drawWarning(70, 0xef4444);
       if (now >= this.windupEndsAt) {
         this.clearWarning();
+        this.dashStartedAt = now;
         this.dashEndsAt = now + (this.isMossWarden ?
           (bossPhase(this.healthRatio) === 1 ? MOSS_DASH.phaseOneDurationMs : MOSS_DASH.phaseTwoDurationMs) :
           this.kind === 'charger' ? CHARGER_DASH.durationMs *
@@ -632,10 +772,11 @@ export class AdvancedEnemy extends Slime {
       const direction = new Phaser.Math.Vector2(targetX - this.x, targetY - this.y).normalize();
       this.dashX = direction.x;
       this.dashY = direction.y;
+      this.windupStartedAt = now;
       this.windupEndsAt = now + (this.isMossWarden ? MOSS_DASH.warningMs : this.isBoss ? 770 :
         CHARGER_DASH.telegraphMs);
       this.setVelocity(0, 0);
-      this.drawWarning(70, 0xef4444);
+      if (!this.isForestRoller) this.drawWarning(70, 0xef4444);
     }
   }
 
@@ -673,18 +814,24 @@ export class AdvancedEnemy extends Slime {
   }
   private clearWarning(): void {
     this.windupEndsAt = 0;
+    this.windupStartedAt = 0;
     this.warning?.destroy();
     this.warning = undefined;
   }
   public override playDefeat(): void {
     this.witchHat?.clear();
+    this.archerBow?.clear();
+    this.archerReleaseAt = 0;
     this.shieldGraphic?.clear();
     this.clearWarning();
+    this.resetForestRollVisual();
     super.playDefeat();
   }
   public override destroy(fromScene?: boolean): void {
     this.witchHat?.destroy();
     this.witchHat = undefined;
+    this.archerBow?.destroy();
+    this.archerBow = undefined;
     this.shieldGraphic?.destroy();
     this.shieldGraphic = undefined;
     this.warning?.destroy();

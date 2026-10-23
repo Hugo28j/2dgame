@@ -3,6 +3,8 @@ import { ENEMY_UNLOCK_ROOMS, getEnemyKindForRoom, getEnemyStatsForRoom } from '.
 import { CHARGER_DASH, WORLD1_BEETLE_DASH } from '../src/enemies/enemyBalance';
 import { WEAPONS, getWeaponStats } from '../src/weapons/weaponConfig';
 import { getAbilityStats } from '../src/abilities/abilityConfig';
+import { BRIAR_ARCHER_DRAW_MS, BRIAR_ARCHER_RELEASE_MS,
+  briarBowDrawAmount } from '../src/enemies/briarArcher';
 
 describe('World 1 mob rebalance and replacement spawns', () => {
   it('introduces the Beetle, Treant, Wisp and Sporecap at their new rooms', () => {
@@ -40,6 +42,14 @@ describe('World 1 mob rebalance and replacement spawns', () => {
     expect(WORLD1_BEETLE_DASH.speedMultiplier).toBe(2);
     expect(WORLD1_BEETLE_DASH.speedMultiplier*WORLD1_BEETLE_DASH.durationMultiplier).toBe(1.5);
     expect(CHARGER_DASH.distance*1.5).toBeGreaterThan(CHARGER_DASH.distance);
+  });
+  it('draws the Briar Archer bow fully before snapping the string forward', () => {
+    expect(briarBowDrawAmount(0)).toBe(0);
+    expect(briarBowDrawAmount(BRIAR_ARCHER_DRAW_MS / 2)).toBeCloseTo(.5);
+    expect(briarBowDrawAmount(BRIAR_ARCHER_DRAW_MS)).toBe(1);
+    expect(briarBowDrawAmount(BRIAR_ARCHER_DRAW_MS + BRIAR_ARCHER_RELEASE_MS / 2))
+      .toBeCloseTo(.5);
+    expect(briarBowDrawAmount(BRIAR_ARCHER_DRAW_MS + BRIAR_ARCHER_RELEASE_MS)).toBe(0);
   });
 });
 describe('Ranger initial balance and Windstep upgrades', () => {

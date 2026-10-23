@@ -10,7 +10,7 @@ import { getBossProfile, getBossTier } from '../enemies/bossProfiles';
 import { MOSS_DASH, ROOT_BRANCH, rootBurstAngles } from '../enemies/worldOneBossBalance';
 import { SPORE_POISON, poisonActive, poisonCovers, poisonTickDue } from '../enemies/poisonHazard';
 import { selectPoisonLocations, type PoisonCircle } from '../enemies/poisonPlacement';
-import { rootWavePoint, rootTipHits } from '../enemies/rootGrowth';
+import { attachedRootLine, rootWavePoint, rootTipHits } from '../enemies/rootGrowth';
 import { JADE_BRANCH, HEART_TREE, jadeBranchLanes, groveBranchTip,
   groveBranchHits, groveTreeHits, type GroveBranchLane } from '../enemies/groveAttacks';
 import { AdvancedEnemy, type BulletPattern } from '../enemies/AdvancedEnemy';
@@ -1670,120 +1670,118 @@ export class GameScene extends Phaser.Scene {
     this.frozenWalls.clear();
   }
 
-  /** Growing underground root wave and three rotating eight-way barrages. */
+  /** Living branch arms for both phases. Every point is recalculated from the
+   * moving boss, so neither the warning nor the damaging branch detaches. */
   private readonly performRootAttack = (enemy: AdvancedEnemy, attack: 'line' | 'burst',
     targetX: number, targetY: number, rotation: number | boolean): void => {
     if (!this.currentRoom || this.gameOver || this.transitioning || this.roomProgress.doorOpen) return;
     const bounds = this.currentRoom.layout.bounds;
-    const origin = {x: enemy.x, y: enemy.y};
-    const aim = Math.atan2(targetY - origin.y, targetX - origin.x);
+    const castOrigin = {x: enemy.x, y: enemy.y};
+    const aim = Math.atan2(targetY - castOrigin.y, targetX - castOrigin.x);
     const angles = attack === 'burst' ? rootBurstAngles(rotation) : [aim];
     const warningMs = attack === 'line' ? ROOT_BRANCH.lineWarningMs : ROOT_BRANCH.burstWarningMs;
     const growMs = attack === 'line' ? 660 : 460;
     for (const angle of angles) {
       const length = attack === 'burst' ? ROOT_BRANCH.burstLength :
-        Math.max(390, Math.hypot(targetX - origin.x, targetY - origin.y) + 95);
-      const end = {
-        x: Phaser.Math.Clamp(origin.x + Math.cos(angle) * length,
-          bounds.x + 12, bounds.x + bounds.width - 12),
-        y: Phaser.Math.Clamp(origin.y + Math.sin(angle) * length,
-          bounds.y + 12, bounds.y + bounds.height - 12),
-      };
-      // Fissures warn the player where a root is about to surface; this is
-      // purely a telegraph and never deals damage.
+        Math.max(390, Math.hypot(targetX - castOrigin.x, targetY - castOrigin.y) + 95);
+      const geometry = () => attachedRootLine(
+        {x: enemy.x, y: enemy.y}, angle, length, bounds,
+      );
       const preview = this.add.graphics().setDepth(24);
       this.rootEffects.add(preview);
-      preview.lineStyle(2, 0xd9f99d, 0.84);
       const segments = 18;
-      for (let j = 0; j < segments; j += 2) {
-        const a = rootWavePoint(origin, end, j / segments);
-        const b = rootWavePoint(origin, end, (j + 1) / segments);
-        preview.lineBetween(a.x, a.y, b.x, b.y);
-      }
-      preview.lineStyle(4, 0x65a30d, 0.30);
-      preview.strokeCircle(origin.x, origin.y, 22);
-      const sprout = this.add.graphics().setDepth(27);
-      this.rootEffects.add(sprout);
-      sprout.fillStyle(0x5b3a1a, 0.93);
-      sprout.fillEllipse(origin.x, origin.y, 18, 8);
-      sprout.lineStyle(2, 0xa3e635, 0.76);
-      sprout.lineBetween(origin.x - 5, origin.y, origin.x + 3, origin.y - 17);
-      let timer: Phaser.Time.TimerEvent;
-      timer = this.time.delayedCall(warningMs, () => {
-        this.bombTimers.delete(timer);
+      const drawPreview = (windup: number): void => {
+        if (!preview.active || !enemy.active) return;
+        const {start, end} = geometry();
+        preview.clear();
+        preview.lineStyle(2.5, 0xd9f99d, .62 + windup * .28);
+        for (let j = 0; j < segments; j += 2) {
+          const a = rootWavePoint(start, end, j / segments);
+          const b = rootWavePoint(start, end, (j + 1) / segments);
+          preview.lineBetween(a.x, a.y, b.x, b.y);
+        }
+        const curl = .14 + windup * .13;
+        const base = rootWavePoint(start, end, curl);
+        preview.lineStyle(15, 0x4a2f1a, .96);
+        preview.lineBetween(start.x, start.y, base.x, base.y);
+        preview.lineStyle(8, 0x78933d, .96);
+        preview.lineBetween(start.x, start.y, base.x, base.y);
+        preview.fillStyle(0x99bd50, .92);
+        preview.fillCircle(start.x, start.y, 9 + windup * 3);
+        preview.fillStyle(0xc9ef86, .76 + windup * .2);
+        preview.fillCircle(base.x, base.y, 6);
+      };
+      drawPreview(0);
+      this.tweens.addCounter({
+        from: 0, to: 1, duration: warningMs, ease: 'Sine.easeIn',
+        onUpdate: tween => drawPreview(tween.getValue() ?? 0),
+        onComplete: () => {
         this.rootEffects.delete(preview);
-        this.rootEffects.delete(sprout);
         preview.destroy();
-        sprout.destroy();
         if (!enemy.active || enemy.aiState === 'defeated' || this.gameOver ||
             this.transitioning || this.roomProgress.doorOpen || this.choosingUpgrade) return;
         const growth = this.add.graphics().setDepth(28);
         this.rootEffects.add(growth);
-        let previousProgress = 0;
+        let previousTip = geometry().start;
         let damaged = false;
+        const drawGrowth = (t: number, canDamage: boolean): void => {
+          if (!growth.active || !enemy.active || this.roomProgress.doorOpen ||
+              this.gameOver || this.transitioning || this.choosingUpgrade) return;
+          const {start, end} = geometry();
+          const totalSegments = Math.max(1, Math.ceil(t * 32));
+          const points: {x: number; y: number}[] = [];
+          for (let i = 0; i <= totalSegments; i++)
+            points.push(rootWavePoint(start, end, t * i / totalSegments));
+          growth.clear();
+          growth.lineStyle(20, 0x3e2817, 1);
+          for (let i = 1; i < points.length; i++)
+            growth.lineBetween(points[i - 1]!.x, points[i - 1]!.y,
+              points[i]!.x, points[i]!.y);
+          growth.lineStyle(11, 0x758c3e, 1);
+          for (let i = 1; i < points.length; i++)
+            growth.lineBetween(points[i - 1]!.x, points[i - 1]!.y,
+              points[i]!.x, points[i]!.y);
+          for (let fraction = .14; fraction <= t; fraction += .14) {
+            const p = rootWavePoint(start, end, fraction);
+            const dir = angle + (Math.floor(fraction * 100) % 2 ? 1 : -1) * .8;
+            growth.lineStyle(5, 0x60411f, .96);
+            growth.lineBetween(p.x, p.y, p.x + Math.cos(dir) * 19,
+              p.y + Math.sin(dir) * 19);
+            growth.fillStyle(0x8eb94d, .9);
+            growth.fillEllipse(p.x + Math.cos(dir) * 19,
+              p.y + Math.sin(dir) * 19, 9, 5);
+          }
+          const tip = rootWavePoint(start, end, t);
+          growth.fillStyle(0xc9ef86, .96); growth.fillCircle(tip.x, tip.y, 11);
+          growth.fillStyle(0xefffc2, .9);
+          growth.fillTriangle(tip.x + Math.cos(angle) * 15, tip.y + Math.sin(angle) * 15,
+            tip.x - Math.sin(angle) * 6, tip.y + Math.cos(angle) * 6,
+            tip.x + Math.sin(angle) * 6, tip.y - Math.cos(angle) * 6);
+          if (canDamage && !damaged && this.player?.active &&
+              rootTipHits(previousTip, tip, this.player, ROOT_BRANCH.lineWidth / 2 + 13)) {
+            damaged = true;
+            this.damagePlayer({damage: enemy.stats.damage * .62,
+              criticalChance: 0, criticalMultiplier: 1});
+          }
+          previousTip = tip;
+        };
         this.tweens.addCounter({
           from: 0, to: 1, duration: growMs, ease: 'Linear',
-          onUpdate: tween => {
-            if (!growth.active || this.roomProgress.doorOpen || this.gameOver ||
-                this.transitioning || this.choosingUpgrade) return;
-            const t = tween.getValue() ?? 0;
-            const totalSegments = Math.max(1, Math.ceil(t * 32));
-            const points: {x: number; y: number}[] = [];
-            for (let i = 0; i <= totalSegments; i++)
-              points.push(rootWavePoint(origin, end, t * i / totalSegments));
-            growth.clear();
-            growth.lineStyle(18, 0x5c381c, 1);
-            for (let i = 1; i < points.length; i++) {
-              growth.lineBetween(points[i - 1]!.x, points[i - 1]!.y,
-                points[i]!.x, points[i]!.y);
-            }
-            growth.lineStyle(9, 0x8ba246, 1);
-            for (let i = 1; i < points.length; i++) {
-              growth.lineBetween(points[i - 1]!.x, points[i - 1]!.y,
-                points[i]!.x, points[i]!.y);
-            }
-            // Side roots emerge progressively, never pre-rendered ahead of the tip.
-            for (let fraction = 0.14; fraction <= t; fraction += 0.14) {
-              const p = rootWavePoint(origin, end, fraction);
-              const dir = angle + (Math.floor(fraction * 100) % 2 ? 1 : -1) * 0.8;
-              growth.lineStyle(4, 0x6d4c23, 0.9);
-              growth.lineBetween(p.x, p.y, p.x + Math.cos(dir) * 17,
-                p.y + Math.sin(dir) * 17);
-            }
-            const tip = rootWavePoint(origin, end, t);
-            growth.fillStyle(0xc2e98b, 0.92);
-            growth.fillCircle(tip.x, tip.y, 11);
-            // Damage travels with the leading tip, NOT instantly along the
-            // full line. Substeps prevent skipped collisions at low mobile FPS.
-            if (!damaged && this.player?.active && enemy.active &&
-                enemy.aiState !== 'defeated') {
-              const slices = Math.max(1, Math.ceil((t - previousProgress) * 60));
-              for (let step = 0; step < slices; step++) {
-                const a = rootWavePoint(origin, end,
-                  previousProgress + (t - previousProgress) * step / slices);
-                const b = rootWavePoint(origin, end,
-                  previousProgress + (t - previousProgress) * (step + 1) / slices);
-                if (rootTipHits(a, b, this.player, ROOT_BRANCH.lineWidth / 2 + 13)) {
-                  damaged = true;
-                  this.damagePlayer({damage: enemy.stats.damage * .62,
-                    criticalChance: 0, criticalMultiplier: 1});
-                  break;
-                }
-              }
-            }
-            previousProgress = t;
-          },
+          onUpdate: tween => drawGrowth(tween.getValue() ?? 0, true),
           onComplete: () => {
             if (!growth.active) return;
-            this.tweens.add({ targets: growth, alpha: 0, duration: 180,
-              onComplete: () => {
+            this.tweens.addCounter({ from: 0, to: 1, duration: 180,
+              onUpdate: tween => {
+                drawGrowth(1, false);
+                growth.setAlpha(1 - (tween.getValue() ?? 0));
+              }, onComplete: () => {
                 this.rootEffects.delete(growth);
                 growth.destroy();
               } });
           },
         });
+        },
       });
-      this.bombTimers.add(timer);
     }
   };
 
