@@ -1853,41 +1853,40 @@ export class GameScene extends Phaser.Scene {
       this.createBlazehoundTrail(enemy, x, y);
       return;
     }
-    const seed = this.add.circle(x, y, 9, 0x92400e, 1)
-      .setStrokeStyle(2, 0xfde68a).setDepth(27);
-    const fuse = this.add.circle(x + 2, y - 10, 3, 0xf97316, 1).setDepth(28);
-    const warning = this.add.circle(x, y, MOSS_DASH.trailRadius, 0xef4444, .11)
-      .setStrokeStyle(2, 0xfb923c, .82).setDepth(24);
-    this.bombWarnings.add(seed);
-    this.bombWarnings.add(fuse);
-    this.bombWarnings.add(warning);
-    this.tweens.add({ targets: seed, scale: 1.35, yoyo: true, repeat: 2,
-      duration: MOSS_DASH.trailFuseMs / 6 });
+    // Dense, square overlapping fire tiles form an unbroken burning trail.
+    // Each tile is hazardous throughout its two-second lifetime.
+    const width = MOSS_DASH.trailWidth;
+    const flame = this.add.rectangle(x, y, width, width, 0xf97316, .43)
+      .setStrokeStyle(2, 0xfbbf24, .85).setDepth(25);
+    const core = this.add.rectangle(x, y, width * .72, width * .72, 0xfacc15, .16)
+      .setDepth(26);
+    this.bombWarnings.add(flame);
+    this.bombWarnings.add(core);
+    this.tweens.add({targets: core, alpha: .38, duration: 160,
+      yoyo: true, repeat: -1});
+    let nextDamageAt = this.time.now;
     let timer: Phaser.Time.TimerEvent;
-    timer = this.time.delayedCall(MOSS_DASH.trailFuseMs, () => {
-      this.bombTimers.delete(timer);
-      for (const graphic of [seed, fuse, warning]) {
-        this.bombWarnings.delete(graphic);
-        graphic.destroy();
+    const bornAt = this.time.now;
+    timer = this.time.addEvent({delay: 50, loop: true, callback: () => {
+      if (this.time.now - bornAt >= MOSS_DASH.trailDurationMs ||
+          this.gameOver || this.transitioning || this.roomProgress.doorOpen ||
+          !flame.active) {
+        timer.remove(false);
+        this.bombTimers.delete(timer);
+        for (const tile of [flame, core]) {
+          this.bombWarnings.delete(tile);
+          if (tile.active) tile.destroy();
+        }
+        return;
       }
-      if (this.gameOver || this.transitioning || this.roomProgress.doorOpen ||
-        !enemy.active || enemy.aiState === 'defeated') return;
-      const flash = this.add.circle(x, y, MOSS_DASH.trailRadius, 0xf97316, .66)
-        .setStrokeStyle(3, 0xfef08a).setDepth(31);
-      this.tweens.add({ targets: flash, alpha: 0, scale: 1.4, duration: 330,
-        onComplete: () => flash.destroy() });
-      for (let i = 0; i < 6; i++) {
-        const a = i * Math.PI / 3;
-        const ember = this.add.circle(x, y, 3, 0xfbbf24).setDepth(32);
-        this.tweens.add({ targets: ember, x: x + Math.cos(a) * 35,
-          y: y + Math.sin(a) * 35, alpha: 0, duration: 340,
-          onComplete: () => ember.destroy() });
+      if (this.player?.active && this.time.now >= nextDamageAt &&
+          Math.abs(this.player.x - x) <= width / 2 + 12 &&
+          Math.abs(this.player.y - y) <= width / 2 + 12) {
+        nextDamageAt = this.time.now + MOSS_DASH.trailDamageTickMs;
+        this.damagePlayer({damage: enemy.stats.damage * .20,
+          criticalChance: 0, criticalMultiplier: 1});
       }
-      if (this.player && withinRadius(x, y, this.player.x, this.player.y,
-        MOSS_DASH.trailRadius))
-        this.damagePlayer({ damage: enemy.stats.damage * .5,
-          criticalChance: 0, criticalMultiplier: 1 });
-    });
+    }});
     this.bombTimers.add(timer);
   };
 
@@ -1981,11 +1980,15 @@ export class GameScene extends Phaser.Scene {
 
   /** Existing Jade projectiles stay untouched. Every independent cycle adds
    * exactly two warning corridors and living branches crossing the arena. */
+  private jadeHorizontalNext = true;
   private readonly performJadeBranches = (enemy: AdvancedEnemy): void => {
     if (this.worldId !== 1 || !enemy.isJadeMatriarch || !this.currentRoom ||
         this.gameOver || this.transitioning || this.roomProgress.doorOpen ||
         this.choosingUpgrade) return;
-    const lanes = jadeBranchLanes(this.currentRoom.layout.bounds, Math.random);
+    const axis = this.jadeHorizontalNext ? 'horizontal' : 'vertical';
+    this.jadeHorizontalNext = !this.jadeHorizontalNext;
+    const lanes = jadeBranchLanes(this.currentRoom.layout.bounds, Math.random, axis).slice(0, 1);
+    const warningMs = enemy.healthRatio <= 0.5 ? JADE_BRANCH.phaseTwoWarningMs : JADE_BRANCH.warningMs;
     for (const lane of lanes) {
       const telegraph = this.add.graphics().setDepth(24);
       this.rootEffects.add(telegraph);
@@ -2006,7 +2009,7 @@ export class GameScene extends Phaser.Scene {
         telegraph.lineBetween(a.x,a.y,b.x,b.y);
       }
       let timer: Phaser.Time.TimerEvent;
-      timer = this.time.delayedCall(JADE_BRANCH.warningMs,() => {
+      timer = this.time.delayedCall(warningMs,() => {
         this.bombTimers.delete(timer);
         this.rootEffects.delete(telegraph);
         telegraph.destroy();
@@ -2015,7 +2018,7 @@ export class GameScene extends Phaser.Scene {
         const now=this.time.now;
         const graphic=this.add.graphics().setDepth(28);
         this.jadeBranches.add({lane,graphic,owner:enemy,
-          startsAt:now, expiresAt:now+JADE_BRANCH.growthMs+JADE_BRANCH.activeMs,
+          startsAt:now, expiresAt:now+JADE_BRANCH.activeMs,
           nextHitAt:now});
       });
       this.bombTimers.add(timer);
