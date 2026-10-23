@@ -2578,6 +2578,7 @@ export class GameScene extends Phaser.Scene {
         this.transitioning || this.roomProgress.doorOpen) return;
     const boss=this.activeBosses.find(b=>b?.active && b.isHeartOfGrove && b.aiState!=='defeated');
     if(!boss || boss.healthRatio>.5) return;
+    void this.startWorldOneBossSplit; // Retain the unused legacy cinematic helper.
     const initial=!this.brambleCutsceneUsed;
     if(!initial && this.time.now<this.nextGroveBomberWaveAt)return;
     const bounds=this.currentRoom.layout.bounds;
