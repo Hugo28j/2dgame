@@ -53,43 +53,44 @@ function drawRobinHoodRanger(g: Phaser.GameObjects.Graphics): void {
   g.fillPoints(polygon([[5,45],[17,43],[18,37],[8,36],[2,40]]),true);
   g.lineStyle(2,0xa27542,.85);g.lineBetween(7,23,17,27);g.lineBetween(7,43,17,39);
 
-  // Fitted tunic with pointed hem and soft shoulder shapes.
+  // A compact top-down torso: the neck and both shoulders remain visible
+  // around the head, even when an animated weapon is drawn over the sprite.
   g.fillStyle(0x2f6b3b,1);g.fillPoints(polygon([
-    [19,16],[32,11],[45,17],[51,31],[46,46],[36,51],[29,46],[22,54],[17,43],[15,29],
+    [18,20],[29,14],[38,18],[42,26],[42,38],[37,46],[28,50],[21,45],[16,37],[16,27],
   ]),true);
   g.fillStyle(0x46844a,1);g.fillPoints(polygon([
-    [25,17],[36,14],[45,20],[46,39],[37,45],[29,42],[21,46],[20,27],
+    [23,21],[30,18],[36,21],[39,28],[39,37],[34,44],[27,44],[21,38],[20,28],
   ]),true);
-  g.fillStyle(0x85a768,.65);g.fillEllipse(31,17,16,9);g.fillEllipse(32,46,18,9);
-  g.lineStyle(2,0xb1c78b,.72);g.lineBetween(24,20,40,42);
+  g.fillStyle(0x85a768,.82);g.fillEllipse(30,17,17,10);g.fillEllipse(30,47,17,10);
+  g.lineStyle(2,0xb1c78b,.72);g.lineBetween(22,24,36,40);
 
   // Curved belt, brass leaf buckle and small utility pouch.
-  g.lineStyle(7,0x5a3821,1);g.lineBetween(19,31,47,34);
-  g.lineStyle(2,0xb47a3f,1);g.lineBetween(20,29,47,32);
-  g.fillStyle(0xd0a64f,1);g.fillEllipse(34,33,8,7);
+  g.lineStyle(7,0x5a3821,1);g.lineBetween(18,31,39,34);
+  g.lineStyle(2,0xb47a3f,1);g.lineBetween(19,29,39,32);
+  g.fillStyle(0xd0a64f,1);g.fillEllipse(31,33,8,7);
   g.fillStyle(0x51311f,1);g.fillEllipse(23,38,10,13);
   g.lineStyle(1.5,0xb98545,1);g.strokeEllipse(23,38,10,13);
 
-  // Weapon shoulder and bracer share the greens and leather from live animation.
-  g.fillStyle(0x356f3e,1);g.fillEllipse(39,14,18,11);
-  g.fillStyle(0x6d4529,1);g.fillPoints(polygon([[41,10],[53,13],[51,21],[40,18]]),true);
-  g.lineStyle(1.6,0xc08a4f,.9);g.lineBetween(43,12,49,19);
+  // Neck separates the head from the tunic. The circular hood, face wedge and
+  // nose make the facing direction immediately readable from directly above.
+  g.fillStyle(0x6a4027,1);g.fillRoundedRect(36,27,8,10,3);
+  g.fillStyle(0x173d27,1);g.fillEllipse(45,32,23,25);
+  g.lineStyle(2,0x80a56a,.9);g.strokeEllipse(45,32,23,25);
+  g.fillStyle(0x5a351f,1);g.fillEllipse(46,32,17,19);
+  g.fillStyle(0xe9b98e,1);g.fillEllipse(49,32,13,15);
+  g.fillTriangle(54,28,61,32,54,36);
+  g.fillStyle(0xf4ead7,1);g.fillCircle(52,28.5,1.8);g.fillCircle(52,35.5,1.8);
+  g.fillStyle(0x1b2a20,1);g.fillCircle(53,28.5,.9);g.fillCircle(53,35.5,.9);
+  g.lineStyle(1.5,0x9b5d3a,.9);g.lineBetween(56,31,58,33);
 
-  // Warm face, swept hair, soft hood/cap and the signature pale feather.
-  g.fillStyle(0x6a4027,1);g.fillEllipse(49,33,22,25);
-  g.fillStyle(0xe9b98e,1);g.fillEllipse(51,32,17,19);
-  g.fillStyle(0x59361f,1);g.fillPoints(polygon([[41,27],[47,20],[57,24],[60,29],[51,26]]),true);
-  g.fillTriangle(43,38,49,45,52,38);
-  g.fillStyle(0xf4ead7,1);g.fillCircle(57,30,2.3);
-  g.fillStyle(0x1b2a20,1);g.fillCircle(58,30,1.1);
-  g.lineStyle(1.4,0x9b5d3a,.9);g.lineBetween(55,37,59,36);
+  // Robin's cap follows the crown instead of reading as a second limb.
   g.fillStyle(0x255d35,1);g.fillPoints(polygon([
-    [36,25],[43,18],[53,17],[62,25],[51,24],[44,29],
+    [35,29],[38,20],[48,18],[57,24],[52,28],[43,27],
   ]),true);
-  g.lineStyle(3,0x7ea466,1);g.lineBetween(39,25,61,25);
-  g.lineStyle(4,0xf0e5b8,1);g.lineBetween(46,20,34,5);
-  g.lineStyle(1.5,0xa8bd86,1);g.lineBetween(44,17,34,5);
-  g.lineBetween(41,13,34,5);g.lineBetween(38,9,34,5);
+  g.lineStyle(3,0x7ea466,1);g.lineBetween(38,27,55,25);
+  g.lineStyle(4,0xf0e5b8,1);g.lineBetween(42,22,30,7);
+  g.lineStyle(1.5,0xa8bd86,1);g.lineBetween(40,19,30,7);
+  g.lineBetween(37,15,30,7);g.lineBetween(34,11,30,7);
 }
 
 /** Heavy but heroic Guardian: layered steel plate, gold trim, crimson cape,
