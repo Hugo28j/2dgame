@@ -28,8 +28,8 @@ describe('world one boss attacks', () => {
     expect(SPORE_POISON.durationMs).toBe(1500);
     expect(SPORE_THROW_INTERVAL_MS).toBe(1000);
   });
-  it('adds 50% to Spore original 1.5× HP at level 15 and retains final-boss HP', () => {
-    for (const [room, multiplier] of [[15, 2.25], [30, 2]] as const) {
+  it('retains the earlier 50% Spore increase, applies the new 15% reduction and preserves final-boss HP', () => {
+    for (const [room, multiplier] of [[15, 2.25 * .85], [30, 2]] as const) {
       const stats = getEnemyStatsForRoom('boss', room, 1);
       const scaling = 1 + (room - 1) * .08;
       const tier = 1 + (Math.floor(room / 5) - 1) * .09;
