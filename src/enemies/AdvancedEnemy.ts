@@ -293,8 +293,12 @@ export class AdvancedEnemy extends Slime {
         break;
       case 'boss': {
         const phase = bossPhase(this.healthRatio);
+        // The original Bramble Gunner never gains his phase-two pattern.
+        // Both summoned Sentinels own that pattern from their first shot.
+        const attackPhase = this.isBrambleGunner ? 1 :
+          this.worldId === 1 && this.roomNumber === 20 && this.fasterTwin ? 2 : phase;
         const profile = getBossProfile(this.roomNumber, this.bossSlot, this.worldId);
-        const mode = getBossPlan(this.roomNumber, phase, this.bossVolleys, this.bossSlot, this.worldId);
+        const mode = getBossPlan(this.roomNumber, attackPhase, this.bossVolleys, this.bossSlot, this.worldId);
         const move = rangedVelocity(this.x, this.y, targetX, targetY, speed,
           profile.preferredRange, this.orbitSign);
         if (this.worldId === 3) {
@@ -398,7 +402,8 @@ export class AdvancedEnemy extends Slime {
           this.bossVolleys++;
           const scaledInterval = this.stats.attackIntervalMs * mode.tempo;
           this.nextShotAt = now + (this.isPoisonAlchemist ? SPORE_THROW_INTERVAL_MS :
-            Math.max(100, scaledInterval / (this.fasterTwin ? BRAMBLE_CINEMATIC.sentinelAttackRateMultiplier :
+            Math.max(100, scaledInterval / (this.fasterTwin ? BRAMBLE_CINEMATIC.sentinelAttackRateMultiplier *
+               (this.healthRatio < 0.5 ? 1.5 : 1) :
               this.worldId === 1 && this.roomNumber === 25 ? 1.5 : 1)));
         }
         // Only explicitly charging bosses use dash logic; other nine archetypes
