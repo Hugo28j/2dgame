@@ -1678,18 +1678,27 @@ export class GameScene extends Phaser.Scene {
     comboIndex: number): void => {
     if (!this.currentRoom || this.gameOver || this.transitioning || this.roomProgress.doorOpen) return;
     if (attack === 'leaf') {
-      this.dropRootLeaf(enemy, targetX, targetY);
+      for (const offset of [-58, 0, 58]) this.dropRootLeaf(enemy, targetX, targetY, offset);
       return;
     }
     const bounds = this.currentRoom.layout.bounds;
     const castOrigin = {x: enemy.x, y: enemy.y};
     const angle = Math.atan2(targetY - castOrigin.y, targetX - castOrigin.x);
+    // The drawn tree faces upward: these offsets line up with its painted hands.
+    const rightArm = attack === 'line' || comboIndex % 2 === 0;
+    const shoulderSide = (rightArm ? 21 : -21) * enemy.scaleX;
+    const shoulderForward = 4 * enemy.scaleY;
+    const shoulderAngle = angle + Math.PI / 2;
+    const shoulder = () => ({
+      x: enemy.x + shoulderSide * Math.cos(shoulderAngle) - shoulderForward * Math.sin(shoulderAngle),
+      y: enemy.y + shoulderSide * Math.sin(shoulderAngle) + shoulderForward * Math.cos(shoulderAngle),
+    });
     const length = Math.max(420, Math.hypot(targetX - castOrigin.x,
       targetY - castOrigin.y) + ROOT_BRANCH.armExtraReach);
     const bendDirection: -1 | 1 = comboIndex % 2 === 0 ? 1 : -1;
     const warningMs = attack === 'line' ? ROOT_BRANCH.lineWarningMs : ROOT_BRANCH.strikeWarningMs;
     const growMs = attack === 'line' ? 720 : 390;
-    const geometry = () => attachedRootLine({x: enemy.x, y: enemy.y}, angle, length, bounds, 23);
+    const geometry = () => attachedRootLine(shoulder(), angle, length, bounds, 0);
 
     // The old dotted/partial branch preview is intentionally gone.
     this.time.delayedCall(warningMs, () => {
@@ -1697,7 +1706,6 @@ export class GameScene extends Phaser.Scene {
           this.transitioning || this.roomProgress.doorOpen || this.choosingUpgrade) return;
       const arm = this.add.graphics().setDepth(28);
       this.rootEffects.add(arm);
-      let previousTip = geometry().start;
       let damaged = false;
       const drawArm = (extension: number, canDamage: boolean): void => {
         if (!arm.active || !enemy.active || this.roomProgress.doorOpen ||
@@ -1742,13 +1750,15 @@ export class GameScene extends Phaser.Scene {
             tip.x + Math.cos(fingerAngle) * 29,
             tip.y + Math.sin(fingerAngle) * 29);
         }
+        // Contact with any still-visible limb segment hurts, including on retreat.
         if (canDamage && !damaged && this.player?.active &&
-            rootTipHits(previousTip, tip, this.player, ROOT_BRANCH.lineWidth / 2 + 16)) {
+            points.slice(1).some((point, index) =>
+              rootTipHits(points[index]!, point, this.player,
+                (46 - ((index + 1) / segments) * 23) / 2 + 13))) {
           damaged = true;
           this.damagePlayer({damage: enemy.stats.damage * .68,
             criticalChance: 0, criticalMultiplier: 1});
         }
-        previousTip = tip;
       };
       this.tweens.addCounter({
         from: 0, to: 1, duration: growMs, ease: 'Cubic.easeOut',
@@ -1756,7 +1766,7 @@ export class GameScene extends Phaser.Scene {
         onComplete: () => {
           if (!arm.active) return;
           this.tweens.addCounter({from: 1, to: 0, duration: 260, ease: 'Sine.easeIn',
-            onUpdate: tween => drawArm(tween.getValue() ?? 0, false),
+            onUpdate: tween => drawArm(tween.getValue() ?? 0, true),
             onComplete: () => {
               this.rootEffects.delete(arm);
               arm.destroy();
@@ -1768,13 +1778,13 @@ export class GameScene extends Phaser.Scene {
 
   /** Phase two finisher: one leaf predicts the hero's movement, visibly
    * flutters down, then bursts only when it touches the arena floor. */
-  private dropRootLeaf(enemy: AdvancedEnemy, targetX: number, targetY: number): void {
+  private dropRootLeaf(enemy: AdvancedEnemy, targetX: number, targetY: number, offset = 0): void {
     if (!this.currentRoom || !this.player?.active) return;
     const bounds = this.currentRoom.layout.bounds;
     const body = this.player.body;
     const velocity = body instanceof Phaser.Physics.Arcade.Body
       ? {x: body.velocity.x, y: body.velocity.y} : {x: 0, y: 0};
-    const landing = predictLeafLanding({x: targetX, y: targetY}, velocity,
+    const landing = predictLeafLanding({x: targetX + offset, y: targetY}, velocity,
       ROOT_BRANCH.leafPredictionMs, bounds, ROOT_BRANCH.leafExplosionRadius);
     const leaf = this.add.graphics().setDepth(30);
     leaf.fillStyle(0x84cc16, 1); leaf.fillEllipse(0, 0, 28, 15);
@@ -1783,9 +1793,10 @@ export class GameScene extends Phaser.Scene {
     leaf.lineBetween(12, 0, 20, 5);
     const shadow = this.add.graphics().setDepth(22);
     this.rootEffects.add(leaf); this.rootEffects.add(shadow);
-    const startX = Phaser.Math.Clamp(landing.x + (enemy.x < landing.x ? -85 : 85),
-      bounds.x + 20, bounds.x + bounds.width - 20);
-    const startY = bounds.y - 38;
+    // Spawn vertically above the player's location; scatter only on landing.
+    const startX = Phaser.Math.Clamp(targetX, bounds.x + 20,
+      bounds.x + bounds.width - 20);
+    const startY = Math.max(bounds.y - 38, targetY - 230);
     this.tweens.addCounter({
       from: 0, to: 1, duration: ROOT_BRANCH.leafFallMs, ease: 'Quad.easeIn',
       onUpdate: tween => {
