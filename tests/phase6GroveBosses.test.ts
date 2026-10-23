@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { JADE_BRANCH, HEART_TREE, jadeBranchLanes, groveBranchTip,
-  groveBranchHits, groveTreeHits } from '../src/enemies/groveAttacks';
+  groveBranchHits, groveTreeHits, selectJadeLane, jadeLaneOverlaps } from '../src/enemies/groveAttacks';
 import { poisonZonesOverlap, selectPoisonLocations } from '../src/enemies/poisonPlacement';
 import { getRoomDefinition } from '../src/rooms/roomConfig';
 import { getBossPlan, getBossProfile } from '../src/enemies/bossProfiles';
@@ -18,7 +18,7 @@ describe('Phase 6: Jade Matriarch growing branches', () => {
     expect(getBossProfile(25,0,1).phaseOne.patterns).toEqual(['ring']);
     expect(getBossProfile(25,0,1).phaseTwo.patterns).toEqual(['offset-ring','cross']);
     expect(getBossPlan(25,2,1,0,1).pattern).toBe('cross');
-    expect(JADE_BRANCH.intervalMs).toBe(800);
+    expect(JADE_BRANCH.intervalMs).toBe(1000);
     expect(JADE_BRANCH.phaseTwoIntervalMs).toBe(600);
     expect(JADE_BRANCH.warningMs).toBe(600);
     expect(JADE_BRANCH.phaseTwoWarningMs).toBe(400);
@@ -106,5 +106,21 @@ describe('Phase 6: Heart of the Grove growing trees', () => {
     expect(groveTreeHits(center,49,{x:280,y:420})).toBe(false);
     expect(groveTreeHits(center,50,{x:282,y:420})).toBe(false);
     expect(groveTreeHits(center,50,{x:230,y:420})).toBe(true);
+  });
+});
+
+describe('Jade Matriarch spread across arena',()=>{
+  it('reserves non-overlapping horizontal and vertical attack positions',()=>{
+    const reservations: import('../src/enemies/groveAttacks').GroveBranchLane[]=[];
+    const next=rng(819);
+    for(let i=0;i<18;i++){
+      const axis=i%2===0?'horizontal':'vertical';
+      const lane=selectJadeLane(bounds,axis,reservations,next);
+      if (!lane) break;
+      expect(lane.orientation).toBe(axis);
+      expect(reservations.every(old=>!jadeLaneOverlaps(lane,old))).toBe(true);
+      reservations.push(lane);
+    }
+    expect(reservations.length).toBeGreaterThanOrEqual(4);
   });
 });
