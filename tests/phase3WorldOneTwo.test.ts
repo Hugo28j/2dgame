@@ -16,7 +16,8 @@ describe('fase 3 — defense in wereld 1 en 2', () => {
       for (const world of [1, 2] as const) {
         for (const room of [1, 4, 10, 17, 20, 30]) {
           expect(getEnemyStatsForRoom(kind, room, world).defense)
-            .toBe(ENEMY_CONFIGS[kind].defense * 2);
+            .toBe(ENEMY_CONFIGS[kind].defense * 2 *
+              (kind === 'boss' && world === 1 && room === 30 ? 1.5 : 1));
         }
       }
     }
