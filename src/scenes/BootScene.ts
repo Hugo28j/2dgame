@@ -51,11 +51,15 @@ export class BootScene extends Phaser.Scene {
     }
 
     const graphics = this.make.graphics({ x: 0, y: 0 }, false);
-    graphics.fillStyle(0xf8fafc, 1);
-    graphics.fillRect(1, 3, 16, 3);
-    graphics.fillStyle(0xf59e0b, 1);
-    graphics.fillTriangle(14, 0, 23, 4, 14, 8);
-    graphics.generateTexture(ARROW_TEXTURE_KEY, 24, 9);
+    // Ranger's real yew arrow: green fletching, wooden shaft and steel broadhead.
+    graphics.fillStyle(0xa9c66d, 1);
+    graphics.fillTriangle(1, 1, 9, 5, 1, 5);
+    graphics.fillTriangle(1, 9, 9, 5, 1, 5);
+    graphics.fillStyle(0x4f321f, 1); graphics.fillRect(7, 4, 17, 3);
+    graphics.fillStyle(0xdbe3df, 1);
+    graphics.fillTriangle(30, 5, 22, 1, 22, 9);
+    graphics.fillStyle(0xffffff, .75);graphics.fillTriangle(28,4,23,3,23,5);
+    graphics.generateTexture(ARROW_TEXTURE_KEY, 31, 10);
     graphics.destroy();
   }
 
@@ -96,7 +100,6 @@ export class BootScene extends Phaser.Scene {
   }
   private createWeaponTextures(): void {
     const colors: Record<string, number> = {
-      'bolt-projectile': 0xfca5a5,
       'magic-projectile': 0xc084fc,
       'lightning-projectile': 0x67e8f9,
       'ember-projectile': 0xfb923c,
@@ -121,6 +124,19 @@ export class BootScene extends Phaser.Scene {
       graphics.generateTexture(key, 24, 24);
       graphics.destroy();
     });
+
+    // Hunter Crossbow bolt uses the same material palette but is shorter,
+    // thicker and heavier than the Ascent Bow arrow.
+    const boltKey='bolt-projectile';
+    if(!this.textures.exists(boltKey)){
+      const bolt=this.make.graphics({x:0,y:0},false);
+      bolt.fillStyle(0x8fab62,1);bolt.fillTriangle(1,1,8,6,1,6);
+      bolt.fillTriangle(1,11,8,6,1,6);
+      bolt.fillStyle(0x55351f,1);bolt.fillRect(7,4,15,4);
+      bolt.fillStyle(0xb9c5c2,1);bolt.fillTriangle(29,6,20,1,20,11);
+      bolt.fillStyle(0xf5faf8,.8);bolt.fillTriangle(27,5,21,3,21,6);
+      bolt.generateTexture(boltKey,30,12);bolt.destroy();
+    }
 
     // Rune Tome uses one enchanted sphere rather than the old plain bullet.
     // The entire rune sprite rotates independently of its flight direction.

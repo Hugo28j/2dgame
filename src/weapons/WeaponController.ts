@@ -13,6 +13,8 @@ import { SHOTGUN_TRANSFORM, shotgunVolleyAngles } from '../abilities/phase9Balan
 import { hasAnimatedHero } from '../heroes/heroEquipmentArt';
 import { CharacterAttackArt, HAMMER_IMPACT_DELAY_MS } from '../heroes/characterAttackArt';
 import { heroWeaponMuzzleDistance } from '../heroes/heroWeaponProportions';
+import { poseLengthMs } from '../heroes/characterAttackPose';
+import { RANGER_WEAPON_ANIMATION } from '../heroes/rangerWeaponAnimation';
 
 export class WeaponController {
   private nextShotAt = 0;
@@ -26,6 +28,7 @@ export class WeaponController {
   }>();
   private readonly groundEffects = new Set<Phaser.GameObjects.Graphics>();
   private readonly hammerTimers = new Set<Phaser.Time.TimerEvent>();
+  private readonly bowReleaseTimers = new Set<Phaser.Time.TimerEvent>();
   private readonly combatArt?: CharacterAttackArt;
   public extraProjectiles = 0;
   public extraPiercing = 0;
@@ -95,6 +98,7 @@ export class WeaponController {
     if (!firing || time < this.nextShotAt) return;
     const config = this.config;
     const interval = fireIntervalMs(config.fireRate * this.owner.attackSpeedAt(time) * this.permanentSpeed);
+    this.combatArt?.begin(time, interval);
     if (this.weaponId === 'iceblade') this.launchBigWave(direction);
     else if (this.weaponId === 'warhammer') {
       // The hitbox lands when the visible hammer-head actually reaches the floor.
@@ -106,8 +110,19 @@ export class WeaponController {
       });
       this.hammerTimers.add(timer);
     } else if (config.attackMode === 'melee') this.swing(direction);
-    else this.fire(direction);
-    this.combatArt?.begin(time, interval);
+    else if (this.weaponId === 'bow') {
+      // The projectile leaves at the same frame as the visible fingers release
+      // the fully drawn string. Direction is captured at the start of the fast draw.
+      const aim = normalizedDirection(direction);
+      const releaseDelay = poseLengthMs('bow', interval) *
+        RANGER_WEAPON_ANIMATION.bowReleaseAt;
+      const timer = this.scene.time.delayedCall(releaseDelay, () => {
+        this.bowReleaseTimers.delete(timer);
+        if (!this.owner.active || this.owner.currentHp <= 0 || !this.scene.sys.isActive()) return;
+        this.fire(aim);
+      });
+      this.bowReleaseTimers.add(timer);
+    } else this.fire(direction);
     this.nextShotAt = time + interval;
   }
 
@@ -501,6 +516,8 @@ export class WeaponController {
   public clearGroundEffects(): void {
     for (const timer of this.hammerTimers) timer.remove(false);
     this.hammerTimers.clear();
+    for (const timer of this.bowReleaseTimers) timer.remove(false);
+    this.bowReleaseTimers.clear();
     this.combatArt?.reset();
     for (const effect of this.groundEffects) {
       this.scene.tweens.killTweensOf(effect);

@@ -16,46 +16,80 @@ function body(g: Phaser.GameObjects.Graphics, armor: number, cloth: number, skin
   g.lineStyle(2, 0xe2e8f0, 0.65); g.strokeRoundedRect(22, 15, 27, 36, 8);
 }
 
-/** A proper Robin Hood silhouette: feathered cap, forest tunic, leather belt,
- * bracers, boots, quiver and short cloak. The live bow remains in the attack layer. */
+/** One organic Robin Hood silhouette built from the same forest cloth, yew,
+ * leather, brass and pale-feather palette as both animated weapons. */
 function drawRobinHoodRanger(g: Phaser.GameObjects.Graphics): void {
-  g.fillStyle(0x020b07, .4); g.fillEllipse(30, 40, 52, 23);
-  // Split forest cloak behind the body.
-  g.fillStyle(0x173d24); g.fillTriangle(8, 12, 4, 57, 35, 44);
-  g.fillStyle(0x285b32); g.fillTriangle(12, 16, 9, 52, 31, 40);
-  // Boots, leggings and the belted green tunic.
-  g.fillStyle(0x4b2f20); g.fillRoundedRect(5, 18, 16, 10, 4);
-  g.fillRoundedRect(5, 39, 16, 10, 4);
-  g.fillStyle(0x806044); g.fillRoundedRect(8, 19, 15, 7, 3);
-  g.fillRoundedRect(8, 41, 15, 7, 3);
-  g.fillStyle(0x315f32); g.fillRoundedRect(19, 14, 29, 38, 8);
-  g.fillStyle(0x4e8a43); g.fillTriangle(22, 45, 34, 57, 36, 44);
-  g.fillStyle(0x244b2b); g.fillTriangle(35, 44, 43, 55, 46, 42);
-  g.fillStyle(0x6d4528); g.fillRoundedRect(20, 29, 29, 6, 2);
-  g.fillStyle(0xd5ad55); g.fillRoundedRect(32, 29, 7, 6, 1);
-  // Quiver behind the lower shoulder, with three individually visible arrows.
-  g.fillStyle(0x51311f); g.fillRoundedRect(17, 43, 22, 8, 3);
-  for (const x of [12, 16, 20]) {
-    g.lineStyle(2, 0xb47a3f, 1); g.lineBetween(x, 48, x - 7, 57);
-    g.fillStyle(x === 16 ? 0xd7e8a5 : 0xb9d47e);
-    g.fillTriangle(x - 7, 57, x - 2, 54, x - 4, 60);
+  const polygon = (coordinates: readonly (readonly [number, number])[]) =>
+    coordinates.map(([x,y]) => new Phaser.Math.Vector2(x,y));
+  g.fillStyle(0x020b07, .42); g.fillEllipse(30, 42, 54, 22);
+
+  // A wind-swept two-layer cape creates a curved, agile silhouette.
+  g.fillStyle(0x102f20, 1); g.fillPoints(polygon([
+    [9,13],[19,17],[31,31],[25,49],[10,58],[13,43],[3,49],[8,31],
+  ]),true);
+  g.fillStyle(0x245b35, 1); g.fillPoints(polygon([
+    [13,16],[24,20],[31,31],[23,43],[12,52],[16,37],[7,43],[12,28],
+  ]),true);
+  g.lineStyle(2,0x6f9a58,.7);g.lineBetween(14,18,11,48);
+
+  // Diagonal quiver and matching real arrows sit behind the drawing shoulder.
+  g.lineStyle(7,0x3b2417,1);g.lineBetween(12,43,27,19);
+  g.lineStyle(4,0x865831,1);g.lineBetween(13,42,28,19);
+  g.fillStyle(0x593720,1);g.fillEllipse(13,44,13,9);
+  for(const offset of [-4,0,4]){
+    g.lineStyle(2,0xb98545,1);g.lineBetween(14+offset,39,27+offset,16);
+    g.fillStyle(offset===0?0xd4e5a4:0xa9c66d,1);
+    g.fillTriangle(25+offset,18,31+offset,13,29+offset,21);
   }
-  // Leather sleeves/bracer leave the weapon hand at the live bow attachment.
-  g.fillStyle(0x3d7138); g.fillRoundedRect(31, 10, 17, 10, 5);
-  g.fillStyle(0x71482d); g.fillRoundedRect(42, 11, 11, 8, 3);
-  g.lineStyle(1.5, 0xc18b52); g.lineBetween(45, 12, 48, 18);
-  // Face, brown hair and the classic pointed cap with a pale feather.
-  g.fillStyle(0x8a5434); g.fillEllipse(48, 33, 20, 23);
-  g.fillStyle(0xf0c49a); g.fillRoundedRect(42, 25, 17, 18, 7);
-  g.fillStyle(0x694129); g.fillTriangle(41, 27, 47, 20, 54, 26);
-  g.fillTriangle(43, 39, 48, 44, 51, 39);
-  g.fillStyle(0xf8fafc); g.fillCircle(56, 31, 2.2);
-  g.fillStyle(0x1e293b); g.fillCircle(57, 31, 1);
-  g.fillStyle(0x2f6b35); g.fillTriangle(35, 24, 48, 15, 61, 25);
-  g.fillRoundedRect(38, 23, 24, 5, 2);
-  g.lineStyle(3, 0xf1e7b8); g.lineBetween(44, 19, 34, 7);
-  g.lineStyle(1.3, 0xb8c98b); g.lineBetween(42, 17, 34, 7);
-  g.lineBetween(39, 14, 34, 7);
+
+  // Tapered leggings and turned leather boots; no rectangular block-body.
+  g.fillStyle(0x243f2a,1);g.fillPoints(polygon([
+    [17,25],[30,27],[27,34],[9,31],[5,26],[8,21],
+  ]),true);
+  g.fillPoints(polygon([[17,38],[30,36],[27,31],[9,34],[5,40],[8,45]]),true);
+  g.fillStyle(0x4b2d1c,1);g.fillPoints(polygon([
+    [5,21],[17,23],[18,29],[8,30],[2,27],
+  ]),true);
+  g.fillPoints(polygon([[5,45],[17,43],[18,37],[8,36],[2,40]]),true);
+  g.lineStyle(2,0xa27542,.85);g.lineBetween(7,23,17,27);g.lineBetween(7,43,17,39);
+
+  // Fitted tunic with pointed hem and soft shoulder shapes.
+  g.fillStyle(0x2f6b3b,1);g.fillPoints(polygon([
+    [19,16],[32,11],[45,17],[51,31],[46,46],[36,51],[29,46],[22,54],[17,43],[15,29],
+  ]),true);
+  g.fillStyle(0x46844a,1);g.fillPoints(polygon([
+    [25,17],[36,14],[45,20],[46,39],[37,45],[29,42],[21,46],[20,27],
+  ]),true);
+  g.fillStyle(0x85a768,.65);g.fillEllipse(31,17,16,9);g.fillEllipse(32,46,18,9);
+  g.lineStyle(2,0xb1c78b,.72);g.lineBetween(24,20,40,42);
+
+  // Curved belt, brass leaf buckle and small utility pouch.
+  g.lineStyle(7,0x5a3821,1);g.lineBetween(19,31,47,34);
+  g.lineStyle(2,0xb47a3f,1);g.lineBetween(20,29,47,32);
+  g.fillStyle(0xd0a64f,1);g.fillEllipse(34,33,8,7);
+  g.fillStyle(0x51311f,1);g.fillEllipse(23,38,10,13);
+  g.lineStyle(1.5,0xb98545,1);g.strokeEllipse(23,38,10,13);
+
+  // Weapon shoulder and bracer share the greens and leather from live animation.
+  g.fillStyle(0x356f3e,1);g.fillEllipse(39,14,18,11);
+  g.fillStyle(0x6d4529,1);g.fillPoints(polygon([[41,10],[53,13],[51,21],[40,18]]),true);
+  g.lineStyle(1.6,0xc08a4f,.9);g.lineBetween(43,12,49,19);
+
+  // Warm face, swept hair, soft hood/cap and the signature pale feather.
+  g.fillStyle(0x6a4027,1);g.fillEllipse(49,33,22,25);
+  g.fillStyle(0xe9b98e,1);g.fillEllipse(51,32,17,19);
+  g.fillStyle(0x59361f,1);g.fillPoints(polygon([[41,27],[47,20],[57,24],[60,29],[51,26]]),true);
+  g.fillTriangle(43,38,49,45,52,38);
+  g.fillStyle(0xf4ead7,1);g.fillCircle(57,30,2.3);
+  g.fillStyle(0x1b2a20,1);g.fillCircle(58,30,1.1);
+  g.lineStyle(1.4,0x9b5d3a,.9);g.lineBetween(55,37,59,36);
+  g.fillStyle(0x255d35,1);g.fillPoints(polygon([
+    [36,25],[43,18],[53,17],[62,25],[51,24],[44,29],
+  ]),true);
+  g.lineStyle(3,0x7ea466,1);g.lineBetween(39,25,61,25);
+  g.lineStyle(4,0xf0e5b8,1);g.lineBetween(46,20,34,5);
+  g.lineStyle(1.5,0xa8bd86,1);g.lineBetween(44,17,34,5);
+  g.lineBetween(41,13,34,5);g.lineBetween(38,9,34,5);
 }
 
 /** Heavy but heroic Guardian: layered steel plate, gold trim, crimson cape,

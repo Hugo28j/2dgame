@@ -4,6 +4,7 @@ import { CHAPTER_ROOM_COUNT } from '../rooms/roomConfig';
 import { isWorldUnlocked, getWorld } from '../worlds/worldConfig';
 import { ensureWorldDiorama } from '../worlds/worldMapArt';
 import { ensureArmorIcon } from '../ui/armorIconArt';
+import { ensureRangerWeaponIcon } from '../ui/rangerWeaponIcon';
 import { ensureDressedHeroTexture } from '../heroes/heroEquipmentArt';
 import { worldAtlasEntries, type WorldAtlasEntry } from '../worlds/worldAtlas';
 import {
@@ -524,7 +525,10 @@ export class MainMenuScene extends Phaser.Scene {
       this.openEquipmentList('weapon');
     });
     this.add.circle(77, 470, 30, weapon.color, .15).setStrokeStyle(2, weapon.color);
-    this.text(77, 470, weapon.attackMode === 'melee' ? '⚔' : '➶', 28, COLOR.white, true, true);
+    const rangerWeaponIcon=ensureRangerWeaponIcon(this,weaponId);
+    if(rangerWeaponIcon)this.add.image(77,470,rangerWeaponIcon).setDisplaySize(58,58);
+    else this.text(77, 470, weapon.attackMode === 'melee' ? '⚔' : '➶', 28,
+      COLOR.white, true, true);
     this.fittedText(118, 428, 'WAPEN  ·  LEVEL ' + profile.weaponLevels[weaponId], 10,
       '#89dbe8', 202, true);
     this.fittedText(118, 451, weapon.name.toUpperCase(), 14, COLOR.white, 196, true);
@@ -653,8 +657,12 @@ export class MainMenuScene extends Phaser.Scene {
         this.add.circle(68, cy, 25, color, .18).setStrokeStyle(1.5, color);
         if (piece)
           this.add.image(68, cy, ensureArmorIcon(this, piece)).setDisplaySize(56, 56);
-        else this.text(68, cy, weapon?.attackMode === 'melee' ? '⚔' : '➶',
-          24, COLOR.white, true, true);
+        else {
+          const icon=ensureRangerWeaponIcon(this,id as WeaponId);
+          if(icon)this.add.image(68,cy,icon).setDisplaySize(48,48);
+          else this.text(68, cy, weapon?.attackMode === 'melee' ? '⚔' : '➶',
+            24, COLOR.white, true, true);
+        }
         this.fittedText(106, cy - 22, weapon?.name ?? d?.name ?? '', 13,
           COLOR.white, 195, true);
         this.fittedText(106, cy, piece
@@ -761,9 +769,12 @@ export class MainMenuScene extends Phaser.Scene {
     this.add.circle(195, 427, 34, accent, .20).setStrokeStyle(2, accent);
     if (piece)
       this.add.image(195, 427, ensureArmorIcon(this, piece)).setDisplaySize(70, 70);
-    else
-      this.text(195, 427, weapon?.attackMode === 'melee' ? '⚔' : '➶',
+    else {
+      const icon=weaponId?ensureRangerWeaponIcon(this,weaponId):undefined;
+      if(icon)this.add.image(195,427,icon).setDisplaySize(66,66);
+      else this.text(195, 427, weapon?.attackMode === 'melee' ? '⚔' : '➶',
         34, COLOR.white, true, true);
+    }
     const previewing = piece
       ? this.isConfirmingUpgrade({ type: 'upgradeArmor', id: piece.id }, piece.level)
       : weaponId ? this.isConfirmingUpgrade({ type: 'upgradeWeapon', id: weaponId },
