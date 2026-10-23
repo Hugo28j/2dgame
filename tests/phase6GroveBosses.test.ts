@@ -18,8 +18,8 @@ describe('Phase 6: Jade Matriarch growing branches', () => {
     expect(getBossProfile(25,0,1).phaseOne.patterns).toEqual(['ring']);
     expect(getBossProfile(25,0,1).phaseTwo.patterns).toEqual(['offset-ring','cross']);
     expect(getBossPlan(25,2,1,0,1).pattern).toBe('cross');
-    expect(JADE_BRANCH.intervalMs).toBe(1000);
-    expect(JADE_BRANCH.phaseTwoIntervalMs).toBe(600);
+    expect(JADE_BRANCH.intervalMs).toBe(667);
+    expect(JADE_BRANCH.phaseTwoIntervalMs).toBe(400);
     expect(JADE_BRANCH.warningMs).toBe(600);
     expect(JADE_BRANCH.phaseTwoWarningMs).toBe(400);
     expect(JADE_BRANCH.activeMs).toBe(5000);
