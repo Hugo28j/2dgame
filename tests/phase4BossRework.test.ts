@@ -32,10 +32,10 @@ describe('phase 4 boss encounter migration', () => {
       expect(getBossArchetypeIndex(20, 0, world)).toBe(6);
     }
   });
-  it('recomputes Spore HP from 15 scaling and its previous 1.5x modifier, plus 50%', () => {
+  it('recomputes Spore HP from 15 scaling and its previous 1.5x modifier, plus 50% and the latest 15% reduction', () => {
     const scale15 = (1 + 14 * .08) * (1 + (3 - 1) * .09);
     expect(getEnemyStatsForRoom('boss', 15, 1, 0).maxHp)
-      .toBe(Math.round(880 * scale15 * 1.5 * 1.5));
+      .toBe(Math.round(880 * scale15 * 1.5 * 1.5 * .85));
     const scale20 = (1 + 19 * .08) * (1 + (4 - 1) * .09);
     expect(getEnemyStatsForRoom('boss', 20, 1, 0).maxHp)
       .toBe(Math.round(880 * scale20 * .7));
