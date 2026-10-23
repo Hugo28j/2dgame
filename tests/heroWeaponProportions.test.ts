@@ -14,8 +14,11 @@ describe('Guardian and Ranger visual weapon proportions', () => {
   });
 
   it('places Ranger projectiles at the visible bow and crossbow muzzle', () => {
-    expect(heroWeaponMuzzleDistance('bow')).toBe(39);
-    expect(heroWeaponMuzzleDistance('crossbow')).toBe(40);
+    expect(heroWeaponMuzzleDistance('bow')).toBe(46);
+    expect(heroWeaponMuzzleDistance('crossbow')).toBe(45);
+    expect(HERO_WEAPON_PROPORTIONS.bow.halfHeight * 2).toBeLessThanOrEqual(48);
+    expect(HERO_WEAPON_PROPORTIONS.crossbow.stockForward +
+      HERO_WEAPON_PROPORTIONS.crossbow.gripX).toBeLessThanOrEqual(46);
     expect(heroWeaponMuzzleDistance('staff')).toBe(29);
   });
 });
