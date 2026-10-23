@@ -101,7 +101,7 @@ export class GameScene extends Phaser.Scene {
     vx: number; vy: number; owner: AdvancedEnemy; damage: number;
   }>();
   private readonly fallingSnowballs = new Set<Phaser.GameObjects.Container>();
-  private readonly bombWarnings = new Set<Phaser.GameObjects.Arc>();
+  private readonly bombWarnings = new Set<Phaser.GameObjects.Shape>();
   private readonly rootEffects = new Set<Phaser.GameObjects.Graphics>();
   private readonly jadeBranches = new Set<{
     lane: GroveBranchLane; graphic: Phaser.GameObjects.Graphics;
