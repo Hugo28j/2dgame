@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import type { AttackData } from '../combat/damage';
 import { reflectArrow, type RicochetAxis } from './enemyRicochet';
 export type EnemyProjectileEffect = 'none' | 'frost-chill' | 'frost-burst' | 'briar-ricochet' |
-  'ember-flame' | 'ember-fireball';
+  'ember-flame' | 'ember-fireball' | 'bramble-ricochet';
 
 export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
   public readonly attack: Readonly<AttackData>;
@@ -17,7 +17,7 @@ export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
     super(scene, x, y, 'enemy-bullet');
     this.attack = { damage, criticalChance: 0, criticalMultiplier: 1 };
     this.effect = effect;
-    this.ricochetsRemaining = effect === 'briar-ricochet' ? 1 : 0;
+    this.ricochetsRemaining = effect === 'bramble-ricochet' ? 2 : effect === 'briar-ricochet' ? 1 : 0;
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.setDepth(17);
@@ -79,7 +79,7 @@ export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
 
   /** Only the first obstacle/wall impact can reflect a Briar arrow. */
   public tryRicochet(axis: RicochetAxis): boolean {
-    if (!this.active || this.effect !== 'briar-ricochet' || this.ricochetsRemaining === 0)
+    if (!this.active || (this.effect !== 'briar-ricochet' && this.effect !== 'bramble-ricochet') || this.ricochetsRemaining === 0)
       return false;
     this.ricochetsRemaining--;
     this.baseVelocity = reflectArrow(this.baseVelocity, axis);
@@ -91,7 +91,7 @@ export class EnemyProjectile extends Phaser.Physics.Arcade.Sprite {
   /** Arena edges count as walls even though enemies' projectiles do not
    * collide with Phaser's world bounds (so the first hit can still ricochet). */
   public bounceAtArenaEdge(): boolean {
-    if (this.effect !== 'briar-ricochet') return false;
+    if (this.effect !== 'briar-ricochet' && this.effect !== 'bramble-ricochet') return false;
     const bounds = this.scene.physics.world.bounds;
     const beyondX = this.x < bounds.x || this.x > bounds.right;
     const beyondY = this.y < bounds.y || this.y > bounds.bottom;
