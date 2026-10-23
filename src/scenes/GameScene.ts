@@ -1754,7 +1754,7 @@ export class GameScene extends Phaser.Scene {
         // Contact with any still-visible limb segment hurts, including on retreat.
         if (canDamage && !damaged && this.player?.active &&
             points.slice(1).some((point, index) =>
-              rootTipHits(points[index]!, point, this.player,
+              rootTipHits(points[index]!, point, this.player!,
                 (46 - ((index + 1) / segments) * 23) / 2 + 13))) {
           damaged = true;
           this.damagePlayer({damage: enemy.stats.damage * .68,
@@ -2506,6 +2506,8 @@ export class GameScene extends Phaser.Scene {
       boss?.active && boss.isBrambleGunner && boss.aiState !== 'defeated');
     if (!gunner || gunner.healthRatio > 0.5) return;
     this.brambleCutsceneUsed = true;
+    // Legacy cinematic remains available for reference but is not triggered.
+    void this.startWorldOneBossSplit;
     const bounds = this.currentRoom.layout.bounds;
     const positions = [-90, 90].map(offset => ({
       x: Phaser.Math.Clamp(gunner.x + offset, bounds.x + 45,
