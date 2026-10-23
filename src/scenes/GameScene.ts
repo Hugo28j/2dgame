@@ -324,6 +324,7 @@ export class GameScene extends Phaser.Scene {
     this.updateFrozenWalls(this.time.now);
     this.updateGlacierBoulders(delta * (this.abilities?.enemyProjectileFactor(this.time.now) ?? 1));
     this.weapon.update(this.time.now, this.controls.isShooting(), aim);
+    this.spawnBrambleReinforcementsAtHalfHealth();
 
     // Ranged world-1 mobs use nearby Ancient Treants as moving cover.
     const treants = this.liveTreantShields();
@@ -2270,7 +2271,7 @@ export class GameScene extends Phaser.Scene {
           bottle.destroy();
           if (this.gameOver || this.transitioning || this.chapterComplete ||
               this.roomProgress.doorOpen || !enemy.active || enemy.aiState === 'defeated') return;
-          this.createPoisonPool(x, y, radius, enemy.stats.damage * SPORE_POISON.damageMultiplier);
+          this.createPoisonPool(x, y, radius, enemy.stats.damage * SPORE_POISON.damageMultiplier * 1.2);
         },
       });
     }
@@ -2493,6 +2494,30 @@ export class GameScene extends Phaser.Scene {
       bar.fillStyle(boss.healthRatio <= 0.5 ? 0xef4444 : 0xf59e0b);
       bar.fillRoundedRect((GAME_WIDTH - 270) / 2 + 2, y + 2, 266 * boss.healthRatio, 10, 3);
     }
+  }
+
+  /** Summon the two phase-two Sentinels as soon as Bramble reaches half HP.
+   * No cutscene, no defeat and no removal of the original boss. */
+  private spawnBrambleReinforcementsAtHalfHealth(): void {
+    if (this.worldId !== 1 || this.roomProgress.roomNumber !== 20 ||
+        this.brambleCutsceneUsed || this.gameOver || this.transitioning ||
+        this.roomProgress.doorOpen || !this.currentRoom || !this.enemySpawner) return;
+    const gunner = this.activeBosses.find(boss =>
+      boss?.active && boss.isBrambleGunner && boss.aiState !== 'defeated');
+    if (!gunner || gunner.healthRatio > 0.5) return;
+    this.brambleCutsceneUsed = true;
+    const bounds = this.currentRoom.layout.bounds;
+    const positions = [-90, 90].map(offset => ({
+      x: Phaser.Math.Clamp(gunner.x + offset, bounds.x + 45,
+        bounds.x + bounds.width - 45),
+      y: Phaser.Math.Clamp(gunner.y + 32, bounds.y + 45,
+        bounds.y + bounds.height - 45),
+    }));
+    this.roomProgress.addEnemies(2);
+    const sentinels = this.enemySpawner.spawnSplitBosses(positions, 20);
+    // The HUD has two rows; new Sentinels still count as separate enemies.
+    this.activeBosses = [gunner, ...sentinels];
+    this.updateEnemyCount();
   }
 
   /** All delayed stage callbacks belong to the current encounter token. */
@@ -2837,10 +2862,6 @@ export class GameScene extends Phaser.Scene {
     this.spawnCoins(enemy.x, enemy.y, kind);
     this.spawnXp(enemy.x, enemy.y, kind);
     this.spawnArmor(enemy, kind);
-    if (this.worldId === 1 && this.roomProgress.roomNumber === 20 &&
-        enemy instanceof AdvancedEnemy && enemy.isBrambleGunner) {
-      this.startWorldOneBossSplit(enemy);
-    }
     if (enemy instanceof AdvancedEnemy &&
         shouldSplitFrozenGiant(this.worldId, enemy.kind, enemy.enemyId)) {
       this.spawnSplitSnowPuffs(enemy);
