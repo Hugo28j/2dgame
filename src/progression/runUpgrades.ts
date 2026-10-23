@@ -71,3 +71,10 @@ export class RunUpgradeDeck {
       .map(item => ({ name: item.name, stacks: this.count(item.id) }));
   }
 }
+
+/** The damage card raises TOTAL weapon damage, not just the hero's small flat bonus.
+ * Player.damage itself is already multiplied per stack for ability damage. */
+export function scaleRunWeaponDamage(weaponComponent: number, heroDamage: number,
+  stacks: number): number {
+  return weaponComponent * Math.pow(1.15, Math.max(0, stacks)) + heroDamage;
+}

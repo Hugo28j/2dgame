@@ -1,3 +1,4 @@
+import { scaleRunWeaponDamage } from '../progression/runUpgrades';
 import Phaser from 'phaser';
 import type { AttackData } from '../combat/damage';
 import { addAndLaunch } from '../combat/launchProjectile';
@@ -536,7 +537,8 @@ export class WeaponController {
     const magicBonus = this.owner.heroId === 'mage' &&
       (config.effect === 'magic' || config.effect === 'chain-lightning') ? 1.2 : 1;
     return {
-      damage: (config.damage * this.armorDamageMultiplier + this.permanentDamage + this.owner.damage) * magicBonus,
+      damage: scaleRunWeaponDamage(config.damage * this.armorDamageMultiplier + this.permanentDamage,
+        this.owner.damage, this.owner.runDamageStacks) * magicBonus,
       criticalChance: this.owner.criticalChance + config.criticalChanceModifier,
       criticalMultiplier: Math.max(this.owner.criticalMultiplier, config.criticalMultiplier),
     };
