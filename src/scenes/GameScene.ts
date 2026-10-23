@@ -341,7 +341,8 @@ export class GameScene extends Phaser.Scene {
           this.fireEnemyProjectiles, this.explodeEnemy, this.dropBossBombs,
           nearestCover?.shieldSurface, this.summonFrostMinions,
           this.performRootAttack, this.dropDashTrailBomb, this.frozenBossSpecial,
-          this.performJadeBranches, this.emberBossSpecial);
+          this.performJadeBranches, this.emberBossSpecial,
+           this.safeRootEscape);
       } else {
         child.chase(this.player.x, this.player.y);
       }
@@ -1671,6 +1672,32 @@ export class GameScene extends Phaser.Scene {
     this.frozenWalls.clear();
   }
 
+  /** Select a wall-safe retreat direction with an obstacle-free swept path. */
+  private readonly safeRootEscape = (enemy: AdvancedEnemy, heroX: number, heroY: number):
+    {x: number; y: number} | undefined => {
+    if (!this.currentRoom) return undefined;
+    const bounds = this.currentRoom.layout.bounds;
+    const angle = Math.atan2(enemy.y - heroY, enemy.x - heroX);
+    const distance = ROOT_BRANCH.evadeSpeed * ROOT_BRANCH.evadeDurationMs / 1000;
+    const padding = 42;
+    const safe = (x: number, y: number): boolean =>
+      x >= bounds.x + padding && x <= bounds.x + bounds.width - padding &&
+      y >= bounds.y + padding && y <= bounds.y + bounds.height - padding &&
+      !this.currentRoom!.layout.obstacles.some(o =>
+        Math.abs(x - o.x) < o.width / 2 + padding &&
+        Math.abs(y - o.y) < o.height / 2 + padding);
+    let best: {x: number; y: number; score: number} | undefined;
+    for (const offset of [0, -Math.PI/4, Math.PI/4, -Math.PI/2, Math.PI/2, Math.PI, -3*Math.PI/4, 3*Math.PI/4]) {
+      const dx = Math.cos(angle + offset), dy = Math.sin(angle + offset);
+      if (![.25,.5,.75,1].every(t => safe(enemy.x + dx * distance * t,
+        enemy.y + dy * distance * t))) continue;
+      const separation = Math.hypot(enemy.x + dx * distance - heroX,
+        enemy.y + dy * distance - heroY);
+      if (!best || separation > best.score) best = {x:dx,y:dy,score:separation};
+    }
+    return best && {x:best.x,y:best.y};
+  };
+
   /** The Tyrant attacks with one enormous articulated limb grown directly
    * from its shoulder. There is deliberately no detached lane telegraph: the
    * extending bark arm itself is the readable animation. */
@@ -1707,7 +1734,7 @@ export class GameScene extends Phaser.Scene {
           this.transitioning || this.roomProgress.doorOpen || this.choosingUpgrade) return;
       const arm = this.add.graphics().setDepth(28);
       this.rootEffects.add(arm);
-      let damaged = false;
+      let nextSpikeDamageAt = 0;
       const drawArm = (extension: number, canDamage: boolean): void => {
         if (!arm.active || !enemy.active || this.roomProgress.doorOpen ||
             this.gameOver || this.transitioning || this.choosingUpgrade) return;
@@ -1751,14 +1778,49 @@ export class GameScene extends Phaser.Scene {
             tip.x + Math.cos(fingerAngle) * 29,
             tip.y + Math.sin(fingerAngle) * 29);
         }
-        // Contact with any still-visible limb segment hurts, including on retreat.
-        if (canDamage && !damaged && this.player?.active &&
-            points.slice(1).some((point, index) =>
-              rootTipHits(points[index]!, point, this.player!,
-                (46 - ((index + 1) / segments) * 23) / 2 + 13))) {
-          damaged = true;
-          this.damagePlayer({damage: enemy.stats.damage * .68,
-            criticalChance: 0, criticalMultiplier: 1});
+        // Spikes follow the entire visible wooden limb, not only its fist.
+        for (let index = 1; index < points.length; index++) {
+          const a = points[index - 1]!, b = points[index]!;
+          const dx = b.x-a.x, dy = b.y-a.y, length = Math.hypot(dx,dy);
+          if (length < 1) continue;
+          const nx = -dy/length, ny = dx/length;
+          for (const sign of [-1,1]) {
+            const mx = (a.x+b.x)/2, my = (a.y+b.y)/2;
+            arm.fillStyle(0xb7a582,1);
+            arm.fillTriangle(mx+nx*sign*10,my+ny*sign*10,
+              mx+nx*sign*32+dx/length*8,my+ny*sign*32+dy/length*8,
+              mx+nx*sign*10+dx/length*15,my+ny*sign*10+dy/length*15);
+          }
+        }
+        // Solid collision: push the hero out of the fully visible branch path
+        // each frame, so they cannot simply walk or dash through it.
+        if (canDamage && this.player?.active) {
+          for (let index=1; index<points.length;index++) {
+            const a=points[index-1]!, b=points[index]!;
+            const dx=b.x-a.x,dy=b.y-a.y,len2=dx*dx+dy*dy;
+            if(len2<.01)continue;
+            const t=Phaser.Math.Clamp(((this.player.x-a.x)*dx+(this.player.y-a.y)*dy)/len2,0,1);
+            const cx=a.x+t*dx,cy=a.y+t*dy;
+            const vx=this.player.x-cx,vy=this.player.y-cy;
+            const dist=Math.hypot(vx,vy);
+            const radius=38;
+            if(dist>=radius)continue;
+            const normalX=dist>.01?vx/dist:-dy/Math.sqrt(len2);
+            const normalY=dist>.01?vy/dist:dx/Math.sqrt(len2);
+            this.player.setPosition(cx+normalX*radius,cy+normalY*radius);
+            const body=this.player.body;
+            if(body instanceof Phaser.Physics.Arcade.Body){
+              const approaching=body.velocity.x*normalX+body.velocity.y*normalY;
+              if(approaching<0)body.setVelocity(
+                body.velocity.x-approaching*normalX,body.velocity.y-approaching*normalY);
+            }
+            if(this.time.now>=nextSpikeDamageAt){
+              nextSpikeDamageAt=this.time.now+ROOT_BRANCH.spikeHitCooldownMs;
+              this.damagePlayer({damage:enemy.stats.damage*.68,
+                criticalChance:0,criticalMultiplier:1});
+            }
+            break;
+          }
         }
       };
       this.tweens.addCounter({
