@@ -12,6 +12,7 @@ import { BIG_WAVE, FLAMETHROWER, bigWaveHitKind, flameConeHits } from './element
 import { SHOTGUN_TRANSFORM, shotgunVolleyAngles } from '../abilities/phase9Balance';
 import { hasAnimatedHero } from '../heroes/heroEquipmentArt';
 import { CharacterAttackArt, HAMMER_IMPACT_DELAY_MS } from '../heroes/characterAttackArt';
+import { heroWeaponMuzzleDistance } from '../heroes/heroWeaponProportions';
 
 export class WeaponController {
   private nextShotAt = 0;
@@ -118,7 +119,7 @@ export class WeaponController {
       const spread = count > 1 ? (index - (count - 1) / 2) * 0.16 : 0;
       const angle = Math.atan2(direction.y, direction.x) + spread;
       const vector = { x: Math.cos(angle), y: Math.sin(angle) };
-      const distance = 29;
+      const distance = heroWeaponMuzzleDistance(this.weaponId);
       const projectile = new Projectile(
         this.scene,
         this.owner.x + vector.x * distance,
