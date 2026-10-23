@@ -7,8 +7,8 @@ export interface GroveBranchLane {
   readonly orientation: 'horizontal' | 'vertical';
 }
 export const JADE_BRANCH = Object.freeze({
-  intervalMs: 1000,
-  phaseTwoIntervalMs: 600,
+  intervalMs: 667,
+  phaseTwoIntervalMs: 400,
   warningMs: 600,
   phaseTwoWarningMs: 400,
   growthMs: 780,
@@ -86,26 +86,29 @@ export function jadeLaneOverlaps(a: GroveBranchLane, b: GroveBranchLane, padding
 }
 export function selectJadeLane(bounds: GroveBounds, axis: 'horizontal' | 'vertical',
   reserved: readonly GroveBranchLane[], random: () => number): GroveBranchLane | undefined {
-  // Full wall-to-wall attacks. Positions are distributed along the OTHER axis,
-  // but no active or telegraphed lane may intersect (including perpendicular lanes).
+  // Bounded attack strips allow both orientations to coexist without crossing.
   const horizontal = axis === 'horizontal';
-  const roomSpan = horizontal ? bounds.height : bounds.width;
-  const edge = 28;
-  const count = Math.max(1, Math.floor((roomSpan - 2*edge) / 42));
-  const positions = Array.from({length: count}, (_, i) => (i + .5) / count);
-  for (let i=positions.length-1; i>0; i--) {
+  const margin = 35;
+  const columns = 7, rows = 7;
+  const spanX = bounds.width - margin * 2, spanY = bounds.height - margin * 2;
+  const shuffled = Array.from({length:columns*rows},(_,i)=>i);
+  for (let i=shuffled.length-1;i>0;i--) {
     const j=Math.floor(random()*(i+1));
-    [positions[i],positions[j]]=[positions[j]!,positions[i]!];
+    [shuffled[i],shuffled[j]]=[shuffled[j]!,shuffled[i]!];
   }
-  for (const fraction of positions) {
-    const coord = (horizontal ? bounds.y : bounds.x) + edge + fraction! * (roomSpan-2*edge);
-    const reverse = random()<.5;
-    const x0=bounds.x+12,x1=bounds.x+bounds.width-12;
-    const y0=bounds.y+12,y1=bounds.y+bounds.height-12;
-    const lane: GroveBranchLane = horizontal ?
-      {orientation:axis,start:{x:reverse?x1:x0,y:coord},end:{x:reverse?x0:x1,y:coord}} :
-      {orientation:axis,start:{x:coord,y:reverse?y1:y0},end:{x:coord,y:reverse?y0:y1}};
-    if (reserved.every(old=>!jadeLaneOverlaps(lane,old))) return lane;
+  const length = horizontal ? Math.min(160,spanX/columns*2.1) :
+    Math.min(160,spanY/rows*2.1);
+  for(const cell of shuffled) {
+    const col=cell%columns,row=Math.floor(cell/columns);
+    const x=bounds.x+margin+(col+.5)*spanX/columns;
+    const y=bounds.y+margin+(row+.5)*spanY/rows;
+    const dx=horizontal ? length/2 : 0, dy=horizontal ? 0 : length/2;
+    const reverse=random()<.5;
+    const p={x:Math.max(bounds.x+12,x-dx),y:Math.max(bounds.y+12,y-dy)};
+    const q={x:Math.min(bounds.x+bounds.width-12,x+dx),
+      y:Math.min(bounds.y+bounds.height-12,y+dy)};
+    const lane: GroveBranchLane={orientation:axis,start:reverse?q:p,end:reverse?p:q};
+    if(reserved.every(old=>!jadeLaneOverlaps(lane,old)))return lane;
   }
   return undefined;
 }
