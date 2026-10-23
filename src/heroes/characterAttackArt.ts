@@ -3,6 +3,9 @@ import type { Player } from '../entities/Player';
 import type { WeaponId } from '../weapons/weaponConfig';
 import { hasAnimatedHero } from './heroEquipmentArt';
 import { HERO_WEAPON_PROPORTIONS } from './heroWeaponProportions';
+import { bowArrowIsHeld, bowDrawAmount, bowNockProgress, crossbowBoltLoadAmount,
+  crossbowCockAmount, crossbowReloadPhase,
+  RANGER_WEAPON_ANIMATION } from './rangerWeaponAnimation';
 
 import {
   attackPoseProgress, poseForWeapon, poseLengthMs, type AttackPose,
@@ -157,46 +160,102 @@ export class CharacterAttackArt {
     attacking:boolean,t:number,sway:number):void {
     const bowSize=HERO_WEAPON_PROPORTIONS.bow;
     const crossbowSize=HERO_WEAPON_PROPORTIONS.crossbow;
-    const recoil=attacking?Math.sin(Math.PI*Math.min(1,t*1.4))*4:0;
-    const gripX=(pose==='crossbow'?crossbowSize.gripX:bowSize.gripX)-recoil,gripY=sway*.25;
-    g.lineStyle(5,0x9b7650);g.lineBetween(8,-5,gripX-2,gripY-1);
-    g.fillStyle(0xf0c391,1);g.fillCircle(gripX-2,gripY-1,4.5);
+    const gripX=pose==='crossbow'?crossbowSize.gripX:bowSize.gripX;
+    const gripY=sway*.22;
+    // Matching forest sleeve, leather bracer and warm skin connect the weapons
+    // to the Robin Hood body rather than floating in a separate art style.
+    g.lineStyle(9,0x2f6b3b,1);g.lineBetween(3,-7,gripX-5,gripY-1);
+    g.lineStyle(5,0x91a96d,.9);g.lineBetween(5,-8,gripX-6,gripY-2);
+    g.lineStyle(7,0x6b4327,1);g.lineBetween(gripX-8,gripY-1,gripX-3,gripY);
+    g.fillStyle(0xe9b98e,1);g.fillCircle(gripX-1,gripY,4.8);
     if(pose==='crossbow'){
-      g.lineStyle(6,0x81552d);g.lineBetween(gripX-crossbowSize.stockBack,gripY,
-        gripX+crossbowSize.stockForward,gripY);
-      g.lineStyle(3,0xaee8d1);g.lineBetween(gripX+19,gripY-crossbowSize.halfSpan,
-        gripX+19,gripY+crossbowSize.halfSpan);
-      g.lineStyle(5,0x325b54);g.lineBetween(gripX+7,gripY-crossbowSize.halfSpan,
-        gripX+crossbowSize.stockForward,gripY);
-      g.lineBetween(gripX+7,gripY+crossbowSize.halfSpan,
-        gripX+crossbowSize.stockForward,gripY);
-      g.lineStyle(2,0xf9e1b0);
-      g.lineBetween(gripX+7,gripY-crossbowSize.halfSpan,gripX+15,gripY);
-      g.lineBetween(gripX+7,gripY+crossbowSize.halfSpan,gripX+15,gripY);
-    } else { // longbow, drawn bowstring flexes and is released on every shot
-      const pull=attacking?(1-Math.min(1,t*2.9))*10:4;
-      g.lineStyle(3.8,0x42796a,1);
-      g.beginPath();g.moveTo(gripX+9,gripY-bowSize.halfHeight);
-      g.lineTo(gripX+17,gripY-10);g.lineTo(gripX+bowSize.bellyForward,gripY);
-      g.lineTo(gripX+17,gripY+10);g.lineTo(gripX+9,gripY+bowSize.halfHeight);g.strokePath();
-      g.lineStyle(1.7,0xe6dfb6,1);
-      g.lineBetween(gripX+9,gripY-bowSize.halfHeight,gripX+9-pull,gripY);
-      g.lineBetween(gripX+9-pull,gripY,gripX+9,gripY+bowSize.halfHeight);
-      if(!attacking||t<.22){
-        g.lineStyle(2.3,0xf2e1b2,1);
-        g.lineBetween(gripX+6-pull,gripY,gripX+bowSize.arrowForward,gripY);
-        g.fillStyle(0x9af0cf);
-        g.fillTriangle(gripX+bowSize.arrowForward+4,gripY,
-          gripX+bowSize.arrowForward-3,gripY-3,gripX+bowSize.arrowForward-3,gripY+3);
+      const progress=attacking?t:1;
+      const phase=crossbowReloadPhase(progress);
+      const cock=attacking?crossbowCockAmount(progress):1;
+      const load=attacking?crossbowBoltLoadAmount(progress):1;
+      const recoil=phase==='release'?
+        (1-progress/RANGER_WEAPON_ANIMATION.crossbowRecoilEnds)*4:0;
+      const stockBack=gripX-crossbowSize.stockBack-recoil;
+      const stockFront=gripX+crossbowSize.stockForward-recoil;
+      // Carved yew stock, dark rail, brass trigger and recurved green limbs.
+      g.lineStyle(10,0x3b2417,1);g.lineBetween(stockBack,gripY,stockFront,gripY);
+      g.lineStyle(6,0x79502d,1);g.lineBetween(stockBack+2,gripY-1,stockFront,gripY-1);
+      g.lineStyle(2.5,0xd0a64f,.9);g.lineBetween(gripX+1,gripY-4,stockFront-2,gripY-4);
+      g.fillStyle(0xc99a43,1);g.fillTriangle(gripX+3,gripY+2,
+        gripX+9,gripY+2,gripX+6,gripY+9);
+      const limbX=gripX+14-recoil;
+      g.lineStyle(6,0x284f31,1);
+      g.beginPath();g.moveTo(limbX,gripY-crossbowSize.halfSpan);
+      g.lineTo(limbX+7,gripY-9);g.lineTo(stockFront,gripY);g.strokePath();
+      g.beginPath();g.moveTo(limbX,gripY+crossbowSize.halfSpan);
+      g.lineTo(limbX+7,gripY+9);g.lineTo(stockFront,gripY);g.strokePath();
+      g.lineStyle(2,0xa8b987,1);
+      const latchX=Phaser.Math.Linear(stockFront-1,gripX+7,cock);
+      g.lineBetween(limbX,gripY-crossbowSize.halfSpan,latchX,gripY);
+      g.lineBetween(limbX,gripY+crossbowSize.halfSpan,latchX,gripY);
+
+      // Rear hand first cocks the string, then visibly carries a fresh bolt
+      // from the shoulder/quiver and lays it onto the rail.
+      let reloadHand={x:-2,y:10+sway*.15};
+      if(phase==='cock') reloadHand={x:latchX-1,y:gripY+3};
+      else if(phase==='load'||phase==='settle') {
+        reloadHand={x:Phaser.Math.Linear(-3,gripX+8,load),
+          y:Phaser.Math.Linear(11,gripY+3,load)};
       }
-    }
-    if(attacking&&t<.45) {
-      const f=1-t/.45;
-      g.fillStyle(0xb7f7e5,.60*f);
-      g.fillCircle(gripX+30,gripY,3+f*4);
-      g.lineStyle(1.4,0xafffe0,.8*f);
-      g.lineBetween(gripX+26,gripY-7,gripX+36,gripY-7);
-      g.lineBetween(gripX+26,gripY+7,gripX+36,gripY+7);
+      g.lineStyle(8,0x356f3e,1);g.lineBetween(1,7,reloadHand.x-3,reloadHand.y);
+      g.lineStyle(5,0x6d4529,1);g.lineBetween(reloadHand.x-5,reloadHand.y,
+        reloadHand.x-1,reloadHand.y);
+      g.fillStyle(0xe9b98e,1);g.fillCircle(reloadHand.x,reloadHand.y,4.5);
+      if(load>0) {
+        const boltRear=Phaser.Math.Linear(-9,gripX+7,load);
+        const boltY=Phaser.Math.Linear(10,gripY-3,load);
+        const boltFront=boltRear+25;
+        g.lineStyle(3,0xb98545,1);g.lineBetween(boltRear,boltY,boltFront,boltY);
+        g.fillStyle(0xb8cc78,1);g.fillTriangle(boltRear-5,boltY-4,
+          boltRear+2,boltY,boltRear-5,boltY+4);
+        g.fillStyle(0xcbd5d1,1);g.fillTriangle(boltFront+6,boltY,
+          boltFront-1,boltY-4,boltFront-1,boltY+4);
+      }
+    } else {
+      const progress=attacking?t:1;
+      const held=!attacking||bowArrowIsHeld(progress);
+      const nock=attacking?bowNockProgress(progress):1;
+      const draw=attacking?bowDrawAmount(progress):.22;
+      const kick=attacking&&!held?Math.sin(Math.min(1,
+        (progress-RANGER_WEAPON_ANIMATION.bowReleaseAt)/.25)*Math.PI)*3:0;
+      // Layered yew longbow with horn tips and a leather-wrapped grip.
+      g.lineStyle(7,0x3a2416,1);
+      g.beginPath();g.moveTo(gripX+8,gripY-bowSize.halfHeight);
+      g.lineTo(gripX+18-kick,gripY-11);g.lineTo(gripX+bowSize.bellyForward-kick,gripY);
+      g.lineTo(gripX+18-kick,gripY+11);g.lineTo(gripX+8,gripY+bowSize.halfHeight);g.strokePath();
+      g.lineStyle(3.5,0x8a5d2f,1);
+      g.beginPath();g.moveTo(gripX+9,gripY-bowSize.halfHeight+1);
+      g.lineTo(gripX+18-kick,gripY-10);g.lineTo(gripX+bowSize.bellyForward-kick,gripY);
+      g.lineTo(gripX+18-kick,gripY+10);g.lineTo(gripX+9,gripY+bowSize.halfHeight-1);g.strokePath();
+      g.lineStyle(4,0x5a3820,1);g.lineBetween(gripX+bowSize.bellyForward-2,gripY-5,
+        gripX+bowSize.bellyForward-2,gripY+5);
+      const nockX=gripX+9-draw*17;
+      g.lineStyle(1.8,0xd8d3a6,1);
+      g.lineBetween(gripX+8,gripY-bowSize.halfHeight,nockX,gripY);
+      g.lineBetween(nockX,gripY,gripX+8,gripY+bowSize.halfHeight);
+      if(held) {
+        const carryX=(1-nock)*-18,carryY=(1-nock)*12;
+        const rear=nockX+carryX,arrowY=gripY+carryY;
+        const front=rear+bowSize.arrowForward+3;
+        g.lineStyle(3,0xb98545,1);g.lineBetween(rear,arrowY,front,arrowY);
+        g.fillStyle(0xb8cc78,1);g.fillTriangle(rear-6,arrowY-4,
+          rear+2,arrowY,rear-6,arrowY+4);
+        g.fillStyle(0xd6e0dc,1);g.fillTriangle(front+7,arrowY,
+          front-1,arrowY-4,front-1,arrowY+4);
+        const hand={x:rear,y:arrowY};
+        const elbow={x:Phaser.Math.Linear(-4,2,draw),y:Phaser.Math.Linear(10,5,draw)};
+        g.lineStyle(9,0x356f3e,1);g.lineBetween(0,8,elbow.x,elbow.y);
+        g.lineStyle(7,0x6d4529,1);g.lineBetween(elbow.x,elbow.y,hand.x-2,hand.y);
+        g.fillStyle(0xe9b98e,1);g.fillCircle(hand.x,hand.y,4.6);
+      } else {
+        g.lineStyle(8,0x356f3e,1);g.lineBetween(0,8,7,5);
+        g.fillStyle(0xe9b98e,1);g.fillCircle(8,4,4.4);
+      }
     }
   }
 
