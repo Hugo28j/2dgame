@@ -224,6 +224,16 @@ export class AdvancedEnemy extends Slime {
       this.drawTreantShield();
     }
     if (this.isKnockedBack(now)) return;
+    if (this.enemyId.startsWith('grove-gunner-')) {
+      const move = rangedVelocity(this.x,this.y,targetX,targetY,this.stats.movementSpeed,215,this.orbitSign);
+      this.setVelocity(move.x,move.y);
+      this.setRotation(Math.atan2(targetY-this.y,targetX-this.x)+Math.PI/2);
+      if (now >= this.nextShotAt) {
+        fire(this,'machinegun',this.bossVolleys++,1.25);
+        this.nextShotAt = now + 155;
+      }
+      return;
+    }
     if (this.worldId === 3 && this.kind !== 'boss') {
       this.updateEmberMob(targetX, targetY, now, fire, explode, dropBombs, trailBomb);
       return;
