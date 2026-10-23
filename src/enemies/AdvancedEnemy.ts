@@ -199,6 +199,7 @@ export class AdvancedEnemy extends Slime {
     jadeBranches?: EnemyJadeBranches, emberBoss?: EnemyEmberBoss): void {
     if (this.aiState === 'defeated') return;
     super.chase(targetX, targetY);
+    if (this.isRootTyrant) this.setRotation(Math.atan2(targetY - this.y, targetX - this.x) + Math.PI / 2);
     // A stunned enemy cannot shoot, summon or trigger scripted special attacks.
     // Its own cooldowns were deferred in applyStun; no global shoot clock.
     if (this.isStunned(now)) return;
