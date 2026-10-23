@@ -3,13 +3,14 @@ export const MOSS_DASH = Object.freeze({
   warningMs: 165, // 50% shorter than the old 330ms warning
   phaseOneSpeed: 720, // +100% over the original 360px/s
   phaseTwoSpeed: 1080, // +200% over the original 360px/s
-  phaseOneDurationMs: 810, // 1.5x the previous travel distance
-  phaseTwoDurationMs: 540, // 1.5x the previous travel distance
+  phaseOneDurationMs: 1215, // 1.5x the previous travel distance
+  phaseTwoDurationMs: 810, // 1.5x the previous travel distance
   phaseOneRechargeMs: 2100,
   phaseTwoRechargeMs: 1250,
-  trailSpacingMs: 160,
-  trailFuseMs: 650,
-  trailRadius: 37,
+  trailSpacingMs: 45,
+  trailDurationMs: 2000,
+  trailWidth: 76,
+  trailDamageTickMs: 250,
 });
 export const ROOT_BRANCH = Object.freeze({
   lineWarningMs: 360,
