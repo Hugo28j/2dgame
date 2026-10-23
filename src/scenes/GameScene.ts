@@ -10,7 +10,7 @@ import { getBossProfile, getBossTier } from '../enemies/bossProfiles';
 import { MOSS_DASH, ROOT_BRANCH } from '../enemies/worldOneBossBalance';
 import { SPORE_POISON, poisonActive, poisonCovers, poisonTickDue } from '../enemies/poisonHazard';
 import { selectPoisonLocations, type PoisonCircle } from '../enemies/poisonPlacement';
-import { attachedRootLine, predictLeafLanding, rootArmPoint, rootTipHits } from '../enemies/rootGrowth';
+import { attachedRootLine, predictLeafLanding, rootArmPoint } from '../enemies/rootGrowth';
 import { JADE_BRANCH, HEART_TREE, groveBranchTip,
   groveBranchHits, groveTreeHits, selectJadeLane, type GroveBranchLane } from '../enemies/groveAttacks';
 import { AdvancedEnemy, type BulletPattern } from '../enemies/AdvancedEnemy';
