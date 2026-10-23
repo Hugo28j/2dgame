@@ -70,26 +70,39 @@ function drawRobinHoodRanger(g: Phaser.GameObjects.Graphics): void {
   g.fillStyle(0x51311f,1);g.fillEllipse(23,38,10,13);
   g.lineStyle(1.5,0xb98545,1);g.strokeEllipse(23,38,10,13);
 
-  // Weapon shoulder and bracer share the greens and leather from live animation.
-  g.fillStyle(0x356f3e,1);g.fillEllipse(39,14,18,11);
-  g.fillStyle(0x6d4529,1);g.fillPoints(polygon([[41,10],[53,13],[51,21],[40,18]]),true);
-  g.lineStyle(1.6,0xc08a4f,.9);g.lineBetween(43,12,49,19);
+  // The two shoulders sit on opposite edges of the tunic in true top-down view.
+  // Keep the static sleeves short: the attacking arms are drawn separately
+  // by CharacterAttackArt in front of this sprite.
+  g.fillStyle(0x173a25,1);g.fillEllipse(35,14,18,12);g.fillEllipse(35,49,18,12);
+  g.fillStyle(0x397b43,1);g.fillEllipse(37,14,15,9);g.fillEllipse(37,49,15,9);
+  g.lineStyle(2,0x8cac69,.85);g.lineBetween(31,10,42,12);
+  g.lineBetween(31,53,42,51);
+  // Leather bracers stay alongside the body, rather than crossing the face.
+  g.fillStyle(0x754b2d,1);g.fillRoundedRect(37,8,11,8,3);
+  g.fillRoundedRect(37,49,11,8,3);
+  g.lineStyle(1.6,0xc08a4f,.9);g.lineBetween(41,9,45,15);
+  g.lineBetween(41,50,45,56);
 
-  // Warm face, swept hair, soft hood/cap and the signature pale feather.
-  g.fillStyle(0x6a4027,1);g.fillEllipse(49,33,22,25);
-  g.fillStyle(0xe9b98e,1);g.fillEllipse(51,32,17,19);
-  g.fillStyle(0x59361f,1);g.fillPoints(polygon([[41,27],[47,20],[57,24],[60,29],[51,26]]),true);
-  g.fillTriangle(43,38,49,45,52,38);
-  g.fillStyle(0xf4ead7,1);g.fillCircle(57,30,2.3);
-  g.fillStyle(0x1b2a20,1);g.fillCircle(58,30,1.1);
-  g.lineStyle(1.4,0x9b5d3a,.9);g.lineBetween(55,37,59,36);
-  g.fillStyle(0x255d35,1);g.fillPoints(polygon([
-    [36,25],[43,18],[53,17],[62,25],[51,24],[44,29],
-  ]),true);
-  g.lineStyle(3,0x7ea466,1);g.lineBetween(39,25,61,25);
-  g.lineStyle(4,0xf0e5b8,1);g.lineBetween(46,20,34,5);
-  g.lineStyle(1.5,0xa8bd86,1);g.lineBetween(44,17,34,5);
-  g.lineBetween(41,13,34,5);g.lineBetween(38,9,34,5);
+  // Neck first, then a large, unmistakable head toward the facing direction.
+  // The cap is BEHIND the visible face, not painted across its centre.
+  g.fillStyle(0x40291a,1);g.fillEllipse(49,33,25,27); // hair/hood rim
+  g.fillStyle(0x255d35,1);g.fillEllipse(46,31,24,27); // rounded hood crown
+  g.fillStyle(0x78a362,1);g.fillEllipse(43,29,14,15); // cap highlight
+  g.fillStyle(0xe9b98e,1);g.fillEllipse(53,33,18,19); // exposed face
+  g.fillStyle(0xf6cba0,1);g.fillEllipse(56,32,11,13);
+  g.fillStyle(0x38281c,1);g.fillEllipse(48,29,6,12); // sideburn/hair
+  // Directional forehead, bright eye and tiny nose read even at mobile size.
+  g.fillStyle(0xffffff,1);g.fillCircle(58,29,2.4);
+  g.fillStyle(0x15231a,1);g.fillCircle(59,29,1.25);
+  g.fillStyle(0xe0a477,1);g.fillTriangle(63,33,59,31,59,35);
+  g.lineStyle(1.5,0x965b3a,.92);g.lineBetween(57,38,60,37);
+  // Narrow folded brim outlines the back/upper side, leaving the face clear.
+  g.lineStyle(3,0xb2ce8a,1);g.lineBetween(42,22,50,21);
+  g.lineBetween(50,21,55,24);
+  // Robin Hood's feather sprouts from the rear edge of the cap.
+  g.lineStyle(4,0xf3e6b4,1);g.lineBetween(43,22,33,5);
+  g.lineStyle(1.5,0xa7b989,1);g.lineBetween(43,22,33,5);
+  g.lineBetween(40,16,33,5);g.lineBetween(38,12,33,5);
 }
 
 /** Heavy but heroic Guardian: layered steel plate, gold trim, crimson cape,
