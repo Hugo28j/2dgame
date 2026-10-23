@@ -13,6 +13,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   public maxHp: number;
   public defense: number;
   public damage: number;
+  public runDamageStacks = 0;
   public attackSpeed: number;
   public movementSpeed: number;
   public criticalChance: number;
@@ -108,7 +109,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite implements Damageable {
   public applyRunBonus(id: 'damage' | 'attackSpeed' | 'movement' | 'maxHp' | 'healing'
     | 'crit' | 'defense' | 'cooldown'): void {
     switch (id) {
-      case 'damage': this.damage *= 1.15; break;
+      case 'damage': this.damage *= 1.15; this.runDamageStacks++; break;
       case 'attackSpeed': this.attackSpeed *= 1.1; break;
       case 'movement': this.movementSpeed *= 1.12; break;
       case 'maxHp': this.maxHp += 20; this.currentHp += 20; break;
