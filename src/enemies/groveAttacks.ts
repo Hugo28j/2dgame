@@ -7,10 +7,12 @@ export interface GroveBranchLane {
   readonly orientation: 'horizontal' | 'vertical';
 }
 export const JADE_BRANCH = Object.freeze({
-  intervalMs: 4900,
-  warningMs: 950,
+  intervalMs: 800,
+  phaseTwoIntervalMs: 600,
+  warningMs: 600,
+  phaseTwoWarningMs: 400,
   growthMs: 780,
-  activeMs: 2000,
+  activeMs: 5000,
   thickness: 26,
   hitCooldownMs: 760,
 });
@@ -23,8 +25,8 @@ export const HEART_TREE = Object.freeze({
 });
 
 /** Two spaced full-arena corridors, with randomized height/width and direction. */
-export function jadeBranchLanes(bounds: GroveBounds, random: () => number): GroveBranchLane[] {
-  const axis: 'horizontal' | 'vertical' = random() < 0.5 ? 'horizontal' : 'vertical';
+export function jadeBranchLanes(bounds: GroveBounds, random: () => number, forcedAxis?: 'horizontal' | 'vertical'): GroveBranchLane[] {
+  const axis: 'horizontal' | 'vertical' = forcedAxis ?? (random() < 0.5 ? 'horizontal' : 'vertical');
   const horizontal = axis === 'horizontal';
   const along = horizontal ? bounds.height : bounds.width;
   const edge = 20;

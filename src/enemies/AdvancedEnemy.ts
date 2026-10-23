@@ -390,7 +390,7 @@ export class AdvancedEnemy extends Slime {
         // cycle: two warning lanes that grow across the chamber.
         if (this.isJadeMatriarch && now >= this.nextJadeBranchesAt) {
           jadeBranches?.(this);
-          this.nextJadeBranchesAt = now + JADE_BRANCH.intervalMs;
+          this.nextJadeBranchesAt = now + (phase === 2 ? JADE_BRANCH.phaseTwoIntervalMs : JADE_BRANCH.intervalMs);
         }
         if (now >= this.nextShotAt && this.windupEndsAt === 0 && this.dashEndsAt === 0) {
           if (!this.isPoisonAlchemist) fire(this, mode.pattern, this.bossVolleys, mode.speed);

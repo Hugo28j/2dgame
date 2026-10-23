@@ -18,8 +18,11 @@ describe('Phase 6: Jade Matriarch growing branches', () => {
     expect(getBossProfile(25,0,1).phaseOne.patterns).toEqual(['ring']);
     expect(getBossProfile(25,0,1).phaseTwo.patterns).toEqual(['offset-ring','cross']);
     expect(getBossPlan(25,2,1,0,1).pattern).toBe('cross');
-    expect(JADE_BRANCH.warningMs).toBeGreaterThanOrEqual(750);
-    expect(JADE_BRANCH.activeMs).toBe(2000);
+    expect(JADE_BRANCH.intervalMs).toBe(800);
+    expect(JADE_BRANCH.phaseTwoIntervalMs).toBe(600);
+    expect(JADE_BRANCH.warningMs).toBe(600);
+    expect(JADE_BRANCH.phaseTwoWarningMs).toBe(400);
+    expect(JADE_BRANCH.activeMs).toBe(5000);
     expect(JADE_BRANCH.growthMs).toBeGreaterThan(350);
   });
   it('chooses precisely two well-spaced full-arena lanes for different random seeds', () => {
@@ -45,6 +48,8 @@ describe('Phase 6: Jade Matriarch growing branches', () => {
       expect(separation).toBeGreaterThan((horizontal?bounds.height:bounds.width)*.26);
     }
     expect(orientations.size).toBe(2);
+    expect(jadeBranchLanes(bounds, rng(2), 'horizontal')[0]!.orientation).toBe('horizontal');
+    expect(jadeBranchLanes(bounds, rng(2), 'vertical')[0]!.orientation).toBe('vertical');
   });
   it('grows from one end and never damages unseen sections', () => {
     const lane=jadeBranchLanes(bounds,rng(22))[0]!;
