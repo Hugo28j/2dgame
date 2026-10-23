@@ -7,10 +7,10 @@ import { addAndLaunch } from '../combat/launchProjectile';
 import { GAME_SCENE_KEY, GAME_TITLE, GAME_OVER_SCENE_KEY, GAME_WIDTH, GAME_HEIGHT } from '../config/constants';
 import { EnemySpawner } from '../enemies/EnemySpawner';
 import { getBossProfile, getBossTier } from '../enemies/bossProfiles';
-import { MOSS_DASH, ROOT_BRANCH, rootBurstAngles } from '../enemies/worldOneBossBalance';
+import { MOSS_DASH, ROOT_BRANCH } from '../enemies/worldOneBossBalance';
 import { SPORE_POISON, poisonActive, poisonCovers, poisonTickDue } from '../enemies/poisonHazard';
 import { selectPoisonLocations, type PoisonCircle } from '../enemies/poisonPlacement';
-import { attachedRootLine, rootWavePoint, rootTipHits } from '../enemies/rootGrowth';
+import { attachedRootLine, predictLeafLanding, rootArmPoint, rootTipHits } from '../enemies/rootGrowth';
 import { JADE_BRANCH, HEART_TREE, jadeBranchLanes, groveBranchTip,
   groveBranchHits, groveTreeHits, type GroveBranchLane } from '../enemies/groveAttacks';
 import { AdvancedEnemy, type BulletPattern } from '../enemies/AdvancedEnemy';
@@ -1670,120 +1670,169 @@ export class GameScene extends Phaser.Scene {
     this.frozenWalls.clear();
   }
 
-  /** Living branch arms for both phases. Every point is recalculated from the
-   * moving boss, so neither the warning nor the damaging branch detaches. */
-  private readonly performRootAttack = (enemy: AdvancedEnemy, attack: 'line' | 'burst',
-    targetX: number, targetY: number, rotation: number | boolean): void => {
+  /** The Tyrant attacks with one enormous articulated limb grown directly
+   * from its shoulder. There is deliberately no detached lane telegraph: the
+   * extending bark arm itself is the readable animation. */
+  private readonly performRootAttack = (enemy: AdvancedEnemy,
+    attack: 'line' | 'strike' | 'leaf', targetX: number, targetY: number,
+    comboIndex: number): void => {
     if (!this.currentRoom || this.gameOver || this.transitioning || this.roomProgress.doorOpen) return;
+    if (attack === 'leaf') {
+      this.dropRootLeaf(enemy, targetX, targetY);
+      return;
+    }
     const bounds = this.currentRoom.layout.bounds;
     const castOrigin = {x: enemy.x, y: enemy.y};
-    const aim = Math.atan2(targetY - castOrigin.y, targetX - castOrigin.x);
-    const angles = attack === 'burst' ? rootBurstAngles(rotation) : [aim];
-    const warningMs = attack === 'line' ? ROOT_BRANCH.lineWarningMs : ROOT_BRANCH.burstWarningMs;
-    const growMs = attack === 'line' ? 660 : 460;
-    for (const angle of angles) {
-      const length = attack === 'burst' ? ROOT_BRANCH.burstLength :
-        Math.max(390, Math.hypot(targetX - castOrigin.x, targetY - castOrigin.y) + 95);
-      const geometry = () => attachedRootLine(
-        {x: enemy.x, y: enemy.y}, angle, length, bounds,
-      );
-      const preview = this.add.graphics().setDepth(24);
-      this.rootEffects.add(preview);
-      const segments = 18;
-      const drawPreview = (windup: number): void => {
-        if (!preview.active || !enemy.active) return;
+    const angle = Math.atan2(targetY - castOrigin.y, targetX - castOrigin.x);
+    const length = Math.max(420, Math.hypot(targetX - castOrigin.x,
+      targetY - castOrigin.y) + ROOT_BRANCH.armExtraReach);
+    const bendDirection: -1 | 1 = comboIndex % 2 === 0 ? 1 : -1;
+    const warningMs = attack === 'line' ? ROOT_BRANCH.lineWarningMs : ROOT_BRANCH.strikeWarningMs;
+    const growMs = attack === 'line' ? 720 : 390;
+    const geometry = () => attachedRootLine({x: enemy.x, y: enemy.y}, angle, length, bounds, 23);
+
+    // The old dotted/partial branch preview is intentionally gone.
+    this.time.delayedCall(warningMs, () => {
+      if (!enemy.active || enemy.aiState === 'defeated' || this.gameOver ||
+          this.transitioning || this.roomProgress.doorOpen || this.choosingUpgrade) return;
+      const arm = this.add.graphics().setDepth(28);
+      this.rootEffects.add(arm);
+      let previousTip = geometry().start;
+      let damaged = false;
+      const drawArm = (extension: number, canDamage: boolean): void => {
+        if (!arm.active || !enemy.active || this.roomProgress.doorOpen ||
+            this.gameOver || this.transitioning || this.choosingUpgrade) return;
         const {start, end} = geometry();
-        preview.clear();
-        preview.lineStyle(2.5, 0xd9f99d, .62 + windup * .28);
-        for (let j = 0; j < segments; j += 2) {
-          const a = rootWavePoint(start, end, j / segments);
-          const b = rootWavePoint(start, end, (j + 1) / segments);
-          preview.lineBetween(a.x, a.y, b.x, b.y);
+        const segments = Math.max(2, Math.ceil(extension * 16));
+        const points = Array.from({length: segments + 1}, (_, index) =>
+          rootArmPoint(start, end, extension * index / segments, bendDirection));
+        arm.clear();
+        for (let index = 1; index < points.length; index++) {
+          const fraction = index / segments;
+          const a = points[index - 1]!, b = points[index]!;
+          arm.lineStyle(46 - fraction * 23, 0x342116, 1);
+          arm.lineBetween(a.x, a.y, b.x, b.y);
         }
-        const curl = .14 + windup * .13;
-        const base = rootWavePoint(start, end, curl);
-        preview.lineStyle(15, 0x4a2f1a, .96);
-        preview.lineBetween(start.x, start.y, base.x, base.y);
-        preview.lineStyle(8, 0x78933d, .96);
-        preview.lineBetween(start.x, start.y, base.x, base.y);
-        preview.fillStyle(0x99bd50, .92);
-        preview.fillCircle(start.x, start.y, 9 + windup * 3);
-        preview.fillStyle(0xc9ef86, .76 + windup * .2);
-        preview.fillCircle(base.x, base.y, 6);
+        for (let index = 1; index < points.length; index++) {
+          const fraction = index / segments;
+          const a = points[index - 1]!, b = points[index]!;
+          arm.lineStyle(27 - fraction * 13, index % 3 === 0 ? 0x7b5730 : 0x624222, 1);
+          arm.lineBetween(a.x, a.y, b.x, b.y);
+        }
+        arm.fillStyle(0x3b2718, 1); arm.fillCircle(start.x, start.y, 24);
+        arm.fillStyle(0x76532d, 1); arm.fillCircle(start.x, start.y, 16);
+        for (let fraction = .18; fraction < extension; fraction += .19) {
+          const knot = rootArmPoint(start, end, fraction, bendDirection);
+          arm.lineStyle(3, 0xb08448, .72);
+          arm.strokeCircle(knot.x, knot.y, Math.max(4, 11 - fraction * 5));
+        }
+        const tip = rootArmPoint(start, end, extension, bendDirection);
+        const beforeTip = rootArmPoint(start, end, Math.max(0, extension - .035), bendDirection);
+        const handAngle = Math.atan2(tip.y - beforeTip.y, tip.x - beforeTip.x);
+        arm.fillStyle(0x442b19, 1); arm.fillCircle(tip.x, tip.y, 15);
+        arm.fillStyle(0x79542c, 1); arm.fillCircle(tip.x, tip.y, 10);
+        for (const spread of [-.48, 0, .48]) {
+          const fingerAngle = handAngle + spread;
+          arm.lineStyle(7, 0x3a2517, 1);
+          arm.lineBetween(tip.x, tip.y, tip.x + Math.cos(fingerAngle) * 27,
+            tip.y + Math.sin(fingerAngle) * 27);
+          arm.lineStyle(3, 0xa47b3e, .85);
+          arm.lineBetween(tip.x + Math.cos(fingerAngle) * 16,
+            tip.y + Math.sin(fingerAngle) * 16,
+            tip.x + Math.cos(fingerAngle) * 29,
+            tip.y + Math.sin(fingerAngle) * 29);
+        }
+        if (canDamage && !damaged && this.player?.active &&
+            rootTipHits(previousTip, tip, this.player, ROOT_BRANCH.lineWidth / 2 + 16)) {
+          damaged = true;
+          this.damagePlayer({damage: enemy.stats.damage * .68,
+            criticalChance: 0, criticalMultiplier: 1});
+        }
+        previousTip = tip;
       };
-      drawPreview(0);
       this.tweens.addCounter({
-        from: 0, to: 1, duration: warningMs, ease: 'Sine.easeIn',
-        onUpdate: tween => drawPreview(tween.getValue() ?? 0),
+        from: 0, to: 1, duration: growMs, ease: 'Cubic.easeOut',
+        onUpdate: tween => drawArm(tween.getValue() ?? 0, true),
         onComplete: () => {
-        this.rootEffects.delete(preview);
-        preview.destroy();
-        if (!enemy.active || enemy.aiState === 'defeated' || this.gameOver ||
-            this.transitioning || this.roomProgress.doorOpen || this.choosingUpgrade) return;
-        const growth = this.add.graphics().setDepth(28);
-        this.rootEffects.add(growth);
-        let previousTip = geometry().start;
-        let damaged = false;
-        const drawGrowth = (t: number, canDamage: boolean): void => {
-          if (!growth.active || !enemy.active || this.roomProgress.doorOpen ||
-              this.gameOver || this.transitioning || this.choosingUpgrade) return;
-          const {start, end} = geometry();
-          const totalSegments = Math.max(1, Math.ceil(t * 32));
-          const points: {x: number; y: number}[] = [];
-          for (let i = 0; i <= totalSegments; i++)
-            points.push(rootWavePoint(start, end, t * i / totalSegments));
-          growth.clear();
-          growth.lineStyle(20, 0x3e2817, 1);
-          for (let i = 1; i < points.length; i++)
-            growth.lineBetween(points[i - 1]!.x, points[i - 1]!.y,
-              points[i]!.x, points[i]!.y);
-          growth.lineStyle(11, 0x758c3e, 1);
-          for (let i = 1; i < points.length; i++)
-            growth.lineBetween(points[i - 1]!.x, points[i - 1]!.y,
-              points[i]!.x, points[i]!.y);
-          for (let fraction = .14; fraction <= t; fraction += .14) {
-            const p = rootWavePoint(start, end, fraction);
-            const dir = angle + (Math.floor(fraction * 100) % 2 ? 1 : -1) * .8;
-            growth.lineStyle(5, 0x60411f, .96);
-            growth.lineBetween(p.x, p.y, p.x + Math.cos(dir) * 19,
-              p.y + Math.sin(dir) * 19);
-            growth.fillStyle(0x8eb94d, .9);
-            growth.fillEllipse(p.x + Math.cos(dir) * 19,
-              p.y + Math.sin(dir) * 19, 9, 5);
-          }
-          const tip = rootWavePoint(start, end, t);
-          growth.fillStyle(0xc9ef86, .96); growth.fillCircle(tip.x, tip.y, 11);
-          growth.fillStyle(0xefffc2, .9);
-          growth.fillTriangle(tip.x + Math.cos(angle) * 15, tip.y + Math.sin(angle) * 15,
-            tip.x - Math.sin(angle) * 6, tip.y + Math.cos(angle) * 6,
-            tip.x + Math.sin(angle) * 6, tip.y - Math.cos(angle) * 6);
-          if (canDamage && !damaged && this.player?.active &&
-              rootTipHits(previousTip, tip, this.player, ROOT_BRANCH.lineWidth / 2 + 13)) {
-            damaged = true;
-            this.damagePlayer({damage: enemy.stats.damage * .62,
-              criticalChance: 0, criticalMultiplier: 1});
-          }
-          previousTip = tip;
-        };
-        this.tweens.addCounter({
-          from: 0, to: 1, duration: growMs, ease: 'Linear',
-          onUpdate: tween => drawGrowth(tween.getValue() ?? 0, true),
-          onComplete: () => {
-            if (!growth.active) return;
-            this.tweens.addCounter({ from: 0, to: 1, duration: 180,
-              onUpdate: tween => {
-                drawGrowth(1, false);
-                growth.setAlpha(1 - (tween.getValue() ?? 0));
-              }, onComplete: () => {
-                this.rootEffects.delete(growth);
-                growth.destroy();
-              } });
-          },
-        });
+          if (!arm.active) return;
+          this.tweens.addCounter({from: 1, to: 0, duration: 260, ease: 'Sine.easeIn',
+            onUpdate: tween => drawArm(tween.getValue() ?? 0, false),
+            onComplete: () => {
+              this.rootEffects.delete(arm);
+              arm.destroy();
+            }});
         },
       });
-    }
+    });
   };
+
+  /** Phase two finisher: one leaf predicts the hero's movement, visibly
+   * flutters down, then bursts only when it touches the arena floor. */
+  private dropRootLeaf(enemy: AdvancedEnemy, targetX: number, targetY: number): void {
+    if (!this.currentRoom || !this.player?.active) return;
+    const bounds = this.currentRoom.layout.bounds;
+    const body = this.player.body;
+    const velocity = body instanceof Phaser.Physics.Arcade.Body
+      ? {x: body.velocity.x, y: body.velocity.y} : {x: 0, y: 0};
+    const landing = predictLeafLanding({x: targetX, y: targetY}, velocity,
+      ROOT_BRANCH.leafPredictionMs, bounds, ROOT_BRANCH.leafExplosionRadius);
+    const leaf = this.add.graphics().setDepth(30);
+    leaf.fillStyle(0x84cc16, 1); leaf.fillEllipse(0, 0, 28, 15);
+    leaf.fillStyle(0xb7e45d, .9); leaf.fillTriangle(-12, 0, 7, -7, 12, 0);
+    leaf.lineStyle(2, 0x365314, 1); leaf.lineBetween(-14, 0, 15, 0);
+    leaf.lineBetween(12, 0, 20, 5);
+    const shadow = this.add.graphics().setDepth(22);
+    this.rootEffects.add(leaf); this.rootEffects.add(shadow);
+    const startX = Phaser.Math.Clamp(landing.x + (enemy.x < landing.x ? -85 : 85),
+      bounds.x + 20, bounds.x + bounds.width - 20);
+    const startY = bounds.y - 38;
+    this.tweens.addCounter({
+      from: 0, to: 1, duration: ROOT_BRANCH.leafFallMs, ease: 'Quad.easeIn',
+      onUpdate: tween => {
+        if (!leaf.active || !shadow.active) return;
+        const t = tween.getValue() ?? 0;
+        leaf.setPosition(Phaser.Math.Linear(startX, landing.x, t) +
+          Math.sin(t * Math.PI * 6) * 30 * (1 - t), Phaser.Math.Linear(startY, landing.y, t));
+        leaf.setRotation(t * Math.PI * 5);
+        shadow.clear(); shadow.fillStyle(0x17210f, .12 + t * .36);
+        shadow.fillEllipse(landing.x, landing.y, 15 + t * 38, 7 + t * 15);
+      },
+      onComplete: () => {
+        this.rootEffects.delete(leaf); this.rootEffects.delete(shadow);
+        leaf.destroy(); shadow.destroy();
+        if (this.gameOver || this.transitioning || this.roomProgress.doorOpen || !enemy.active) return;
+        const radius = ROOT_BRANCH.leafExplosionRadius;
+        if (this.player?.active && Phaser.Math.Distance.Between(
+          landing.x, landing.y, this.player.x, this.player.y) <= radius + 14) {
+          this.damagePlayer({damage: enemy.stats.damage * ROOT_BRANCH.leafDamageFactor,
+            criticalChance: 0, criticalMultiplier: 1});
+        }
+        const explosion = this.add.graphics().setDepth(31);
+        this.rootEffects.add(explosion);
+        this.tweens.addCounter({from: 0, to: 1, duration: 380, ease: 'Cubic.easeOut',
+          onUpdate: tween => {
+            if (!explosion.active) return;
+            const t = tween.getValue() ?? 0;
+            explosion.clear();
+            explosion.fillStyle(0x65a30d, .7 * (1 - t));
+            explosion.fillCircle(landing.x, landing.y, radius * (.2 + .8 * t));
+            explosion.lineStyle(6 * (1 - t) + 1, 0xd9f99d, 1 - t);
+            explosion.strokeCircle(landing.x, landing.y, radius * t);
+            for (let index = 0; index < 10; index++) {
+              const angle = index * Math.PI * 2 / 10 + t;
+              explosion.lineStyle(4, index % 2 ? 0x84cc16 : 0xfde68a, 1 - t);
+              explosion.lineBetween(landing.x + Math.cos(angle) * radius * .15,
+                landing.y + Math.sin(angle) * radius * .15,
+                landing.x + Math.cos(angle) * radius * (1.1 * t),
+                landing.y + Math.sin(angle) * radius * (1.1 * t));
+            }
+          }, onComplete: () => {
+            this.rootEffects.delete(explosion);
+            explosion.destroy();
+          }});
+      },
+    });
+  }
 
   /** Moss Warden phase-two dash drops animated explosive seed-bombs. */
   private readonly dropDashTrailBomb = (enemy: AdvancedEnemy, x: number, y: number): void => {
