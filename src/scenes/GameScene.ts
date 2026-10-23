@@ -2139,7 +2139,7 @@ export class GameScene extends Phaser.Scene {
   /** Heart of the Grove: replace its old orange blast circles with marked
    * tree growth. Reserve each footprint before the windup to avoid ALL overlaps. */
   private growHeartTrees(enemy: AdvancedEnemy, targetX: number, targetY: number,
-    count: number, radius: number, windupMs: number): void {
+    count: number, radius: number, _windupMs: number): void {
     if (this.worldId!==1 || !enemy.isHeartOfGrove || !this.currentRoom ||
         this.gameOver || this.transitioning || this.roomProgress.doorOpen) return;
     const reserved=Array.from(this.groveTreeZones,zone=>zone.site);
