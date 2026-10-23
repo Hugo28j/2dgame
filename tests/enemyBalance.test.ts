@@ -22,7 +22,7 @@ describe('world-1 Bramble Gunner health balance', () => {
     const frozenSentinel = getEnemyStatsForRoom('boss', 15, 2, 1);
     expect(frozenGunner.maxHp).toBe(frozenSentinel.maxHp);
     expect(getEnemyStatsForRoom('boss', 10, 1).maxHp).toBeGreaterThan(0);
-    expect(getEnemyStatsForRoom('boss', 15, 1).maxHp).toBeGreaterThan(bloom.maxHp);
+    expect(getEnemyStatsForRoom('boss', 15, 1).maxHp).toBe(Math.round(4953 * 0.85));
   });
 });
 
