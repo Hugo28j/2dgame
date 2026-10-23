@@ -58,6 +58,10 @@ function drawMinion(g: Phaser.GameObjects.Graphics, look: CharacterLook): void {
       worldMark(g, look.worldId, 0xeaffce, 24, 15);
       break;
     case 'archer':
+      if (look.worldId === 1) {
+        drawBriarArcher(g);
+        break;
+      }
       // A distinct masked ranger with shoulders and a bow.
       g.fillStyle(look.primary); g.fillTriangle(24, 4, 9, 27, 39, 27);
       g.fillStyle(look.secondary); g.fillRoundedRect(13, 25, 22, 15, 4);
@@ -111,6 +115,38 @@ function drawMinion(g: Phaser.GameObjects.Graphics, look: CharacterLook): void {
       break;
     default: break;
   }
+}
+
+/** Forest archer body. The bow, arrow and drawing arms are intentionally not
+ * baked into this texture: AdvancedEnemy renders and animates those parts. */
+function drawBriarArcher(g: Phaser.GameObjects.Graphics): void {
+  // Boots, slim legs and a split leather tunic make this a humanoid archer.
+  g.fillStyle(0x2d2118); g.fillRoundedRect(13, 35, 8, 10, 2);
+  g.fillRoundedRect(28, 35, 8, 10, 2);
+  g.fillStyle(0x69452a); g.fillRoundedRect(11, 41, 12, 4, 2);
+  g.fillRoundedRect(27, 41, 12, 4, 2);
+  g.fillStyle(0x38562b); g.fillRoundedRect(13, 20, 23, 21, 5);
+  g.fillStyle(0x6e8f3d); g.fillTriangle(14, 31, 24, 42, 25, 29);
+  g.fillTriangle(35, 31, 25, 42, 24, 29);
+  g.fillStyle(0x493322); g.fillRoundedRect(12, 30, 25, 5, 2);
+  g.fillStyle(0xc7a45c); g.fillRoundedRect(22, 30, 6, 5, 1);
+  // Quiver and visible arrow feathers behind the shoulder.
+  g.fillStyle(0x4b2f1f); g.fillRoundedRect(8, 14, 7, 24, 3);
+  g.lineStyle(2, 0xb9874b); g.lineBetween(10, 20, 6, 3);
+  g.lineBetween(13, 20, 12, 2);
+  g.fillStyle(0xd7e6b0); g.fillTriangle(4, 3, 8, 3, 6, 8);
+  g.fillTriangle(10, 2, 14, 2, 12, 7);
+  // Pointed hood, face opening, alert eyes and leaf clasp.
+  g.fillStyle(0x274426); g.fillTriangle(24, 3, 8, 25, 41, 25);
+  g.fillStyle(0x416d32); g.fillRoundedRect(11, 12, 28, 18, 8);
+  g.fillStyle(0x162318); g.fillEllipse(25, 21, 19, 14);
+  g.fillStyle(0xd9ef9a); g.fillRoundedRect(16, 19, 7, 3, 1);
+  g.fillRoundedRect(28, 19, 7, 3, 1);
+  g.fillStyle(0x233319); g.fillRect(20, 19, 2, 3); g.fillRect(29, 19, 2, 3);
+  g.fillStyle(0x86b94c); g.fillTriangle(23, 11, 30, 7, 28, 15);
+  g.fillStyle(0xcfe986); g.fillCircle(24, 27, 3);
+  // Shoulders stop short of the hands so the animated arms stay readable.
+  g.fillStyle(0x587f37); g.fillCircle(13, 26, 5); g.fillCircle(37, 26, 5);
 }
 
 /** The World-1 charger and first boss are one readable creature family:

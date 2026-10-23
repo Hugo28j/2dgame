@@ -20,6 +20,7 @@ import { EMBER_ATTACKS } from './emberWastes';
 import { EMBER_BOSS_ATTACKS, getEmberBossAttack,
   type EmberBossAttack } from './emberBosses';
 import type { BulletPattern } from './projectilePatterns';
+import { BRIAR_ARCHER_DRAW_MS, briarBowDrawAmount } from './briarArcher';
 export type { BulletPattern } from './projectilePatterns';
 
 export type EnemyFire = (enemy: AdvancedEnemy, pattern: BulletPattern, volley?: number, speed?: number) => void;
@@ -52,6 +53,10 @@ export class AdvancedEnemy extends Slime {
   private nextSummonAt = Number.POSITIVE_INFINITY;
   private readonly summonerType: SummonerType | undefined;
   private witchHat?: Phaser.GameObjects.Graphics;
+  private archerBow?: Phaser.GameObjects.Graphics;
+  private archerAimAngle = 0;
+  private archerDrawStartedAt = -100000;
+  private archerReleaseAt = 0;
   private windupEndsAt = 0;
   private windupStartedAt = 0;
   private dashEndsAt = 0;
@@ -105,6 +110,7 @@ export class AdvancedEnemy extends Slime {
     this.summonerType = getSummonerType(worldId, kind, roomNumber, bossSlot);
     this.nextSummonAt = firstSummonTime(scene.time.now, this.summonerType);
     if (this.isFrostWitch) this.witchHat = scene.add.graphics().setDepth(14);
+    if (this.isBriarArcher) this.archerBow = scene.add.graphics().setDepth(14);
   }
 
   /** Only THIS enemy's attack and summon clocks pause while it is stunned.
@@ -116,6 +122,11 @@ export class AdvancedEnemy extends Slime {
     const pause = (deadline: number) =>
       delayEnemyAttackForStun(deadline, now, before, this.stunEndsAt);
     this.nextShotAt = pause(this.nextShotAt);
+    if (this.archerReleaseAt > 0) {
+      const oldRelease = this.archerReleaseAt;
+      this.archerReleaseAt = pause(this.archerReleaseAt);
+      this.archerDrawStartedAt += this.archerReleaseAt - oldRelease;
+    }
     this.nextSpecialAt = pause(this.nextSpecialAt);
     if (this.nextSnowfallAt > 0) this.nextSnowfallAt = pause(this.nextSnowfallAt);
     this.nextJadeBranchesAt = pause(this.nextJadeBranchesAt);
@@ -141,6 +152,9 @@ export class AdvancedEnemy extends Slime {
   }
   public get isFrostWitch(): boolean {
     return this.worldId === 2 && this.kind === 'mage';
+  }
+  public get isBriarArcher(): boolean {
+    return this.worldId === 1 && this.kind === 'archer';
   }
   public get isAncientTreant(): boolean { return this.kind === 'tank' && this.worldId === 1; }
   public get isTreantShield(): boolean {
@@ -231,10 +245,26 @@ export class AdvancedEnemy extends Slime {
           ? getObstacleAvoidanceVelocity(horizontalBlock, targetX - this.x,
               targetY - this.y, speed, this.orbitSign)
           : move;
-        this.setVelocity(velocity.x, velocity.y);
-        if (now >= this.nextShotAt) {
-          fire(this, this.isFrostWitch || this.kind === 'archer' ? 'single' : 'double');
-          this.nextShotAt = now + this.stats.attackIntervalMs;
+        this.archerAimAngle = Math.atan2(targetY - this.y, targetX - this.x);
+        this.setFlipX(targetX < this.x);
+        if (this.isBriarArcher && this.archerReleaseAt > 0) {
+          // Stand firmly while drawing; release the real arrow at full tension.
+          this.setVelocity(0, 0);
+          if (now >= this.archerReleaseAt) {
+            fire(this, 'single');
+            this.archerReleaseAt = 0;
+            this.nextShotAt = now + this.stats.attackIntervalMs;
+          }
+        } else if (this.isBriarArcher && now >= this.nextShotAt) {
+          this.setVelocity(0, 0);
+          this.archerDrawStartedAt = now;
+          this.archerReleaseAt = now + BRIAR_ARCHER_DRAW_MS;
+        } else {
+          this.setVelocity(velocity.x, velocity.y);
+          if (now >= this.nextShotAt) {
+            fire(this, this.isFrostWitch || this.kind === 'archer' ? 'single' : 'double');
+            this.nextShotAt = now + this.stats.attackIntervalMs;
+          }
         }
         break;
       }
@@ -381,6 +411,7 @@ export class AdvancedEnemy extends Slime {
 
   public override preUpdate(time: number, delta: number): void {
     super.preUpdate(time, delta);
+    if (this.isBriarArcher) this.drawBriarBow(this.scene.time.now);
     if (!this.isForestRoller || !this.active || this.aiState === 'defeated') return;
     const now = this.scene.time.now;
     if (this.windupEndsAt > 0) {
@@ -407,6 +438,43 @@ export class AdvancedEnemy extends Slime {
       const direction = this.dashX < 0 ? -1 : 1;
       this.setAngle(direction * (now - this.dashStartedAt) * .86);
     }
+  }
+
+  /** One cached overlay follows the moving archer. The string, nocked arrow
+   * and both hands move through draw -> full tension -> snap release. */
+  private drawBriarBow(now: number): void {
+    const g = this.archerBow;
+    if (!g || !g.active || !this.active || this.aiState === 'defeated') return;
+    g.clear();
+    g.setPosition(this.x, this.y);
+    const ux = Math.cos(this.archerAimAngle), uy = Math.sin(this.archerAimAngle);
+    const px = -uy, py = ux;
+    const draw = this.isStunned(now) ? 0 : briarBowDrawAmount(now - this.archerDrawStartedAt);
+    const gripX = ux * 12, gripY = uy * 12 + 2;
+    const topX = gripX + px * 16 + ux * 2, topY = gripY + py * 16 + uy * 2;
+    const bottomX = gripX - px * 16 + ux * 2, bottomY = gripY - py * 16 + uy * 2;
+    const bellyX = gripX + ux * 8, bellyY = gripY + uy * 8;
+    const pullX = gripX - ux * (2 + draw * 14), pullY = gripY - uy * (2 + draw * 14);
+    // Rear drawing arm and forward bow arm visibly separate during the pull.
+    g.lineStyle(7, 0x5f873a, 1);
+    g.lineBetween(-ux * 3, -uy * 3 + 3, pullX, pullY);
+    g.lineBetween(ux * 1, uy * 1 + 4, gripX, gripY);
+    g.fillStyle(0xa1c75d); g.fillCircle(pullX, pullY, 3.5); g.fillCircle(gripX, gripY, 3.5);
+    // Curved yew bow and taut string.
+    g.lineStyle(3.4, 0x7a4b25, 1);
+    g.beginPath(); g.moveTo(topX, topY); g.lineTo(bellyX, bellyY);
+    g.lineTo(bottomX, bottomY); g.strokePath();
+    g.lineStyle(1.4, 0xeee7c7, .96);
+    g.lineBetween(topX, topY, pullX, pullY); g.lineBetween(pullX, pullY, bottomX, bottomY);
+    // Nocked arrow remains aligned with the target and shoots from this pose.
+    const arrowBackX = pullX - ux * 5, arrowBackY = pullY - uy * 5;
+    const arrowTipX = gripX + ux * 27, arrowTipY = gripY + uy * 27;
+    g.lineStyle(2.3, 0x9b6a36, 1); g.lineBetween(arrowBackX, arrowBackY, arrowTipX, arrowTipY);
+    g.fillStyle(0xd8dde1); g.fillTriangle(arrowTipX + ux * 5, arrowTipY + uy * 5,
+      arrowTipX + px * 3, arrowTipY + py * 3, arrowTipX - px * 3, arrowTipY - py * 3);
+    g.fillStyle(0xdbe9b5);
+    g.fillTriangle(arrowBackX, arrowBackY, arrowBackX - ux * 6 + px * 3,
+      arrowBackY - uy * 6 + py * 3, arrowBackX - ux * 4, arrowBackY - uy * 4);
   }
 
   private resetForestRollVisual(): void {
@@ -733,6 +801,8 @@ export class AdvancedEnemy extends Slime {
   }
   public override playDefeat(): void {
     this.witchHat?.clear();
+    this.archerBow?.clear();
+    this.archerReleaseAt = 0;
     this.shieldGraphic?.clear();
     this.clearWarning();
     this.resetForestRollVisual();
@@ -741,6 +811,8 @@ export class AdvancedEnemy extends Slime {
   public override destroy(fromScene?: boolean): void {
     this.witchHat?.destroy();
     this.witchHat = undefined;
+    this.archerBow?.destroy();
+    this.archerBow = undefined;
     this.shieldGraphic?.destroy();
     this.shieldGraphic = undefined;
     this.warning?.destroy();
