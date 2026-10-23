@@ -200,6 +200,7 @@ export class AdvancedEnemy extends Slime {
     if (this.aiState === 'defeated') return;
     super.chase(targetX, targetY);
     if (this.isRootTyrant) this.setRotation(Math.atan2(targetY - this.y, targetX - this.x) + Math.PI / 2);
+    if (this.isJadeMatriarch) this.setRotation(now * 0.0017);
     // A stunned enemy cannot shoot, summon or trigger scripted special attacks.
     // Its own cooldowns were deferred in applyStun; no global shoot clock.
     if (this.isStunned(now)) return;
@@ -393,7 +394,7 @@ export class AdvancedEnemy extends Slime {
           this.nextJadeBranchesAt = now + (phase === 2 ? JADE_BRANCH.phaseTwoIntervalMs : JADE_BRANCH.intervalMs);
         }
         if (now >= this.nextShotAt && this.windupEndsAt === 0 && this.dashEndsAt === 0) {
-          if (!this.isPoisonAlchemist) fire(this, mode.pattern, this.bossVolleys, mode.speed);
+          if (!this.isPoisonAlchemist) fire(this, this.isJadeMatriarch ? 'spiral' : mode.pattern, this.bossVolleys, mode.speed);
           if (mode.bombs > 0 && dropBombs && !(this.worldId === 2 && this.roomNumber === 10)) {
             dropBombs(this, targetX, targetY,
               this.isPoisonAlchemist ? (phase === 1 ? 6 : 12) : mode.bombs,
