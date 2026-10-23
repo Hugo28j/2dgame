@@ -161,12 +161,18 @@ export class CharacterAttackArt {
     const bowSize=HERO_WEAPON_PROPORTIONS.bow;
     const crossbowSize=HERO_WEAPON_PROPORTIONS.crossbow;
     const gripX=pose==='crossbow'?crossbowSize.gripX:bowSize.gripX;
-    const gripY=sway*.22;
-    // Matching forest sleeve, leather bracer and warm skin connect the weapons
-    // to the Robin Hood body rather than floating in a separate art style.
-    g.lineStyle(9,0x2f6b3b,1);g.lineBetween(3,-7,gripX-5,gripY-1);
-    g.lineStyle(5,0x91a96d,.9);g.lineBetween(5,-8,gripX-6,gripY-2);
-    g.lineStyle(7,0x6b4327,1);g.lineBetween(gripX-8,gripY-1,gripX-3,gripY);
+    const gripY=-2+sway*.22;
+    // The bow arm starts at the upper shoulder and bends around the head.
+    // Two distinct segments prevent it reading as a bar through the face.
+    const supportShoulder={x:-1,y:-12};
+    const supportElbow={x:8,y:-13+sway*.12};
+    g.lineStyle(10,0x2f6b3b,1);g.lineBetween(supportShoulder.x,supportShoulder.y,
+      supportElbow.x,supportElbow.y);
+    g.fillStyle(0x85a768,1);g.fillCircle(supportShoulder.x,supportShoulder.y,5.2);
+    g.lineStyle(7,0x6b4327,1);g.lineBetween(supportElbow.x,supportElbow.y,
+      gripX-3,gripY);
+    g.lineStyle(2,0xc08a4f,.9);g.lineBetween(supportElbow.x+1,supportElbow.y,
+      gripX-4,gripY-1);
     g.fillStyle(0xe9b98e,1);g.fillCircle(gripX-1,gripY,4.8);
     if(pose==='crossbow'){
       const progress=attacking?t:1;
@@ -196,14 +202,18 @@ export class CharacterAttackArt {
 
       // Rear hand first cocks the string, then visibly carries a fresh bolt
       // from the shoulder/quiver and lays it onto the rail.
-      let reloadHand={x:-2,y:10+sway*.15};
+      let reloadHand={x:-3,y:13+sway*.15};
       if(phase==='cock') reloadHand={x:latchX-1,y:gripY+3};
       else if(phase==='load'||phase==='settle') {
         reloadHand={x:Phaser.Math.Linear(-3,gripX+8,load),
-          y:Phaser.Math.Linear(11,gripY+3,load)};
+          y:Phaser.Math.Linear(13,gripY+3,load)};
       }
-      g.lineStyle(8,0x356f3e,1);g.lineBetween(1,7,reloadHand.x-3,reloadHand.y);
+      const reloadElbow={x:2,y:13+sway*.1};
+      g.lineStyle(9,0x356f3e,1);g.lineBetween(-1,12,reloadElbow.x,reloadElbow.y);
+      g.fillStyle(0x85a768,1);g.fillCircle(-1,12,4.8);
       g.lineStyle(5,0x6d4529,1);g.lineBetween(reloadHand.x-5,reloadHand.y,
+        reloadHand.x-1,reloadHand.y);
+      g.lineStyle(7,0x6d4529,1);g.lineBetween(reloadElbow.x,reloadElbow.y,
         reloadHand.x-1,reloadHand.y);
       g.fillStyle(0xe9b98e,1);g.fillCircle(reloadHand.x,reloadHand.y,4.5);
       if(load>0) {
@@ -248,13 +258,15 @@ export class CharacterAttackArt {
         g.fillStyle(0xd6e0dc,1);g.fillTriangle(front+7,arrowY,
           front-1,arrowY-4,front-1,arrowY+4);
         const hand={x:rear,y:arrowY};
-        const elbow={x:Phaser.Math.Linear(-4,2,draw),y:Phaser.Math.Linear(10,5,draw)};
-        g.lineStyle(9,0x356f3e,1);g.lineBetween(0,8,elbow.x,elbow.y);
+        const elbow={x:Phaser.Math.Linear(-4,3,draw),y:Phaser.Math.Linear(14,11,draw)};
+        g.lineStyle(9,0x356f3e,1);g.lineBetween(-1,12,elbow.x,elbow.y);
+        g.fillStyle(0x85a768,1);g.fillCircle(-1,12,4.8);
         g.lineStyle(7,0x6d4529,1);g.lineBetween(elbow.x,elbow.y,hand.x-2,hand.y);
         g.fillStyle(0xe9b98e,1);g.fillCircle(hand.x,hand.y,4.6);
       } else {
-        g.lineStyle(8,0x356f3e,1);g.lineBetween(0,8,7,5);
-        g.fillStyle(0xe9b98e,1);g.fillCircle(8,4,4.4);
+        g.lineStyle(8,0x356f3e,1);g.lineBetween(-1,12,5,11);
+        g.lineStyle(6,0x6d4529,1);g.lineBetween(5,11,8,6);
+        g.fillStyle(0xe9b98e,1);g.fillCircle(8,6,4.4);
       }
     }
   }
