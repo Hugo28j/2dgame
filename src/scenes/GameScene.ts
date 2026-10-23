@@ -485,8 +485,8 @@ export class GameScene extends Phaser.Scene {
       color: '#86efac', fontFamily: 'system-ui, sans-serif',
       fontSize: '11px', fontStyle: 'bold', stroke: '#020617', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(43).setScrollFactor(0).setVisible(false);
-    // Two dedicated HUD slots: the room-15 double encounter never overlaps.
-    for (let slot = 0; slot < 2; slot++) {
+    // Three HUD slots for the level-20 Gunner and his two reinforcements.
+    for (let slot = 0; slot < 3; slot++) {
       const y = 135 + slot * 44;
       this.bossHealthBars.push(this.add.graphics().setDepth(41)
         .setScrollFactor(0).setVisible(false));
@@ -2477,7 +2477,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateBossHud(): void {
-    for (let slot = 0; slot < 2; slot++) {
+    for (let slot = 0; slot < 3; slot++) {
       const boss = this.activeBosses[slot];
       const bar = this.bossHealthBars[slot];
       const name = this.bossNameTexts[slot];
