@@ -26,7 +26,8 @@ export type { BulletPattern } from './projectilePatterns';
 export type EnemyFire = (enemy: AdvancedEnemy, pattern: BulletPattern, volley?: number, speed?: number) => void;
 export type EnemyExplosion = (enemy: AdvancedEnemy, radius: number) => void;
 export type EnemySummon = (enemy: AdvancedEnemy) => void;
-export type EnemyRoot = (enemy: AdvancedEnemy, attack: 'line' | 'burst', targetX: number, targetY: number, rotation: number | boolean) => void;
+export type EnemyRoot = (enemy: AdvancedEnemy, attack: 'line' | 'strike' | 'leaf',
+  targetX: number, targetY: number, comboIndex: number) => void;
 export type EnemyTrail = (enemy: AdvancedEnemy, x: number, y: number) => void;
 export type EnemyJadeBranches = (enemy: AdvancedEnemy) => void;
 export type EnemyBomb = (enemy: AdvancedEnemy, targetX: number, targetY: number,
@@ -42,7 +43,7 @@ export class AdvancedEnemy extends Slime {
   private nextTrailAt = 0;
   private nextSnowfallAt = 0;
   private nextJadeBranchesAt = 0;
-  private rootStage: 'ready' | 'second' | 'third' | 'rest' = 'ready';
+  private rootStage: 'ready' | 'second' | 'third' | 'leaf' | 'rest' = 'ready';
   public fasterTwin = false;
   /** Index of the two split Void Sentinels (0 spins clockwise, 1 counterclockwise). */
   public splitTwinIndex: 0 | 1 = 0;
@@ -315,18 +316,22 @@ export class AdvancedEnemy extends Slime {
           this.setVelocity(move.x * 0.55, move.y * 0.55);
           if (now >= this.nextShotAt) {
             if (phase === 1) {
-              rootAttack?.(this, 'line', targetX, targetY, false);
+              rootAttack?.(this, 'line', targetX, targetY, 0);
               this.nextShotAt = now + ROOT_BRANCH.lineRecoveryMs + ROOT_BRANCH.lineWarningMs;
             } else if (this.rootStage === 'ready') {
-              rootAttack?.(this, 'burst', targetX, targetY, 0);
+              rootAttack?.(this, 'strike', targetX, targetY, 0);
               this.rootStage = 'second';
-              this.nextShotAt = now + ROOT_BRANCH.burstStaggerMs;
+              this.nextShotAt = now + ROOT_BRANCH.strikeStaggerMs;
             } else if (this.rootStage === 'second') {
-              rootAttack?.(this, 'burst', targetX, targetY, 1);
+              rootAttack?.(this, 'strike', targetX, targetY, 1);
               this.rootStage = 'third';
-              this.nextShotAt = now + ROOT_BRANCH.burstStaggerMs;
+              this.nextShotAt = now + ROOT_BRANCH.strikeStaggerMs;
             } else if (this.rootStage === 'third') {
-              rootAttack?.(this, 'burst', targetX, targetY, 2);
+              rootAttack?.(this, 'strike', targetX, targetY, 2);
+              this.rootStage = 'leaf';
+              this.nextShotAt = now + ROOT_BRANCH.leafDelayMs;
+            } else if (this.rootStage === 'leaf') {
+              rootAttack?.(this, 'leaf', targetX, targetY, 3);
               this.rootStage = 'rest';
               this.nextShotAt = now + ROOT_BRANCH.pauseAfterBurstMs;
             } else {
