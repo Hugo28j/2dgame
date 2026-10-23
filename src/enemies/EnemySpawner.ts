@@ -89,8 +89,9 @@ export class EnemySpawner {
     });
   }
 
-  /** The final Verdant Ruins encounter calls 10 kamikaze shrooms and two unique gunners. */
-  public summonGroveReinforcements(points: readonly SpawnPoint[], room: number): readonly AdvancedEnemy[] {
+  /** The final Verdant Ruins encounter calls two kamikaze shrooms each wave; first wave also has two gunners. */
+  public summonGroveReinforcements(points: readonly SpawnPoint[], room: number,
+    gunnerCount = 0): readonly AdvancedEnemy[] {
     const gunKey = 'grove-machine-gunner';
     if (!this.scene.textures.exists(gunKey)) {
       const gfx = this.scene.add.graphics();
@@ -103,7 +104,7 @@ export class EnemySpawner {
       gfx.generateTexture(gunKey,48,48); gfx.destroy();
     }
     return points.map((point,index)=>{
-      const gunner=index>=10;
+      const gunner=index>=points.length-gunnerCount;
       const kind=gunner?'archer':'bomber';
       const enemy=new AdvancedEnemy(this.scene,
         (gunner?'grove-gunner-':'grove-bomber-')+this.nextEnemyNumber++,point.x,point.y,kind,room,1);
