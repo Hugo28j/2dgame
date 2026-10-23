@@ -7,7 +7,7 @@ export interface GroveBranchLane {
   readonly orientation: 'horizontal' | 'vertical';
 }
 export const JADE_BRANCH = Object.freeze({
-  intervalMs: 800,
+  intervalMs: 1000,
   phaseTwoIntervalMs: 600,
   warningMs: 600,
   phaseTwoWarningMs: 400,
@@ -73,4 +73,34 @@ export function groveTreeHits(
   center: GrovePoint, radius: number, player: GrovePoint,
 ): boolean {
   return Math.hypot(center.x-player.x,center.y-player.y) <= radius;
+}
+
+/** A short, movable lane can avoid both parallel and perpendicular existing lanes.
+ * Reserve telegraphed lanes too: no later cast can overlap a pending one. */
+export function jadeLaneOverlaps(a: GroveBranchLane, b: GroveBranchLane, padding = 34): boolean {
+  const ax0 = Math.min(a.start.x,a.end.x)-padding, ax1 = Math.max(a.start.x,a.end.x)+padding;
+  const ay0 = Math.min(a.start.y,a.end.y)-padding, ay1 = Math.max(a.start.y,a.end.y)+padding;
+  const bx0 = Math.min(b.start.x,b.end.x)-padding, bx1 = Math.max(b.start.x,b.end.x)+padding;
+  const by0 = Math.min(b.start.y,b.end.y)-padding, by1 = Math.max(b.start.y,b.end.y)+padding;
+  return ax0 <= bx1 && ax1 >= bx0 && ay0 <= by1 && ay1 >= by0;
+}
+export function selectJadeLane(bounds: GroveBounds, axis: 'horizontal' | 'vertical',
+  reserved: readonly GroveBranchLane[], random: () => number): GroveBranchLane | undefined {
+  // Try a shuffled selection of short attack segments across all arena regions.
+  const horizontal = axis === 'horizontal';
+  const cellsX = 7, cellsY = 6;
+  const order = Array.from({length:cellsX*cellsY},(_,i)=>i);
+  for(let i=order.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[order[i],order[j]]=[order[j]!,order[i]!];}
+  const margin=30, xspan=bounds.width-2*margin, yspan=bounds.height-2*margin;
+  const length=(horizontal ? xspan/cellsX : yspan/cellsY)*2.05;
+  for(const index of order){
+    const column=index%cellsX, row=Math.floor(index/cellsX);
+    const cx=bounds.x+margin+(column+.5)*xspan/cellsX;
+    const cy=bounds.y+margin+(row+.5)*yspan/cellsY;
+    const dx=horizontal ? length/2 : 0, dy=horizontal ? 0 : length/2;
+    const lane: GroveBranchLane={orientation:axis,start:{x:Math.max(bounds.x+12,cx-dx),y:Math.max(bounds.y+12,cy-dy)},
+      end:{x:Math.min(bounds.x+bounds.width-12,cx+dx),y:Math.min(bounds.y+bounds.height-12,cy+dy)}};
+    if(reserved.every(existing=>!jadeLaneOverlaps(lane,existing))) return lane;
+  }
+  return undefined;
 }
