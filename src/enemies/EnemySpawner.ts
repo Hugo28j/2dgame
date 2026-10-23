@@ -89,6 +89,30 @@ export class EnemySpawner {
     });
   }
 
+  /** The final Verdant Ruins encounter calls 10 kamikaze shrooms and two unique gunners. */
+  public summonGroveReinforcements(points: readonly SpawnPoint[], room: number): readonly AdvancedEnemy[] {
+    const gunKey = 'grove-machine-gunner';
+    if (!this.scene.textures.exists(gunKey)) {
+      const gfx = this.scene.add.graphics();
+      gfx.fillStyle(0x2f513c); gfx.fillEllipse(24,28,37,34);
+      gfx.fillStyle(0x89a75b); gfx.fillCircle(24,21,12);
+      gfx.fillStyle(0x293b31); gfx.fillRect(19,0,10,22);
+      gfx.fillStyle(0x9ca3af); gfx.fillRect(21,0,6,21);
+      gfx.fillStyle(0xfbbf24); gfx.fillRect(20,0,8,4);
+      gfx.lineStyle(3,0x17291e); gfx.strokeEllipse(24,28,37,34);
+      gfx.generateTexture(gunKey,48,48); gfx.destroy();
+    }
+    return points.map((point,index)=>{
+      const gunner=index>=10;
+      const kind=gunner?'archer':'bomber';
+      const enemy=new AdvancedEnemy(this.scene,
+        (gunner?'grove-gunner-':'grove-bomber-')+this.nextEnemyNumber++,point.x,point.y,kind,room,1);
+      if(gunner){enemy.setTexture(gunKey);enemy.setScale(1.18);}
+      addBoundedEnemy(enemy,()=>this.enemyGroup.add(enemy));
+      return enemy;
+    });
+  }
+
   public spawnSlimes(
     spawnPoints: readonly SpawnPoint[],
     stats: Readonly<SlimeRuntimeStats>,
