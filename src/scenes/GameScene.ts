@@ -130,6 +130,7 @@ export class GameScene extends Phaser.Scene {
   /** One lifecycle, not overlapping stage booleans. */
   private brambleStage: BrambleStage = 'idle';
   private brambleCutsceneUsed = false;
+  private nextGroveBomberWaveAt = 0;
   private brambleSequence = 0;
   private brambleBoss?: AdvancedEnemy;
   private brambleOverlay?: Phaser.GameObjects.Container;
@@ -211,6 +212,7 @@ export class GameScene extends Phaser.Scene {
     this.pausePanel = undefined;
     this.brambleStage = 'idle';
     this.brambleCutsceneUsed = false;
+    this.nextGroveBomberWaveAt = 0;
     this.brambleSequence++;
     this.run = new RunLedger(saved?.ledger.runId, this.worldId);
     if (saved) this.run.restore(saved.ledger);
@@ -1123,7 +1125,9 @@ export class GameScene extends Phaser.Scene {
     const angle = Math.atan2(this.player.y - enemy.y, this.player.x - enemy.x);
     // The two split Void Sentinels fire in opposite directions and rotate
     // twice as quickly as the original spiral. Keep other bosses unchanged.
-    const angles = this.worldId === 1 && enemy.fasterTwin &&
+    const angles = enemy.isJadeMatriarch
+      ? [-0.20, 0, 0.20].map(spread => volley * Math.PI / 6 + spread)
+      : this.worldId === 1 && enemy.fasterTwin &&
       enemy.stats.roomNumber === 20
       ? [splitTwinShotAngle(amplifiedTwinVolleyIndex(volley), enemy.splitTwinIndex)]
       : shotAngles(pattern, angle, volley);
@@ -2566,36 +2570,36 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Exactly once at half HP, the final Grove boss brings in ten explosive
-   * shrooms and two unique machine gunners. Every summon must be defeated. */
+  /** Heart of the Grove summons two gunners once and two kamikaze shrooms
+   * immediately at phase two, then two more every five seconds while alive. */
   private spawnGroveReinforcementsAtHalfHealth(): void {
-    if (this.worldId!==1 || this.roomProgress.roomNumber!==30 || this.brambleCutsceneUsed ||
-        !this.currentRoom || !this.enemySpawner || this.gameOver || this.transitioning ||
-        this.roomProgress.doorOpen) return;
+    if (this.worldId !== 1 || this.roomProgress.roomNumber !== 30 ||
+        !this.currentRoom || !this.enemySpawner || this.gameOver ||
+        this.transitioning || this.roomProgress.doorOpen) return;
     const boss=this.activeBosses.find(b=>b?.active && b.isHeartOfGrove && b.aiState!=='defeated');
-    if (!boss || boss.healthRatio>.5) return;
-    void this.startWorldOneBossSplit; // historical cinematic is intentionally inactive
-    this.brambleCutsceneUsed=true;
+    if(!boss || boss.healthRatio>.5) return;
+    const initial=!this.brambleCutsceneUsed;
+    if(!initial && this.time.now<this.nextGroveBomberWaveAt)return;
     const bounds=this.currentRoom.layout.bounds;
+    const count=initial ? 4 : 2;
     const positions: Array<{x:number;y:number}>=[];
-    const random=Math.random;
-    for(let i=0;i<12;i++){
-      let found: {x:number;y:number}|undefined;
-      for(let tries=0;tries<90;tries++){
-        const x=bounds.x+55+random()*(bounds.width-110);
-        const y=bounds.y+55+random()*(bounds.height-110);
+    for(let i=0;i<count;i++) {
+      for(let attempt=0;attempt<120;attempt++) {
+        const x=bounds.x+55+Math.random()*(bounds.width-110);
+        const y=bounds.y+55+Math.random()*(bounds.height-110);
         if(Math.hypot(x-boss.x,y-boss.y)<115 ||
-           this.currentRoom.layout.obstacles.some(o=>Math.abs(x-o.x)<o.width/2+35 &&
-             Math.abs(y-o.y)<o.height/2+35) ||
-           positions.some(p=>Math.hypot(p.x-x,p.y-y)<55)) continue;
-        found={x,y};break;
+          this.currentRoom.layout.obstacles.some(o=>
+            Math.abs(x-o.x)<o.width/2+35 && Math.abs(y-o.y)<o.height/2+35) ||
+          positions.some(p=>Math.hypot(p.x-x,p.y-y)<55)) continue;
+        positions.push({x,y});break;
       }
-      if(found)positions.push(found);
     }
-    // Only count enemies actually created; preserve the two gunner positions.
-    if(positions.length<12) return;
-    this.roomProgress.addEnemies(12);
-    this.enemySpawner.summonGroveReinforcements(positions,30);
+    if(positions.length!==count)return;
+    if(initial)this.brambleCutsceneUsed=true;
+    this.nextGroveBomberWaveAt=this.time.now+5000;
+    this.roomProgress.addEnemies(count);
+    // Spawn 2 bombers followed by the 2 unique gunners on the first wave.
+    this.enemySpawner.summonGroveReinforcements(positions,30,initial ? 2 : 0);
     this.updateEnemyCount();
   }
 
