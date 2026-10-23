@@ -91,8 +91,8 @@ export function selectJadeLane(bounds: GroveBounds, axis: 'horizontal' | 'vertic
   const horizontal = axis === 'horizontal';
   const roomSpan = horizontal ? bounds.height : bounds.width;
   const edge = 28;
-  const positions = Array.from({length: Math.max(1, Math.floor((roomSpan - 2*edge) / 42))},
-    (_, i, all) => (i + .5) / all.length);
+  const count = Math.max(1, Math.floor((roomSpan - 2*edge) / 42));
+  const positions = Array.from({length: count}, (_, i) => (i + .5) / count);
   for (let i=positions.length-1; i>0; i--) {
     const j=Math.floor(random()*(i+1));
     [positions[i],positions[j]]=[positions[j]!,positions[i]!];
