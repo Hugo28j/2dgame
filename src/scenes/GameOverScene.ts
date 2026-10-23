@@ -69,31 +69,31 @@ export class GameOverScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x47708a, 0.95);
     this.add.rectangle(cx, 86, panelWidth - 38, 4, accent, 0.95);
 
-    this.add.text(cx, 113, 'DUNGEON ASCENT', {
+    this.add.text(cx, 100, 'DUNGEON ASCENT', {
       fontFamily: font, fontSize: '14px', fontStyle: 'bold',
       color: '#c9e9fa', letterSpacing: 2,
     }).setOrigin(0.5);
 
-    const emblem = this.add.circle(cx, 168, 38, win ? 0x235e64 : 0x613c55)
+    const emblem = this.add.circle(cx, 146, 27, win ? 0x235e64 : 0x613c55)
       .setStrokeStyle(3, accent);
-    this.add.circle(cx, 168, 29, win ? 0x2e807b : 0x844a64, 0.65);
-    this.add.text(cx, 166, win ? '★' : '✕', {
-      fontFamily: font, fontSize: '39px', fontStyle: 'bold',
+    this.add.circle(cx, 146, 21, win ? 0x2e807b : 0x844a64, 0.65);
+    this.add.text(cx, 145, win ? '★' : '✕', {
+      fontFamily: font, fontSize: '30px', fontStyle: 'bold',
       color: accentHex,
     }).setOrigin(0.5);
     // Keep a subtle arrival animation without animating interactive controls.
     this.tweens.add({ targets: emblem, scale: { from: 0.88, to: 1 },
       duration: 420, ease: 'Back.easeOut' });
 
-    this.add.text(cx, 224, win ? 'OVERWINNING!' : 'GAME OVER', {
-      fontFamily: font, fontSize: '30px', fontStyle: 'bold',
+    this.add.text(cx, 191, win ? 'OVERWINNING!' : 'GAME OVER', {
+      fontFamily: font, fontSize: '27px', fontStyle: 'bold',
       color: '#f8fbff',
     }).setOrigin(0.5);
-    this.add.text(cx, 261,
+    this.add.text(cx, 220,
       win ? 'Je hebt deze wereld overwonnen.' : 'Je avontuur eindigt hier.',
       { fontFamily: font, fontSize: '14px', color: '#c1d7e5' },
     ).setOrigin(0.5);
-    this.add.text(cx, 294, world.name.toUpperCase(), {
+    this.add.text(cx, 246, world.name.toUpperCase(), {
       fontFamily: font, fontSize: '16px', fontStyle: 'bold',
       color: accentHex,
     }).setOrigin(0.5);
@@ -103,44 +103,44 @@ export class GameOverScene extends Phaser.Scene {
     const left = cx - gap / 2 - cardWidth / 2;
     const right = cx + gap / 2 + cardWidth / 2;
     const stat = (x: number, y: number, label: string, value: string): void => {
-      this.add.rectangle(x, y, cardWidth, 62, 0x25445e)
+      this.add.rectangle(x, y, cardWidth, 54, 0x25445e)
         .setStrokeStyle(1, 0x56748b);
-      this.add.text(x, y - 16, label, {
+      this.add.text(x, y - 13, label, {
         fontFamily: font, fontSize: '11px', color: '#b9cedf',
       }).setOrigin(0.5);
-      this.add.text(x, y + 12, value, {
+      this.add.text(x, y + 11, value, {
         fontFamily: font, fontSize: '22px', fontStyle: 'bold', color: '#ffffff',
       }).setOrigin(0.5);
     };
-    stat(left, 360, 'BEREIKTE KAMER', report.reachedRoom + '/' + CHAPTER_ROOM_COUNT);
-    stat(right, 360, 'VIJANDEN VERSLAGEN', String(report.enemiesDefeated));
-    stat(left, 430, 'KAMERS VOLTOOID', String(report.roomsCleared));
-    stat(right, 430, 'BOSSEN VERSLAGEN', String(report.bossesDefeated));
+    stat(left, 298, 'BEREIKTE KAMER', report.reachedRoom + '/' + CHAPTER_ROOM_COUNT);
+    stat(right, 298, 'VIJANDEN VERSLAGEN', String(report.enemiesDefeated));
+    stat(left, 359, 'KAMERS VOLTOOID', String(report.roomsCleared));
+    stat(right, 359, 'BOSSEN VERSLAGEN', String(report.bossesDefeated));
 
-    this.add.rectangle(cx, 505, panelWidth - 52, 66, 0x2b4e64)
+    this.add.rectangle(cx, 428, panelWidth - 52, 58, 0x2b4e64)
       .setStrokeStyle(1, 0xa67c34);
-    this.add.text(cx, 488, 'GOUD VERDIEND DEZE RUN', {
+    this.add.text(cx, 413, 'GOUD VERDIEND DEZE RUN', {
       fontFamily: font, fontSize: '12px', fontStyle: 'bold', color: '#fbd68d',
     }).setOrigin(0.5);
-    this.add.text(cx, 517, '+' + report.earnedGold.toLocaleString('nl-BE') + ' G', {
+    this.add.text(cx, 440, '+' + report.earnedGold.toLocaleString('nl-BE') + ' G', {
       fontFamily: font, fontSize: '27px', fontStyle: 'bold', color: '#ffdc73',
     }).setOrigin(0.5);
 
-    this.add.text(cx, 549,
+    this.add.text(cx, 469,
       'Goudsaldo: ' + profile.gold.toLocaleString('nl-BE') + ' G',
       { fontFamily: font, fontSize: '13px', color: '#c7dde9' },
     ).setOrigin(0.5);
 
     // A compact section for every genuinely collected armor piece, not loot
     // that simply dropped on the ground.
-    this.add.rectangle(cx, 623, panelWidth - 52, 124, 0x193950, 0.98)
+    this.add.rectangle(cx, 587, panelWidth - 52, 210, 0x193950, 0.98)
       .setStrokeStyle(1, 0x4e7894);
-    this.add.text(cx - panelWidth / 2 + 30, 580,
+    this.add.text(cx - panelWidth / 2 + 30, 502,
       'KLEDIJ GEVONDEN  ·  ' + rewards.length, {
         fontFamily: font, fontSize: '12px', fontStyle: 'bold', color: '#d9f0ff',
       }).setOrigin(0, 0.5);
     if (rewards.length > 2) {
-      this.add.text(cx + panelWidth / 2 - 30, 580, 'SCROLL ↓', {
+      this.add.text(cx + panelWidth / 2 - 30, 502, 'SCROLL ↓', {
         fontFamily: font, fontSize: '10px', color: '#9fbdd2',
       }).setOrigin(1, 0.5);
     }
@@ -155,7 +155,7 @@ export class GameOverScene extends Phaser.Scene {
   private createEndScreenControls(rewards: ReturnType<typeof armorRunRewards>, panelWidth: number,
     gatheredArmor: readonly ArmorItem[]): void {
     const bounds = homeButtonLayout(GAME_WIDTH);
-    const lootBounds = { x: GAME_WIDTH / 2, y: 638, width: panelWidth - 68, height: 77 };
+    const lootBounds = { x: GAME_WIDTH / 2, y: 602, width: panelWidth - 68, height: 167 };
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = '⌂   HOME';
