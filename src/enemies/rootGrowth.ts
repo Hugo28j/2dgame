@@ -1,5 +1,23 @@
 /** Geometry for the Root Tyrant's advancing, wavy underground roots. */
 export interface RootPoint { x: number; y: number }
+export interface RootBounds { x: number; y: number; width: number; height: number }
+
+/** Keeps the first point on the Tyrant's shoulder and translates the whole
+ * branch with its body. The end remains inside the arena. */
+export function attachedRootLine(center: RootPoint, angle: number, length: number,
+  bounds: RootBounds, shoulderOffset = 27): { start: RootPoint; end: RootPoint } {
+  const dx = Math.cos(angle), dy = Math.sin(angle);
+  const start = { x: center.x + dx * shoulderOffset, y: center.y + dy * shoulderOffset };
+  return {
+    start,
+    end: {
+      x: Math.max(bounds.x + 12, Math.min(bounds.x + bounds.width - 12,
+        start.x + dx * length)),
+      y: Math.max(bounds.y + 12, Math.min(bounds.y + bounds.height - 12,
+        start.y + dy * length)),
+    },
+  };
+}
 export function rootWavePoint(start: RootPoint, end: RootPoint, t: number): RootPoint {
   const fraction = Math.max(0, Math.min(1, t));
   const dx = end.x - start.x, dy = end.y - start.y;

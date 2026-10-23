@@ -94,6 +94,10 @@ function drawMinion(g: Phaser.GameObjects.Graphics, look: CharacterLook): void {
       worldMark(g, look.worldId, 0xffffff, 24, 33);
       break;
     case 'tank':
+      if (look.worldId === 1) {
+        drawAncientTreantGuardian(g);
+        break;
+      }
       // Oversized shoulders, helmet and iron fists.
       g.fillStyle(look.primary); g.fillRoundedRect(9, 12, 30, 31, 6);
       g.fillStyle(look.secondary); g.fillRoundedRect(2, 20, 14, 20, 4);
@@ -115,6 +119,40 @@ function drawMinion(g: Phaser.GameObjects.Graphics, look: CharacterLook): void {
       break;
     default: break;
   }
+}
+
+/** Bark-armoured shield bearer. Its shield is a live overlay because it must
+ * face the hero and share the exact collision surface used by gameplay. */
+function drawAncientTreantGuardian(g: Phaser.GameObjects.Graphics): void {
+  g.fillStyle(0x07130b, .62); g.fillEllipse(24, 44, 40, 7);
+  // Root feet and a tapered trunk rather than the old square tank body.
+  g.fillStyle(0x3b2918);
+  g.fillTriangle(18, 34, 5, 44, 22, 42);
+  g.fillTriangle(29, 34, 43, 44, 26, 42);
+  g.fillStyle(0x624424); g.fillRoundedRect(12, 15, 25, 28, 8);
+  g.fillStyle(0x79562c); g.fillTriangle(14, 18, 24, 8, 34, 18);
+  g.fillStyle(0x4d351f); g.fillRoundedRect(16, 20, 18, 14, 5);
+  // Deep wooden face with amber eyes and a low bark brow.
+  g.fillStyle(0x201b13); g.fillRoundedRect(16, 19, 18, 10, 3);
+  g.fillStyle(0xf2cf63); g.fillRoundedRect(18, 22, 5, 3, 1);
+  g.fillRoundedRect(28, 22, 5, 3, 1);
+  g.lineStyle(3, 0x2e2418); g.lineBetween(15, 19, 24, 21);
+  g.lineBetween(27, 21, 35, 18);
+  // Crown branches, moss mantle and the unshielded claw arm.
+  g.lineStyle(5, 0x51361e); g.lineBetween(17, 17, 9, 4);
+  g.lineBetween(9, 7, 4, 2); g.lineBetween(10, 8, 14, 1);
+  g.lineBetween(32, 16, 40, 3); g.lineBetween(39, 7, 46, 2);
+  g.lineBetween(39, 8, 35, 1);
+  g.fillStyle(0x567a35); g.fillEllipse(14, 15, 18, 8);
+  g.fillEllipse(34, 14, 17, 8); g.fillCircle(24, 10, 5);
+  g.lineStyle(8, 0x604326); g.lineBetween(35, 29, 45, 36);
+  g.fillStyle(0x806039); g.fillCircle(45, 36, 5);
+  g.lineStyle(2, 0xb79155); g.lineBetween(43, 34, 48, 31);
+  g.lineBetween(45, 36, 49, 36); g.lineBetween(43, 38, 47, 42);
+  // Bark grooves make the character readable as living wood at phone size.
+  g.lineStyle(1.7, 0xa27a42, .75);
+  g.lineBetween(20, 31, 18, 39); g.lineBetween(28, 31, 31, 40);
+  g.lineBetween(24, 14, 22, 18); g.lineBetween(29, 15, 31, 18);
 }
 
 /** Forest archer body. The bow, arrow and drawing arms are intentionally not
@@ -336,6 +374,10 @@ function drawBoss(g: Phaser.GameObjects.Graphics, look: CharacterLook, tier: num
     drawForestRollerGolem(g, true);
     return;
   }
+  if (look.worldId === 1 && tier === 3) {
+    drawRootTyrant(g);
+    return;
+  }
   // Distinct silhouettes for the six encounters, including both room-15 bosses.
   g.fillStyle(0x020617, 0.7); g.fillEllipse(24, 44, 40, 7);
   g.fillStyle(look.secondary); g.fillRoundedRect(6, 16, 36, 28, 8);
@@ -362,6 +404,38 @@ function drawBoss(g: Phaser.GameObjects.Graphics, look: CharacterLook, tier: num
     g.lineBetween(44, 32, 36, 40);
   }
   worldMark(g, look.worldId, 0xf8fafc, 24, 38);
+}
+
+/** World-1 boss two: a walking ancient tree whose own branch arms become the
+ * phase-one lash and phase-two radial branch attacks at runtime. */
+function drawRootTyrant(g: Phaser.GameObjects.Graphics): void {
+  g.fillStyle(0x061109, .68); g.fillEllipse(24, 45, 45, 7);
+  g.fillStyle(0x342315);
+  g.fillTriangle(18, 31, 2, 45, 23, 42);
+  g.fillTriangle(31, 31, 47, 45, 26, 42);
+  g.fillStyle(0x5a3d21); g.fillRoundedRect(10, 9, 29, 35, 10);
+  g.fillStyle(0x75532d); g.fillRoundedRect(14, 12, 21, 25, 7);
+  // Existing arm stumps visually continue into every attached attack branch.
+  g.lineStyle(9, 0x50351d); g.lineBetween(13, 23, 1, 29);
+  g.lineBetween(36, 22, 47, 28);
+  g.fillStyle(0x392718); g.fillCircle(3, 29, 5); g.fillCircle(45, 28, 5);
+  // Hollow face and luminous sap eyes.
+  g.fillStyle(0x17160f); g.fillRoundedRect(15, 18, 20, 13, 4);
+  g.fillStyle(0xcdf56a); g.fillTriangle(17, 22, 23, 21, 21, 25);
+  g.fillTriangle(28, 21, 34, 22, 30, 25);
+  g.fillStyle(0x271c13); g.fillTriangle(22, 28, 28, 28, 25, 32);
+  // Crown and foliage make the silhouette unmistakably tree-like.
+  g.lineStyle(5, 0x4a301c); g.lineBetween(16, 13, 7, 1);
+  g.lineBetween(9, 5, 2, 4); g.lineBetween(10, 6, 14, -1);
+  g.lineBetween(31, 12, 40, 0); g.lineBetween(38, 4, 46, 3);
+  g.lineBetween(38, 5, 34, -1);
+  g.fillStyle(0x426b2a); g.fillCircle(10, 8, 7); g.fillCircle(19, 6, 8);
+  g.fillCircle(31, 6, 8); g.fillCircle(40, 9, 7);
+  g.fillStyle(0x6e9a3c); g.fillCircle(24, 4, 7);
+  // Bark cracks follow the branch direction into the torso.
+  g.lineStyle(2, 0xaa7c3e, .75);
+  g.lineBetween(8, 27, 19, 25); g.lineBetween(19, 25, 23, 35);
+  g.lineBetween(41, 27, 31, 25); g.lineBetween(31, 25, 27, 37);
 }
 
 /** Unique World-3 boss silhouettes keyed by their retained archetype texture index. */

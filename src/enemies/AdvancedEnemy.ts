@@ -681,20 +681,39 @@ export class AdvancedEnemy extends Slime {
     const centerX = (a.x + b.x) / 2;
     const centerY = (a.y + b.y) / 2;
     const nx = this.shieldFacingX, ny = this.shieldFacingY;
+    const tx = -ny, ty = nx;
     graphic.clear();
-    graphic.lineStyle(15, 0x243b24, 0.98);
+    // A bent branch arm visibly connects torso, hand and the physical shield.
+    const elbowX = this.x + nx * 12 + tx * 9;
+    const elbowY = this.y + ny * 12 + ty * 9;
+    graphic.lineStyle(11, 0x392719, 1);
+    graphic.lineBetween(this.x + tx * 8, this.y + ty * 8, elbowX, elbowY);
+    graphic.lineBetween(elbowX, elbowY, centerX - nx * 4, centerY - ny * 4);
+    graphic.lineStyle(6, 0x76532e, 1);
+    graphic.lineBetween(this.x + tx * 8, this.y + ty * 8, elbowX, elbowY);
+    graphic.lineBetween(elbowX, elbowY, centerX - nx * 4, centerY - ny * 4);
+    // Thick rim plus four individual planks reads as a held tower shield.
+    graphic.lineStyle(19, 0x263522, 1);
     graphic.lineBetween(a.x, a.y, b.x, b.y);
-    graphic.lineStyle(10, 0x826a3f, 1);
+    graphic.lineStyle(15, 0x6f4b29, 1);
     graphic.lineBetween(a.x, a.y, b.x, b.y);
-    graphic.lineStyle(6, 0xc6a86c, 0.98);
-    graphic.lineBetween(a.x + nx * 2, a.y + ny * 2, b.x + nx * 2, b.y + ny * 2);
-    graphic.lineStyle(2.8, 0xd9f99d, 0.85);
+    for (const offset of [-31, -10, 11, 32]) {
+      const px = centerX + tx * offset, py = centerY + ty * offset;
+      graphic.lineStyle(4.5, offset % 2 ? 0xa47b43 : 0x8b6335, .98);
+      graphic.lineBetween(px - nx * 7, py - ny * 7, px + nx * 8, py + ny * 8);
+    }
+    graphic.lineStyle(3, 0xc49a58, .88);
     graphic.lineBetween(a.x + nx * 7, a.y + ny * 7, b.x + nx * 7, b.y + ny * 7);
-    // A central metal boss plate and two wooden cross-braces.
+    // Iron rim pins, central boss plate, gripping hand and reinforcing brace.
+    graphic.fillStyle(0xc7a76b, 1);
+    for (const offset of [-38, -19, 19, 38])
+      graphic.fillCircle(centerX + tx * offset + nx * 5, centerY + ty * offset + ny * 5, 2.5);
     graphic.fillStyle(0x647744, 1);
     graphic.fillCircle(centerX + nx * 6, centerY + ny * 6, 9);
     graphic.lineStyle(2, 0xfef3c7, 0.9);
     graphic.strokeCircle(centerX + nx * 6, centerY + ny * 6, 9);
+    graphic.fillStyle(0x8c6638, 1);
+    graphic.fillCircle(centerX - nx * 4, centerY - ny * 4, 5);
     const integrity = this.healthRatio;
     if (integrity < 0.67) {
       const dx = b.x - a.x, dy = b.y - a.y;
