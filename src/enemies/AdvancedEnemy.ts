@@ -41,6 +41,9 @@ export class AdvancedEnemy extends Slime {
   public readonly stats: Readonly<SlimeRuntimeStats>;
   private nextShotAt = 0;
   private nextTrailAt = 0;
+  private mossBombsDropped = 0;
+  private mossDashOriginX = 0;
+  private mossDashOriginY = 0;
   private nextSnowfallAt = 0;
   private nextJadeBranchesAt = 0;
   private rootStage: 'ready' | 'second' | 'third' | 'leaf' | 'rest' = 'ready';
@@ -348,13 +351,24 @@ export class AdvancedEnemy extends Slime {
           break;
         }
         if (this.isMossWarden) {
-          // Moss Warden only dashes; phase two also leaves explosive bomb trails.
+          // Lay exactly twenty seed bombs in one line along each phase-two dash.
+          // Interpolate missed positions so low frame rates don't skip bombs.
+          if (phase === 2 && this.dashEndsAt > 0 && this.dashStartedAt > 0) {
+            const duration = MOSS_DASH.phaseTwoDurationMs;
+            const progress = Math.min(1, Math.max(0, (now - this.dashStartedAt) / duration));
+            const required = Math.min(MOSS_DASH.trailBombCount,
+              Math.floor(progress * MOSS_DASH.trailBombCount) + 1);
+            while (this.mossBombsDropped < required) {
+              const fraction = this.mossBombsDropped / Math.max(1, MOSS_DASH.trailBombCount - 1);
+              const along = progress > 0 ? Math.min(1, fraction / progress) : 0;
+              trailBomb?.(this,
+                Phaser.Math.Linear(this.mossDashOriginX, this.x, along),
+                Phaser.Math.Linear(this.mossDashOriginY, this.y, along));
+              this.mossBombsDropped++;
+            }
+          }
           this.chargeLogic(targetX, targetY, now, distance,
             phase === 1 ? MOSS_DASH.phaseOneRechargeMs : MOSS_DASH.phaseTwoRechargeMs);
-          if (phase === 2 && this.dashEndsAt > now && now >= this.nextTrailAt) {
-            trailBomb?.(this, this.x, this.y);
-            this.nextTrailAt = now + MOSS_DASH.trailSpacingMs;
-          }
           break;
         }
         if (this.worldId === 1 && this.roomNumber === 20 && this.fasterTwin) {
@@ -773,6 +787,11 @@ export class AdvancedEnemy extends Slime {
       if (now >= this.windupEndsAt) {
         this.clearWarning();
         this.dashStartedAt = now;
+        if (this.isMossWarden) {
+          this.mossDashOriginX = this.x;
+          this.mossDashOriginY = this.y;
+          this.mossBombsDropped = 0;
+        }
         this.dashEndsAt = now + (this.isMossWarden ?
           (bossPhase(this.healthRatio) === 1 ? MOSS_DASH.phaseOneDurationMs : MOSS_DASH.phaseTwoDurationMs) :
           this.kind === 'charger' ? CHARGER_DASH.durationMs *

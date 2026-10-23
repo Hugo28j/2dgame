@@ -7,10 +7,9 @@ export const MOSS_DASH = Object.freeze({
   phaseTwoDurationMs: 810, // 1.5x the previous travel distance
   phaseOneRechargeMs: 2100,
   phaseTwoRechargeMs: 1250,
-  trailSpacingMs: 45,
-  trailDurationMs: 2000,
-  trailWidth: 76,
-  trailDamageTickMs: 250,
+  trailBombCount: 20,
+  trailFuseMs: 650,
+  trailRadius: 37,
 });
 export const ROOT_BRANCH = Object.freeze({
   lineWarningMs: 360,
