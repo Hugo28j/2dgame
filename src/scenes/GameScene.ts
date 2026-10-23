@@ -324,7 +324,7 @@ export class GameScene extends Phaser.Scene {
     this.updateFrozenWalls(this.time.now);
     this.updateGlacierBoulders(delta * (this.abilities?.enemyProjectileFactor(this.time.now) ?? 1));
     this.weapon.update(this.time.now, this.controls.isShooting(), aim);
-    this.spawnBrambleReinforcementsAtHalfHealth();
+    this.spawnGroveReinforcementsAtHalfHealth();
 
     // Ranged world-1 mobs use nearby Ancient Treants as moving cover.
     const treants = this.liveTreantShields();
@@ -1139,7 +1139,8 @@ export class GameScene extends Phaser.Scene {
       (briarHunter ? WORLD1_BRIAR_ARROW_SPEED_MULTIPLIER : 1);
     const frostArcher = this.worldId === 2 && enemy.kind === 'archer';
     const frostWitch = enemy.isFrostWitch;
-    const effect = emberFlame ? 'ember-flame' :
+    const effect = this.worldId === 1 && enemy.isBrambleGunner && enemy.healthRatio <= .5 ? 'bramble-ricochet' :
+      emberFlame ? 'ember-flame' :
       emberFireball || emberBossProjectile ? 'ember-fireball' :
       frostWitch ? 'frost-burst' : frostArcher ? 'frost-chill' :
       briarHunter ? 'briar-ricochet' : 'none';
@@ -2138,7 +2139,7 @@ export class GameScene extends Phaser.Scene {
   /** Heart of the Grove: replace its old orange blast circles with marked
    * tree growth. Reserve each footprint before the windup to avoid ALL overlaps. */
   private growHeartTrees(enemy: AdvancedEnemy, targetX: number, targetY: number,
-    count: number, radius: number, windupMs: number): void {
+    count: number, radius: number, _windupMs: number): void {
     if (this.worldId!==1 || !enemy.isHeartOfGrove || !this.currentRoom ||
         this.gameOver || this.transitioning || this.roomProgress.doorOpen) return;
     const reserved=Array.from(this.groveTreeZones,zone=>zone.site);
@@ -2150,16 +2151,16 @@ export class GameScene extends Phaser.Scene {
       this.groveTreeZones.add(zone);
       const {x,y}=site;
       const r=site.radius;
-      graphic.fillStyle(0x78350f,0.15).fillCircle(x,y,r);
-      graphic.lineStyle(3,0xfde68a,0.92).strokeCircle(x,y,r);
-      graphic.lineStyle(2,0x78350f,0.88);
+      graphic.fillStyle(0x8f1010,0.27).fillCircle(x,y,r);
+      graphic.lineStyle(3,0xef4444,0.95).strokeCircle(x,y,r);
+      graphic.lineStyle(3,0x7f1d1d,0.95);
       for (let j=0;j<8;j++) {
         const a=j*Math.PI/4,inner=r*0.14,outer=r*0.72;
         graphic.lineBetween(x+Math.cos(a)*inner,y+Math.sin(a)*inner,
           x+Math.cos(a+0.13)*outer,y+Math.sin(a+0.13)*outer);
       }
       let warningTimer: Phaser.Time.TimerEvent;
-      warningTimer=this.time.delayedCall(windupMs+HEART_TREE.warningExtraMs,()=>{
+      warningTimer=this.time.delayedCall(700,()=>{
         this.bombTimers.delete(warningTimer);
         if (!graphic.active || !enemy.active || enemy.aiState==='defeated' ||
             this.gameOver || this.transitioning || this.choosingUpgrade ||
@@ -2176,31 +2177,26 @@ export class GameScene extends Phaser.Scene {
                 this.roomProgress.doorOpen) return;
             const t=tween.getValue()??0;
             graphic.clear();
-            // Roots radiate to the entire warned circumference, matching
-            // the true circular hitbox exactly.
-            graphic.fillStyle(0x3f6212,0.11*t).fillCircle(x,y,r*t);
-            graphic.lineStyle(3,0x854d0e,0.8);
-            for(let i=0;i<9;i++){
-              const a=i*Math.PI*2/9,dist=r*t;
-              graphic.lineBetween(x,y,x+Math.cos(a)*dist,
-                y+Math.sin(a)*dist);
+            // A jagged stone-and-thorn spike bursts vertically from cracked ground.
+            const height=r*2.1*t;
+            graphic.fillStyle(0x4b281c,0.32).fillEllipse(x,y,r*1.7,r*.5);
+            graphic.fillStyle(0x594737,1);
+            graphic.fillTriangle(x-r*.45*t,y+8,x+r*.45*t,y+8,x+r*.09*t,y-height);
+            graphic.fillStyle(0xd2af70,.96);
+            graphic.fillTriangle(x+r*.09*t,y-height,x+r*.45*t,y+8,x+r*.12*t,y-height*.6);
+            for(const sign of [-1,1]){
+              graphic.fillStyle(0x87643c,1);
+              graphic.fillTriangle(x+sign*r*.16*t,y-height*.25,
+                x+sign*r*.64*t,y-height*.52,
+                x+sign*r*.33*t,y-height*.09);
             }
-            const height=r*1.22*t;
-            graphic.lineStyle(Math.max(5,r*0.24*t),0x754424,1);
-            graphic.lineBetween(x,y+8,x,y-height);
-            graphic.lineStyle(3,0xb98d53,0.82);
-            graphic.lineBetween(x-3,y+3,x-3,y-height);
-            graphic.fillStyle(0x65a30d,0.83);
-            graphic.fillEllipse(x,y-height*0.77,r*1.45*t,r*0.95*t);
-            graphic.fillStyle(0xbef264,0.6);
-            graphic.fillEllipse(x-r*0.13,y-height*0.92,r*0.7*t,r*0.35*t);
             // The first damage frame matches the visible expanding roots.
             if (!hit && t>=HEART_TREE.damageAtProgress &&
                 this.player?.active && enemy.active &&
                 enemy.aiState!=='defeated' &&
                 groveTreeHits(site,r*t,this.player)) {
               hit=true;
-              this.damagePlayer({damage:enemy.stats.damage*0.62,
+              this.damagePlayer({damage:enemy.stats.damage*1.86,
                 criticalChance:0,criticalMultiplier:1});
             }
           },
@@ -2465,7 +2461,7 @@ export class GameScene extends Phaser.Scene {
     obstacleObject: ArcadeCollisionObject,
   ): void => {
     if (!(projectileObject instanceof EnemyProjectile) || !projectileObject.active) return;
-    if (projectileObject.effect === 'briar-ricochet') {
+    if (projectileObject.effect === 'briar-ricochet' || projectileObject.effect === 'bramble-ricochet') {
       const body = projectileObject.body;
       const touch = body instanceof Phaser.Physics.Arcade.Body ? body.touching : {};
       const obstacle = obstacleObject instanceof Phaser.GameObjects.Rectangle
@@ -2570,29 +2566,36 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Summon the two phase-two Sentinels as soon as Bramble reaches half HP.
-   * No cutscene, no defeat and no removal of the original boss. */
-  private spawnBrambleReinforcementsAtHalfHealth(): void {
-    if (this.worldId !== 1 || this.roomProgress.roomNumber !== 20 ||
-        this.brambleCutsceneUsed || this.gameOver || this.transitioning ||
-        this.roomProgress.doorOpen || !this.currentRoom || !this.enemySpawner) return;
-    const gunner = this.activeBosses.find(boss =>
-      boss?.active && boss.isBrambleGunner && boss.aiState !== 'defeated');
-    if (!gunner || gunner.healthRatio > 0.5) return;
-    this.brambleCutsceneUsed = true;
-    // Legacy cinematic remains available for reference but is not triggered.
-    void this.startWorldOneBossSplit;
-    const bounds = this.currentRoom.layout.bounds;
-    const positions = [-90, 90].map(offset => ({
-      x: Phaser.Math.Clamp(gunner.x + offset, bounds.x + 45,
-        bounds.x + bounds.width - 45),
-      y: Phaser.Math.Clamp(gunner.y + 32, bounds.y + 45,
-        bounds.y + bounds.height - 45),
-    }));
-    this.roomProgress.addEnemies(2);
-    const sentinels = this.enemySpawner.spawnSplitBosses(positions, 20);
-    // The HUD has two rows; new Sentinels still count as separate enemies.
-    this.activeBosses = [gunner, ...sentinels];
+  /** Exactly once at half HP, the final Grove boss brings in ten explosive
+   * shrooms and two unique machine gunners. Every summon must be defeated. */
+  private spawnGroveReinforcementsAtHalfHealth(): void {
+    if (this.worldId!==1 || this.roomProgress.roomNumber!==30 || this.brambleCutsceneUsed ||
+        !this.currentRoom || !this.enemySpawner || this.gameOver || this.transitioning ||
+        this.roomProgress.doorOpen) return;
+    const boss=this.activeBosses.find(b=>b?.active && b.isHeartOfGrove && b.aiState!=='defeated');
+    if (!boss || boss.healthRatio>.5) return;
+    void this.startWorldOneBossSplit; // historical cinematic is intentionally inactive
+    this.brambleCutsceneUsed=true;
+    const bounds=this.currentRoom.layout.bounds;
+    const positions: Array<{x:number;y:number}>=[];
+    const random=Math.random;
+    for(let i=0;i<12;i++){
+      let found: {x:number;y:number}|undefined;
+      for(let tries=0;tries<90;tries++){
+        const x=bounds.x+55+random()*(bounds.width-110);
+        const y=bounds.y+55+random()*(bounds.height-110);
+        if(Math.hypot(x-boss.x,y-boss.y)<115 ||
+           this.currentRoom.layout.obstacles.some(o=>Math.abs(x-o.x)<o.width/2+35 &&
+             Math.abs(y-o.y)<o.height/2+35) ||
+           positions.some(p=>Math.hypot(p.x-x,p.y-y)<55)) continue;
+        found={x,y};break;
+      }
+      if(found)positions.push(found);
+    }
+    // Only count enemies actually created; preserve the two gunner positions.
+    if(positions.length<12) return;
+    this.roomProgress.addEnemies(12);
+    this.enemySpawner.summonGroveReinforcements(positions,30);
     this.updateEnemyCount();
   }
 

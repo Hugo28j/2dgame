@@ -110,11 +110,11 @@ describe('Phase 6: Heart of the Grove growing trees', () => {
 });
 
 describe('Jade Matriarch spread across arena',()=>{
-  it('reserves non-overlapping horizontal and vertical attack positions',()=>{
+  it('reserves multiple non-overlapping wall-to-wall rows while perpendicular attacks wait',()=>{
     const reservations: import('../src/enemies/groveAttacks').GroveBranchLane[]=[];
     const next=rng(819);
     for(let i=0;i<18;i++){
-      const axis=i%2===0?'horizontal':'vertical';
+      const axis='horizontal' as const;
       const lane=selectJadeLane(bounds,axis,reservations,next);
       if (!lane) break;
       expect(lane.orientation).toBe(axis);
@@ -122,5 +122,6 @@ describe('Jade Matriarch spread across arena',()=>{
       reservations.push(lane);
     }
     expect(reservations.length).toBeGreaterThanOrEqual(4);
+    expect(selectJadeLane(bounds,'vertical',reservations,next)).toBeUndefined();
   });
 });
