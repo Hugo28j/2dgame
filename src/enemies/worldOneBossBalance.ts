@@ -12,19 +12,17 @@ export const MOSS_DASH = Object.freeze({
   trailRadius: 37,
 });
 export const ROOT_BRANCH = Object.freeze({
-  lineWarningMs: 500,
-  burstWarningMs: 350,
-  burstStaggerMs: 800,
-  burstCount: 8,
-  burstRotation: Math.PI / 8,
+  lineWarningMs: 360,
+  strikeWarningMs: 150,
+  strikeStaggerMs: 650,
   pauseAfterBurstMs: 3000,
   lineRecoveryMs: 3000,
-  lineWidth: 24,
-  burstLength: 350,
+  lineWidth: 38,
+  armExtraReach: 125,
+  leafDelayMs: 720,
+  leafFallMs: 1050,
+  leafPredictionMs: 900,
+  leafExplosionRadius: 68,
+  leafDamageFactor: .78,
 });
-export function rootBurstAngles(rotationIndex: number | boolean): number[] {
-  const turn = typeof rotationIndex === 'boolean' ? Number(rotationIndex) : rotationIndex;
-  return Array.from({ length: ROOT_BRANCH.burstCount }, (_, index) =>
-    index * Math.PI * 2 / ROOT_BRANCH.burstCount + turn * ROOT_BRANCH.burstRotation);
-}
 export const SPORE_THROW_INTERVAL_MS = 1000;

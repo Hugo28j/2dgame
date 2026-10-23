@@ -4,9 +4,10 @@ import { getWorldBossName } from '../src/worlds/worldConfig';
 import { getWorldCharacter, getWorldBossArtRoster } from '../src/enemies/worldCharacters';
 import { getEnemyStatsForRoom } from '../src/enemies/enemyConfig';
 import { selectPoisonLocations, poisonZonesOverlap } from '../src/enemies/poisonPlacement';
-import { attachedRootLine, rootWavePoint, rootTipHits } from '../src/enemies/rootGrowth';
+import { attachedRootLine, predictLeafLanding, rootArmPoint,
+  rootTipHits } from '../src/enemies/rootGrowth';
 import { sporePatrolVelocity } from '../src/enemies/sporeMovement';
-import { ROOT_BRANCH, rootBurstAngles, SPORE_THROW_INTERVAL_MS } from '../src/enemies/worldOneBossBalance';
+import { ROOT_BRANCH, SPORE_THROW_INTERVAL_MS } from '../src/enemies/worldOneBossBalance';
 import { SPORE_POISON } from '../src/enemies/poisonHazard';
 
 describe('phase 4 boss encounter migration', () => {
@@ -42,21 +43,19 @@ describe('phase 4 boss encounter migration', () => {
       .toBe(Math.round(Math.round(880 * scale20) * 1.5));
   });
 });
-describe('Root Tyrant wave and triple eight-way burst', () => {
-  it('has three distinct rotations separated by .8s and a final 3s break', () => {
-    for (const rotation of [0,1,2]) {
-      const angles = rootBurstAngles(rotation);
-      expect(angles).toHaveLength(8);
-      expect(angles[0]).toBeCloseTo(rotation * Math.PI / 8);
-    }
-    expect(ROOT_BRANCH.burstStaggerMs).toBe(800);
+describe('Root Tyrant giant arm combo and falling leaf', () => {
+  it('uses three fast single-arm strikes, then gives the leaf a short delay and a final break', () => {
+    expect(ROOT_BRANCH.strikeStaggerMs).toBe(650);
+    expect(ROOT_BRANCH.strikeWarningMs).toBe(150);
+    expect(ROOT_BRANCH.leafDelayMs).toBe(720);
     expect(ROOT_BRANCH.pauseAfterBurstMs).toBe(3000);
   });
-  it('curves as it grows, and only a sweeping tip can deal damage', () => {
+  it('bends like an articulated arm, and only its sweeping hand can deal damage', () => {
     const a={x:0,y:0}, b={x:400,y:0};
-    expect(rootWavePoint(a,b,0)).toEqual(a);
-    expect(rootWavePoint(a,b,1).x).toBeCloseTo(400);
-    expect(Math.abs(rootWavePoint(a,b,.3).y)).toBeGreaterThan(1);
+    expect(rootArmPoint(a,b,0,1)).toEqual(a);
+    expect(rootArmPoint(a,b,1,1).x).toBeCloseTo(400);
+    expect(rootArmPoint(a,b,.5,1).y).toBeGreaterThan(1);
+    expect(rootArmPoint(a,b,.5,-1).y).toBeLessThan(-1);
     expect(rootTipHits({x:200,y:1},{x:205,y:3},{x:204,y:5},12)).toBe(true);
     expect(rootTipHits({x:200,y:1},{x:205,y:3},{x:350,y:0},12)).toBe(false);
   });
@@ -68,6 +67,15 @@ describe('Root Tyrant wave and triple eight-way burst', () => {
     expect(after.start.y-before.start.y).toBeCloseTo(18);
     expect(after.end.x-before.end.x).toBeCloseTo(25);
     expect(after.end.y-before.end.y).toBeCloseTo(18);
+  });
+  it('aims the explosive leaf at the predicted, arena-clamped hero landing', () => {
+    const bounds={x:20,y:30,width:500,height:400};
+    expect(predictLeafLanding({x:200,y:200},{x:100,y:-50},900,bounds,68))
+      .toEqual({x:290,y:155});
+    expect(predictLeafLanding({x:500,y:390},{x:900,y:900},900,bounds,68))
+      .toEqual({x:452,y:362});
+    expect(ROOT_BRANCH.leafExplosionRadius).toBe(68);
+    expect(ROOT_BRANCH.leafFallMs).toBeGreaterThan(ROOT_BRANCH.strikeStaggerMs);
   });
 });
 describe('Spore Alchemist safe poison and arena mobility', () => {

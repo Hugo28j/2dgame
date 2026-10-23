@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getEnemyStatsForRoom } from '../src/enemies/enemyConfig';
-import { MOSS_DASH, ROOT_BRANCH, SPORE_THROW_INTERVAL_MS,
-  rootBurstAngles } from '../src/enemies/worldOneBossBalance';
+import { MOSS_DASH, ROOT_BRANCH,
+  SPORE_THROW_INTERVAL_MS } from '../src/enemies/worldOneBossBalance';
 import { SPORE_POISON } from '../src/enemies/poisonHazard';
 
 describe('world one boss attacks', () => {
@@ -15,16 +15,12 @@ describe('world one boss attacks', () => {
       .toBeCloseTo(360 * 1080 / 1000 * 1.5);
     expect(MOSS_DASH.phaseTwoRechargeMs).toBeLessThan(MOSS_DASH.phaseOneRechargeMs);
   });
-  it('fires three rotated eight-way root bursts with 0.8s gaps and a 3s rest', () => {
-    const first = rootBurstAngles(0), second = rootBurstAngles(1), third = rootBurstAngles(2);
-    expect(first).toHaveLength(8);
-    expect(second).toHaveLength(8);
-    expect(third).toHaveLength(8);
-    for (let i = 0; i < 8; i++) {
-      expect(second[i]! - first[i]!).toBeCloseTo(Math.PI / 8);
-      expect(third[i]! - second[i]!).toBeCloseTo(Math.PI / 8);
-    }
-    expect(ROOT_BRANCH.burstStaggerMs).toBe(800);
+  it('uses three fast giant-arm strikes, then a predicted explosive leaf and a 3s rest', () => {
+    expect(ROOT_BRANCH.strikeStaggerMs).toBe(650);
+    expect(ROOT_BRANCH.strikeWarningMs).toBeLessThan(ROOT_BRANCH.lineWarningMs);
+    expect(ROOT_BRANCH.leafDelayMs).toBeGreaterThan(ROOT_BRANCH.strikeStaggerMs);
+    expect(ROOT_BRANCH.leafPredictionMs).toBe(900);
+    expect(ROOT_BRANCH.leafExplosionRadius).toBe(68);
     expect(ROOT_BRANCH.pauseAfterBurstMs).toBe(3000);
     expect(ROOT_BRANCH.lineRecoveryMs).toBe(3000);
   });
