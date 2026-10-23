@@ -12,7 +12,7 @@ describe('world one boss attacks', () => {
     expect(MOSS_DASH.phaseOneSpeed * MOSS_DASH.phaseOneDurationMs / 1000)
       .toBeCloseTo(360 * 1080 / 1000 * 2.25);
     expect(MOSS_DASH.phaseTwoSpeed * MOSS_DASH.phaseTwoDurationMs / 1000)
-      .toBeCloseTo(360 * 1080 / 1000 * 1.5);
+      .toBeCloseTo(360 * 1080 / 1000 * 2.25);
     expect(MOSS_DASH.phaseTwoRechargeMs).toBeLessThan(MOSS_DASH.phaseOneRechargeMs);
     expect(MOSS_DASH.trailDurationMs).toBe(2000);
     expect(MOSS_DASH.trailSpacingMs).toBeLessThanOrEqual(50);
