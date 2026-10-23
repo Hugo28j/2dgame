@@ -46,6 +46,10 @@ export class AdvancedEnemy extends Slime {
   private mossDashOriginY = 0;
   private nextSnowfallAt = 0;
   private nextJadeBranchesAt = 0;
+  private rootEvadeUntil = 0;
+  private rootEvadeReadyAt = 0;
+  private rootEvadeX = 0;
+  private rootEvadeY = 0;
   private rootStage: 'ready' | 'second' | 'third' | 'leaf' | 'rest' = 'ready';
   public fasterTwin = false;
   /** Index of the two split Void Sentinels (0 spins clockwise, 1 counterclockwise). */
@@ -199,7 +203,8 @@ export class AdvancedEnemy extends Slime {
     coverTank?: Readonly<ShieldSurface>, summon?: EnemySummon,
     rootAttack?: EnemyRoot, trailBomb?: EnemyTrail,
     frozenSpecial?: (enemy: AdvancedEnemy, effect: 'boulder' | 'snow' | 'golems', count: number) => void,
-    jadeBranches?: EnemyJadeBranches, emberBoss?: EnemyEmberBoss): void {
+    jadeBranches?: EnemyJadeBranches, emberBoss?: EnemyEmberBoss,
+    rootEscape?: (enemy: AdvancedEnemy, heroX: number, heroY: number) => {x: number; y: number} | undefined): void {
     if (this.aiState === 'defeated') return;
     super.chase(targetX, targetY);
     if (this.isRootTyrant) this.setRotation(Math.atan2(targetY - this.y, targetX - this.x) + Math.PI / 2);
@@ -322,7 +327,18 @@ export class AdvancedEnemy extends Slime {
           break;
         }
         if (this.isRootTyrant) {
-          this.setVelocity(move.x * 0.55, move.y * 0.55);
+          const separation = Math.hypot(targetX - this.x, targetY - this.y);
+          if (now >= this.rootEvadeReadyAt && separation < ROOT_BRANCH.evadeDistance) {
+            const vector = rootEscape?.(this, targetX, targetY);
+            if (vector) {
+              this.rootEvadeX = vector.x;
+              this.rootEvadeY = vector.y;
+              this.rootEvadeUntil = now + ROOT_BRANCH.evadeDurationMs;
+              this.rootEvadeReadyAt = now + ROOT_BRANCH.evadeCooldownMs;
+            }
+          }
+          this.setVelocity(now < this.rootEvadeUntil ? this.rootEvadeX * ROOT_BRANCH.evadeSpeed : move.x * 0.55,
+            now < this.rootEvadeUntil ? this.rootEvadeY * ROOT_BRANCH.evadeSpeed : move.y * 0.55);
           if (now >= this.nextShotAt) {
             if (phase === 1) {
               rootAttack?.(this, 'line', targetX, targetY, 0);

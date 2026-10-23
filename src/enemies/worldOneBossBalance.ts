@@ -12,6 +12,11 @@ export const MOSS_DASH = Object.freeze({
   trailRadius: 37,
 });
 export const ROOT_BRANCH = Object.freeze({
+  evadeDistance: 155,
+  evadeSpeed: 460,
+  evadeDurationMs: 260,
+  evadeCooldownMs: 1650,
+  spikeHitCooldownMs: 500,
   lineWarningMs: 360,
   strikeWarningMs: 150,
   strikeStaggerMs: 650,
